@@ -122,7 +122,7 @@
   Worker processes job:
     1. Tone classification (GPT-4o-mini) — news / event / sports / memorial etc.
     2. Data extraction (GPT-4o-mini) — title, date, time, location, contributor name, categories, confidence score
-    3. Editorial writing (GPT-4o) — 500-word article using platform voice, tone register, and golden examples
+    3. Editorial writing (GPT-4o) — article written to the natural length of the submission, maximum 500 words, using platform voice, tone register, and golden examples. A simple event notice may be 80 words; a community story may be 400. The AI writes what the content warrants, not a fixed target.
     4. Header assignment — template by category (Phase 1) or DALL-E generated (Phase 2)
       ↓
   Confidence routing:
@@ -156,7 +156,7 @@
   Worker processes job:
     1. Tone classification
     2. Data extraction
-    3. AI writes summary article (300–400 words) with attribution + link to original source
+    3. AI writes summary article to natural length, maximum 300 words, with attribution + link to original source
     4. Template header assigned by category — RSS posts never use DALL-E generation
       ↓
   Auto-publish (official verified source = high trust, no review needed)
@@ -527,7 +527,7 @@
   | Safety check | €0.000 |
   | Image reading (2 images) | €0.010 |
   | Tone + extraction | €0.0003 |
-  | Editorial writing (500 words) | €0.014 |
+  | Editorial writing (up to 500 words, length varies by content) | €0.005–0.014 |
   | Template header | €0.000 |
   | Image storage | €0.001 |
   | **Total** | **~€0.025** |
@@ -546,7 +546,7 @@
   |---|---|
   | Geographic relevance check | €0.001 |
   | Tone + extraction | €0.0003 |
-  | Article writing (350 words) | €0.010 |
+  | Article writing (up to 300 words, length varies by content) | €0.004–0.010 |
   | Template header | €0.000 |
   | **Total** | **~€0.015** |
 
