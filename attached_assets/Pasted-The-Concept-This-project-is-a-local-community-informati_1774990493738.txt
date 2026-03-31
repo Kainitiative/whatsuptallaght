@@ -1,0 +1,234 @@
+The Concept
+
+This project is a local community information platform for Tallaght, powered by AI and driven entirely through WhatsApp.
+
+The goal is simple:
+
+Anyone can send a message, and within minutes it becomes a clean, structured public post.
+
+The system removes all friction from contributing content while keeping the public-facing website organised, readable, and useful.
+
+It acts as a live digital noticeboard, news feed, and community hub for Tallaght.
+
+⚙️ What the Platform Does
+
+The platform allows people to submit information by sending a WhatsApp message to a dedicated number.
+
+Users do not need to:
+
+sign up
+log in
+download an app
+fill out forms
+
+They simply send:
+
+text
+images
+screenshots
+voice notes
+
+The system receives the message, processes it using AI, and turns it into a structured post that is published on the website and shared across social platforms.
+
+🔁 The Full Pipeline
+1. Discovery
+
+People see a call to action:
+
+“Got something happening in Tallaght? Send it to us on WhatsApp.”
+
+This appears on:
+
+the website
+Facebook and Instagram
+promotional posts or graphics
+2. Submission
+
+The user sends a WhatsApp message which may include:
+
+a short text description
+a poster or image
+a screenshot (e.g. from Facebook)
+a voice note
+3. Voice Processing (if needed)
+
+If the message is a voice note:
+
+it is automatically transcribed into text
+the text is passed into the system
+4. Message Ingestion
+
+The WhatsApp message is received via the WhatsApp Business API and sent to the backend.
+
+The system:
+
+stores the message
+logs the phone number
+prepares it for processing
+5. Contributor Tracking
+
+The system checks the database:
+
+If the phone number is new → a new contributor profile is created
+If the number already exists → the submission is added to that profile’s history
+
+Over time, this allows the system to:
+
+recognise repeat contributors
+understand what type of content they send
+improve how it formats their posts
+
+This is done using the phone number as a reference, not personal identity.
+
+6. AI Processing
+
+The AI acts as an editor and assistant.
+
+It:
+
+reads the message
+analyses images if included
+extracts key details such as:
+event type
+date and time
+location
+subject category
+
+It then:
+
+rewrites the content into clear, structured language
+generates a title
+assigns categories
+7. Validation & Interaction
+
+If the submission is incomplete or unclear, the system replies on WhatsApp:
+
+Examples:
+
+“What time does the event start?”
+“Can you confirm the location?”
+
+The system can also send a preview:
+
+“Here’s your post. Reply YES to publish.”
+
+This creates a conversational, assistant-like experience.
+
+8. Moderation Layer
+
+Before publishing, the system:
+
+filters inappropriate content
+removes spam
+flags unclear or low-confidence submissions
+
+Posts can be:
+
+automatically published (high confidence)
+held for review (medium confidence)
+rejected (low confidence)
+9. Publishing
+
+Once approved, the content is:
+
+published on the website
+categorised (events, business, community, news, etc.)
+formatted into a clean article or post
+10. Distribution
+
+The same content is automatically shared to:
+
+Facebook
+Instagram
+
+This drives traffic back to the website and increases visibility.
+
+11. Growth Loop
+
+The system creates a natural loop:
+
+People see posts online
+They see the WhatsApp number
+They send content
+AI publishes it
+More people see it
+
+Over time, this builds habit and adoption.
+
+🧩 Core Features
+WhatsApp-Based Submission
+Single entry point
+No accounts required
+Supports text, images, screenshots, and voice
+AI Editor
+Transcribes voice notes
+Cleans and rewrites content
+Extracts key information
+Creates structured posts
+Contributor Memory
+Tracks submissions by phone number
+Builds a history of contributions
+Improves formatting and categorisation over time
+Interactive Replies
+Confirms submissions
+Requests missing details
+Allows user approval before publishing
+Automated Publishing
+Posts appear on the website within minutes
+Categorised and organised
+Social Distribution
+Auto-posts to Facebook and Instagram
+Expands reach without extra work
+Moderation & Safety
+Filters harmful or inappropriate content
+Uses confidence scoring to control publishing
+Content Categories
+
+The platform can support:
+
+events
+business updates
+lifestyle
+hobbies
+sports
+community notices
+local news
+alerts
+memorial notices
+🌐 What the Website Becomes
+
+Over time, the platform becomes:
+
+The main place people check to see what’s happening in Tallaght
+
+A central hub for:
+
+daily activity
+upcoming events
+community updates
+local stories
+💡 Key Advantage
+
+The strength of the system is:
+
+low friction input (WhatsApp)
+high quality output (AI structured posts)
+
+People contribute easily, while the platform remains clean and organised.
+
+💰 Cost Model (Early Stage)
+VPS hosting: ~€20/month
+AI processing: €10–€40/month
+WhatsApp API: €0–€50/month (mostly free if user-initiated)
+
+Total:
+
+~€30–€100/month to run initially
+
+🚀 Final Summary
+
+This platform is a real-time, AI-powered local content engine.
+
+It allows anyone in Tallaght to submit information through WhatsApp, and within minutes that information becomes structured, readable, and publicly available.
+
+It removes friction for contributors, maintains quality through AI, and builds a growing, self-sustaining community information hub.
