@@ -18,7 +18,7 @@ import { logger } from "./logger";
 // ---------------------------------------------------------------------------
 
 async function getOpenAI(): Promise<OpenAI> {
-  const apiKey = await getSettingValue("openai_api_key");
+  const apiKey = (await getSettingValue("openai_api_key")) ?? process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OpenAI API key is not configured");
   return new OpenAI({ apiKey });
 }
