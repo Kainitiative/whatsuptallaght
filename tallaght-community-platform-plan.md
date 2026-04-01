@@ -27,7 +27,8 @@
   17. [Third-Party Services](#third-party-services)
   18. [Cost Estimates](#cost-estimates)
   19. [Future Features Roadmap](#future-features-roadmap)
-  20. [Build Phases](#build-phases)
+  20. [Deployment Infrastructure](#deployment-infrastructure)
+  21. [Build Phases](#build-phases)
 
   ---
 
@@ -580,6 +581,71 @@
   | Planning Alerts | Community notices about local planning applications | Could supplement council RSS |
   | Contributor "Check My Posts" Expanded | More detailed contributor dashboard via WhatsApp | Submission stats, tips |
   | Multi-area Network | Replicate platform for Clondalkin, Lucan, Ballymun etc. | New instances, shared AI pipeline |
+
+  ---
+
+  ## Deployment Infrastructure
+
+  ### VPS Environment
+
+  The application is deployed to an existing VPS at **185.43.233.219**. This server already hosts another application (GroupWatch) and that must not be interfered with under any circumstances.
+
+  **Existing VPS architecture:**
+  - nginx runs as a Docker container and proxies domains to app containers by internal port
+  - Each application runs in its own Docker service on its own internal port
+  - Cloudflare sits in front and handles HTTPS termination for all domains
+  - Deployments happen via GitHub Actions over SSH
+
+  ### Required Files to Produce at Build Time
+
+  | File | Purpose |
+  |---|---|
+  | \`Dockerfile\` | Builds and runs the application |
+  | \`docker-compose.yml\` | Defines the app service on its own internal port |
+  | \`deploy/nginx/tallaght-community.conf\` | nginx \`server {}\` block for the new domain only |
+  | \`.github/workflows/deploy.yml\` | CI/CD workflow — SSH into VPS, pull image, restart only this service |
+
+  ### Port Allocation
+
+  - GroupWatch occupies port **8080**
+  - This application must use **port 8081 or higher**
+  - Port must not conflict with any other service on the VPS
+
+  ### docker-compose.yml Rules
+
+  - The app runs as its own named service (e.g. \`tallaght-community\`)
+  - Uses its own internal port (8081 or higher)
+  - Does **not** modify or reference any other services on the host
+  - The deploy workflow must **never** run \`docker compose up -d\` without specifying the service name — always \`docker compose up -d <service-name>\`
+
+  ### GitHub Actions Deploy Workflow
+
+  The deploy workflow must:
+  1. SSH into the VPS using repository secrets
+  2. Pull only the new app's Docker image
+  3. Restart only the new app's Docker service by name
+  4. Never touch GroupWatch or any other running service
+
+  **Repository secrets used:**
+  - \`VPS_HOST\` — the server IP or hostname
+  - \`VPS_USER\` — SSH username
+  - \`VPS_SSH_KEY\` — private SSH key for authentication
+  - \`GITHUB_TOKEN\` — for pulling the Docker image from GitHub Container Registry
+
+  ### nginx Configuration
+
+  - A \`server {}\` block is provided in \`deploy/nginx/tallaght-community.conf\`
+  - This file is **manually merged** into the existing nginx container on the VPS by the owner — the deploy workflow does not touch nginx
+  - The config must only define the new domain's server block — no modifications to existing server blocks
+  - Cloudflare handles HTTPS — nginx config can accept on port 80 and proxy to the app's internal port
+
+  ### Summary of Hard Rules
+
+  - Do **not** use port 8080 (GroupWatch)
+  - Do **not** run \`docker compose up -d\` without specifying the service name
+  - Do **not** modify, restart, or reference any other services in docker-compose
+  - nginx config is provided as a file for manual application — the deploy pipeline does not touch nginx
+  - Cloudflare handles all HTTPS — no SSL certs managed on the VPS directly
 
   ---
 
