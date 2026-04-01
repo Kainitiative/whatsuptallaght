@@ -5,7 +5,9 @@
  * Tallaght Community Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminUser } from "./adminUser";
 
-export interface HealthStatus {
-  status: string;
+export interface AdminLoginResponse {
+  adminUser: AdminUser;
+  sessionToken: string;
 }
