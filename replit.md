@@ -135,6 +135,42 @@ Phase 2b — WhatsApp ingestion and AI processing pipeline. All files live in th
 - `whatsapp_webhook_verify_token` — webhook verification
 - `whatsapp_app_secret` — signature validation (optional but recommended)
 
+### RSS Ingestion (`artifacts/api-server/src/lib/`)
+
+Phase 2c — RSS feed ingestion with Tallaght geo-filtering and AI rewriting.
+
+**Geo-filter** (`src/lib/geo-filter.ts`):
+- `isRelevantToTallaght(feedUrl, title, content)` — two-pass filter
+- Pass 1: Feed-level always-relevant check (SDCC only — 100% South Dublin scope)
+- Pass 2: Keyword match across 40+ Tallaght/South Dublin place names, infrastructure, and institution keywords
+- `getFeedTrustLevel(feedUrl)` — returns "official" / "news" / "general" for AI pipeline routing
+
+**RSS Fetcher** (`src/lib/rss-fetcher.ts`):
+- `startRssScheduler()` — polls every 5 minutes, respects per-feed `checkIntervalMinutes`
+- On each run: fetches all active feeds that are due, deduplicates by GUID
+- Stores all items (relevant or not) in `rss_items` for analytics
+- Queues `PROCESS_RSS_SUBMISSION` jobs for relevant items
+- Handles 403/404/timeouts gracefully — updates `lastFetchedAt` regardless
+- `onConflictDoNothing` prevents race conditions on duplicate GUIDs
+
+**RSS AI Pipeline** (in `src/lib/ai-pipeline.ts`):
+- Lighter than WhatsApp pipeline — no media processing, no WhatsApp replies
+- Uses GPT-4o-mini for rewriting (cheaper than GPT-4o; content is already structured)
+- Trust-level routing: `official` → auto-publish (≥ 0.75 confidence), `news` → hold, `general` → hold
+- Updates `rss_items.post_id` when article is created
+
+**Active feeds (as of April 2026):**
+- Transport for Ireland (`/feed/`) — keyword-filtered, 20 min interval ✅
+- The Journal (`thejournal.ie/feed/`) — keyword-filtered, 30 min interval ✅
+- Dublin Live (`dublinlive.ie`) — keyword-filtered, 30 min interval ✅
+- SDCC: RSS removed by SDCC — disabled
+- Garda: blocks cloud IPs — disabled (re-enable on VPS)
+- Met Éireann: RSS removed — disabled
+
+**Seed management:**
+- `DEPRECATED_URLS` array in seed-rss-feeds.ts auto-disables old/broken URLs on each startup
+- `onConflictDoUpdate` now also syncs `isActive` so deactivations propagate correctly
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.

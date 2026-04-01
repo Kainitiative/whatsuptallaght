@@ -5,6 +5,7 @@ import {
   postsTable,
   categoriesTable,
   goldenExamplesTable,
+  rssItemsTable,
 } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSettingValue } from "../routes/settings";
@@ -468,4 +469,141 @@ export async function processWhatsAppSubmission(payload: PipelinePayload): Promi
       `📬 Thanks! We received your story and it's under review by our editors.\n\n"${infoResult.headline}"\n\nWe'll let you know once it's published.`,
     ).catch(() => {});
   }
+}
+
+// ---------------------------------------------------------------------------
+// RSS submission pipeline
+// ---------------------------------------------------------------------------
+
+export interface RssPipelinePayload {
+  submissionId: number;
+  rssItemId: number;
+  feedId: number;
+  feedName: string;
+  feedUrl: string;
+  trustLevel: "official" | "news" | "general";
+  title: string;
+  content: string;
+  link: string;
+}
+
+export async function processRssSubmission(payload: RssPipelinePayload): Promise<void> {
+  const { submissionId, rssItemId, feedName, feedUrl, trustLevel, title, content, link } = payload;
+
+  logger.info({ submissionId, feedName }, "RSS pipeline: starting");
+
+  const [submission] = await db
+    .select()
+    .from(submissionsTable)
+    .where(eq(submissionsTable.id, submissionId))
+    .limit(1);
+
+  if (!submission) throw new Error(`Submission ${submissionId} not found`);
+
+  await db
+    .update(submissionsTable)
+    .set({ status: "processing", updatedAt: new Date() })
+    .where(eq(submissionsTable.id, submissionId));
+
+  const openai = await getOpenAI();
+
+  // --- Safety check (lightweight — RSS sources are semi-trusted) ---
+  const combinedText = [title, content].filter(Boolean).join(" ");
+  const safety = await runSafetyCheck(openai, combinedText);
+
+  if (!safety.passed) {
+    logger.warn({ submissionId, reason: safety.reason }, "RSS pipeline: safety check failed");
+    await db
+      .update(submissionsTable)
+      .set({ status: "rejected", safetyCheckPassed: "false", rejectionReason: safety.reason, updatedAt: new Date() })
+      .where(eq(submissionsTable.id, submissionId));
+    return;
+  }
+
+  await db
+    .update(submissionsTable)
+    .set({ safetyCheckPassed: "true", updatedAt: new Date() })
+    .where(eq(submissionsTable.id, submissionId));
+
+  // --- Tone + info extraction ---
+  const [toneResult, infoResult] = await Promise.all([
+    classifyTone(openai, combinedText),
+    extractInfo(openai, combinedText),
+  ]);
+
+  // --- Resolve category ---
+  const allCategories = await db.select().from(categoriesTable);
+  const matchedCategory =
+    allCategories.find(
+      (c) => c.name.toLowerCase() === toneResult.suggestedCategory.toLowerCase(),
+    ) ?? allCategories[0];
+
+  // --- Rewrite in community voice ---
+  const systemPrompt = [
+    "You are an editor for Tallaght Community, a local news platform for Tallaght, Dublin, Ireland.",
+    `The following content is sourced from: ${feedName}.`,
+    "Rewrite it as a clear, community-focused article. Remove formal/official language. Make it readable for local residents.",
+    "Keep all facts accurate — do not add or invent anything.",
+    "Write 100–300 words. Output the article body only — no headline, no byline.",
+    link ? `Original source: ${link}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const rssArticleResponse = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: combinedText },
+    ],
+  });
+
+  const articleBody = rssArticleResponse.choices[0].message.content?.trim() ?? content;
+
+  // --- Confidence and routing ---
+  // Official sources get auto-published; news/general sources are held for review
+  const baseConfidence = trustLevel === "official" ? 0.85 : trustLevel === "news" ? 0.6 : 0.5;
+  const confidence = Math.min(1, baseConfidence + infoResult.completenessScore * 0.15);
+  const postStatus = confidence >= 0.75 ? "published" : "held";
+
+  const slug =
+    infoResult.headline
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") +
+    "-" +
+    Date.now().toString(36);
+
+  const [newPost] = await db
+    .insert(postsTable)
+    .values({
+      title: infoResult.headline || title,
+      slug,
+      body: articleBody,
+      excerpt: articleBody.split(". ").slice(0, 2).join(". ") + ".",
+      status: postStatus,
+      confidenceScore: confidence.toFixed(2),
+      wordCount: articleBody.split(/\s+/).length,
+      primaryCategoryId: matchedCategory?.id ?? null,
+      sourceSubmissionId: submissionId,
+      publishedAt: postStatus === "published" ? new Date() : null,
+    })
+    .returning();
+
+  // Update submission
+  await db
+    .update(submissionsTable)
+    .set({ status: "processed", updatedAt: new Date() })
+    .where(eq(submissionsTable.id, submissionId));
+
+  // Update rss_item with post reference
+  await db
+    .update(rssItemsTable)
+    .set({ postId: newPost.id })
+    .where(eq(rssItemsTable.id, rssItemId));
+
+  logger.info(
+    { submissionId, postId: newPost.id, status: postStatus, feedName },
+    "RSS pipeline: complete",
+  );
 }

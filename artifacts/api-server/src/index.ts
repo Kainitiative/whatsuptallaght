@@ -5,6 +5,7 @@ import { seedRssFeeds } from "./lib/seed-rss-feeds";
 import { seedDemoContent } from "./lib/seed-demo-content";
 import { isEncryptionKeySet } from "./lib/encryption";
 import { startQueueWorker } from "./lib/queue-worker";
+import { startRssScheduler } from "./lib/rss-fetcher";
 
 const rawPort = process.env["PORT"];
 
@@ -45,6 +46,7 @@ async function start() {
     }
     logger.info({ port }, "Server listening");
     startQueueWorker();
+    startRssScheduler();
   });
 }
 

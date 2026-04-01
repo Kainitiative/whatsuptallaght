@@ -1,13 +1,15 @@
 import { db } from "@workspace/db";
 import { rssFeedsTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
 
 const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">[] = [
 
   // ── Local Government ─────────────────────────────────────────────────────────
   {
     name: "South Dublin County Council — News",
+    // SDCC removed their RSS feed — disabled until a working URL is found
     url: "https://www.sdcc.ie/en/news/news.rss",
-    isActive: true,
+    isActive: false,
     checkIntervalMinutes: 60,
   },
   {
@@ -20,8 +22,9 @@ const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">
   // ── Emergency Services ───────────────────────────────────────────────────────
   {
     name: "An Garda Síochána — Press Releases",
+    // Garda blocks cloud IP ranges; re-enable when self-hosting on VPS
     url: "https://www.garda.ie/en/press-centre/press-releases/press-releases.rss",
-    isActive: true,
+    isActive: false,
     checkIntervalMinutes: 30,
   },
   {
@@ -33,10 +36,11 @@ const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">
 
   // ── Transport ────────────────────────────────────────────────────────────────
   {
-    name: "Transport for Ireland — Service Alerts",
-    url: "https://www.transportforireland.ie/tfi-alerts/feed/",
+    name: "Transport for Ireland — News",
+    // Correct URL confirmed 2026-04: /tfi-alerts/feed/ redirects to 404; /feed/ works
+    url: "https://www.transportforireland.ie/feed/",
     isActive: true,
-    checkIntervalMinutes: 15,
+    checkIntervalMinutes: 20,
   },
   {
     name: "Dublin Bus — News & Disruptions",
@@ -48,12 +52,20 @@ const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">
   // ── Weather ──────────────────────────────────────────────────────────────────
   {
     name: "Met Éireann — Weather Warnings",
+    // Met Éireann removed RSS support — disabled
     url: "https://www.met.ie/Open_Data/rss/met-eireann-weather-warnings-rss.xml",
-    isActive: true,
+    isActive: false,
     checkIntervalMinutes: 30,
   },
 
   // ── National News (Dublin / Community Focus) ─────────────────────────────────
+  {
+    name: "The Journal — Ireland News",
+    // Replaces RTÉ RSS (broken); thejournal.ie has working RSS and good Tallaght coverage
+    url: "https://www.thejournal.ie/feed/",
+    isActive: true,
+    checkIntervalMinutes: 30,
+  },
   {
     name: "RTÉ News — Ireland",
     url: "https://www.rte.ie/news/rss/news-ireland.xml",
@@ -98,6 +110,12 @@ const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">
   },
 ];
 
+// URLs that have changed or been removed — disable them if they exist in the DB
+const DEPRECATED_URLS: string[] = [
+  "https://www.transportforireland.ie/tfi-alerts/feed/", // Changed to /feed/
+  "https://www.rte.ie/news/rss/news-ireland.xml",        // Replaced by thejournal.ie
+];
+
 export async function seedRssFeeds(): Promise<void> {
   for (const feed of DEFAULT_FEEDS) {
     await db
@@ -107,8 +125,17 @@ export async function seedRssFeeds(): Promise<void> {
         target: rssFeedsTable.url,
         set: {
           name: feed.name,
+          isActive: feed.isActive,
           checkIntervalMinutes: feed.checkIntervalMinutes,
         },
       });
+  }
+
+  // Deactivate any deprecated feed URLs
+  for (const url of DEPRECATED_URLS) {
+    await db
+      .update(rssFeedsTable)
+      .set({ isActive: false })
+      .where(eq(rssFeedsTable.url, url));
   }
 }

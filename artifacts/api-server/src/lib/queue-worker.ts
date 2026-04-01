@@ -1,7 +1,7 @@
 import { db } from "@workspace/db";
 import { jobQueueTable } from "@workspace/db/schema";
 import { eq, lte, sql, or, isNull } from "drizzle-orm";
-import { processWhatsAppSubmission, type PipelinePayload } from "./ai-pipeline";
+import { processWhatsAppSubmission, processRssSubmission, type PipelinePayload, type RssPipelinePayload } from "./ai-pipeline";
 import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = 5000;
@@ -81,6 +81,10 @@ async function dispatchJob(jobType: string, payload: Record<string, unknown>): P
   switch (jobType) {
     case "PROCESS_WHATSAPP_SUBMISSION":
       await processWhatsAppSubmission(payload as unknown as PipelinePayload);
+      break;
+
+    case "PROCESS_RSS_SUBMISSION":
+      await processRssSubmission(payload as unknown as RssPipelinePayload);
       break;
 
     default:
