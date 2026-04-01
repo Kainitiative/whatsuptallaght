@@ -21,6 +21,7 @@
   11. [Spam & Abuse Handling](#spam--abuse-handling)
   12. [Admin Dashboard](#admin-dashboard)
   13. [The Public Website](#the-public-website)
+      - [Visual Design Direction](#visual-design-direction)
   14. [Social Distribution](#social-distribution)
   15. [Processing Queue & Scalability](#processing-queue--scalability)
   16. [Revenue Model](#revenue-model)
@@ -401,6 +402,106 @@
   - Article-based output only
   - SEO-first — clean URLs, permanent content, fast loading
   - Every post is a permanent indexed URL
+
+  ---
+
+  ### Visual Design Direction
+
+  #### Reference Sites (Mood Board)
+
+  The design direction was established from four reference sites chosen by the owner:
+
+  | Site | What It Contributes |
+  |---|---|
+  | **Yelp** (yelp.ie) | Primary layout model — card-based discovery, category filter bars, strong local identity, functional and community-driven |
+  | **Euronews** (euronews.com) | Category-led navigation, breaking/featured story treatment, card grid hierarchy |
+  | **The New Humanitarian** | Editorial authority, strong photo treatment, confident typography, content-first |
+  | **The Design Japan** | Restraint and whitespace — things breathe, quality over quantity, nothing crammed |
+
+  **Overall feel:** A Yelp-style community discovery platform — warm, functional, and unmistakably local. Yelp is the strongest influence: functional discovery, card-based layout, category filters, and community contributor identity on display.
+
+  ---
+
+  #### Colour Palette
+
+  Colours are drawn directly from the **Tallaght Unity Flag** (An Bratach Aontacht Thamlachta, 2017), which was created through community surveys — the people of Tallaght chose red, green, white, and blue to represent themselves. This gives the platform a genuine, rooted identity rather than invented brand colours.
+
+  | Role | Colour | Source | Usage |
+  |---|---|---|---|
+  | **Primary** | Deep community red | Flag — the field | Header, logo, primary CTAs, featured labels |
+  | **Secondary** | Rich forest green | Flag — second field colour | Community CTAs, WhatsApp button, hover states |
+  | **Accent** | Flag blue | Flag — Battle of Tallaght stars (1867) | Links, interactive elements, map elements |
+  | **Base** | Clean white | Flag — the bend | Page backgrounds, article reading surface |
+  | **Surface** | Light warm grey | — | Card backgrounds, section dividers |
+  | **Text** | Near-black charcoal | — | All body text and headlines |
+
+  This palette aligns naturally with Yelp's design language — Yelp also uses red as its primary brand colour.
+
+  #### Category Colour Coding
+
+  Each content category is assigned a colour from the flag palette so users can identify content type at a glance on cards and tags:
+
+  | Category | Colour | Feeling |
+  |---|---|---|
+  | Events & What's On | Red | Energetic, urgent |
+  | Community & Notices | Green | Local, warm, civic |
+  | Sport | Blue | Active, trustworthy |
+  | Business & Local Services | Warm amber | Neutral, commercial |
+  | News & Issues | Charcoal | Serious, informational |
+
+  ---
+
+  #### Typography
+
+  - **Headlines:** A warm, characterful sans-serif — readable and confident, not corporate or decorative. Strong weight for scannability.
+  - **Body text:** Clean, high-readability sans-serif optimised for comfortable reading across all ages and screen sizes
+  - **Sizing:** Errs larger than typical — the audience spans all demographics in Tallaght
+  - **Line spacing:** Generous throughout — influenced by Design Japan's restraint
+
+  ---
+
+  #### Homepage Layout
+
+  Yelp-inspired structure from top to bottom:
+
+  1. **Header bar** — site name/logo (red), search field, WhatsApp CTA button (green), category navigation
+  2. **Category icon row** — horizontal strip: Events · Sport · Business · Community · News · What's On (each with a small icon and colour tag)
+  3. **Hero/featured article** — full-width card, large image, bold headline, category tag
+  4. **"Happening This Weekend"** — a curated horizontal strip of upcoming events
+  5. **Main card grid** — three columns desktop / one column mobile; each card has: dominant image, colour-coded category tag, bold headline, time posted, contributor first name
+  6. **Load more / pagination** at the bottom
+
+  #### Article Page Layout
+
+  - Full-width header image at the top
+  - Clean single reading column — no sidebar, no distractions
+  - Category tag + date + contributor credit below the headline
+  - Generous line length and spacing for comfortable reading
+  - Related articles strip at the bottom
+
+  #### Card Design
+
+  Each article card contains:
+  - Dominant image (cropped to a consistent aspect ratio)
+  - Colour-coded category tag in the top corner
+  - Bold headline (2–3 lines max)
+  - Time posted ("2 hours ago", "Yesterday")
+  - Contributor first name and area ("Submitted by Maria, Jobstown") — shown once contributor identity is established
+
+  #### WhatsApp Submission CTA
+
+  - Present on every page — pinned in the header alongside the logo
+  - Green button using WhatsApp's own colour (reinforces instant recognition)
+  - Warm, community-friendly copy: **"Send us your story"**
+  - Never intrusive — functional, not a popup or overlay
+
+  ---
+
+  #### Flag Usage Note
+
+  The platform draws colour inspiration from the Tallaght Unity Flag — it does not reproduce the flag graphic itself. If the brand identity ever incorporates the actual flag design, the Tallaght Historical Society should be contacted (they actively encourage community use and have a simple email protocol).
+
+  ---
 
   ### Pages
 
