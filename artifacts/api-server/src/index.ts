@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedSettings } from "./lib/seed-settings";
+import { seedRssFeeds } from "./lib/seed-rss-feeds";
 import { isEncryptionKeySet } from "./lib/encryption";
 
 const rawPort = process.env["PORT"];
@@ -28,6 +29,9 @@ async function start() {
 
   await seedSettings();
   logger.info("Platform settings seeded");
+
+  await seedRssFeeds();
+  logger.info("RSS feeds seeded");
 
   app.listen(port, (err) => {
     if (err) {
