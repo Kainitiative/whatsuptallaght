@@ -8,6 +8,7 @@ import adminRouter from "./admin";
 import rssRouter from "./rss";
 import statsRouter from "./stats";
 import settingsRouter from "./settings";
+import webhookRouter from "./webhook";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(adminRouter);
 router.use(rssRouter);
 router.use(statsRouter);
 router.use(settingsRouter);
+router.use(webhookRouter);
 
 export default router;

@@ -91,6 +91,50 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### WhatsApp + AI Pipeline (`artifacts/api-server/src/`)
+
+Phase 2b — WhatsApp ingestion and AI processing pipeline. All files live in the API server.
+
+**Webhook** (`src/routes/webhook.ts`):
+- `GET /api/webhooks/whatsapp` — Meta verification handshake (checks `whatsapp_webhook_verify_token` setting)
+- `POST /api/webhooks/whatsapp` — Incoming messages; validates HMAC-SHA256 signature if `whatsapp_app_secret` is set; returns 200 immediately; processes async
+- Phone numbers are hashed (SHA-256) before storage — never stored in plaintext
+- Contributors auto-created on first message; duplicate-safe
+- Checks `isBanned` before processing
+- Recognises commands (HELP, MY POSTS, STATUS, DELETE, STOP) and routes them to the command handler
+
+**WhatsApp client** (`src/lib/whatsapp-client.ts`):
+- `sendTextMessage(to, body)` — sends via Meta Cloud API
+- `downloadMedia(mediaId)` — resolves temporary URL then downloads; returns `{buffer, mimeType}`
+- All credentials fetched from encrypted settings at call time
+
+**Command handler** (`src/lib/commands.ts`):
+- `isCommand(text)` — detects commands
+- `handleCommand(phone, contributorId, text)` — dispatches HELP / MY POSTS / STATUS / DELETE / STOP
+
+**AI Pipeline** (`src/lib/ai-pipeline.ts`):
+- Stage 1: OpenAI Moderation API (free) — safety gate; rejects + bans on failure
+- Stage 2: Whisper transcription for audio messages
+- Stage 3: GPT-4o Vision for image messages
+- Stage 4: GPT-4o-mini tone classification (JSON)
+- Stage 5: GPT-4o-mini info extraction — headline, location, date, key facts, completeness score (JSON)
+- Stage 6: GPT-4o article writing — uses golden examples for few-shot prompting
+- Stage 7: Confidence routing — ≥ 0.75 → auto-publish; < 0.75 → held; < 0.4 → reject
+- Sends WhatsApp notification on completion (published / held / rejected)
+
+**Queue worker** (`src/lib/queue-worker.ts`):
+- `startQueueWorker()` — polls `job_queue` table every 5 seconds
+- Atomic job claiming via `FOR UPDATE SKIP LOCKED`
+- Retry schedule: 60s → 5min → 15min, then permanent failure
+- Job type: `PROCESS_WHATSAPP_SUBMISSION`
+
+**Credentials required (set via admin settings):**
+- `openai_api_key` — GPT-4o, Whisper, Moderation
+- `whatsapp_access_token` — Meta Cloud API
+- `whatsapp_phone_number_id` — Meta phone number
+- `whatsapp_webhook_verify_token` — webhook verification
+- `whatsapp_app_secret` — signature validation (optional but recommended)
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.

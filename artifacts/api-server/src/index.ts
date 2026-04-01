@@ -4,6 +4,7 @@ import { seedSettings } from "./lib/seed-settings";
 import { seedRssFeeds } from "./lib/seed-rss-feeds";
 import { seedDemoContent } from "./lib/seed-demo-content";
 import { isEncryptionKeySet } from "./lib/encryption";
+import { startQueueWorker } from "./lib/queue-worker";
 
 const rawPort = process.env["PORT"];
 
@@ -43,6 +44,7 @@ async function start() {
       process.exit(1);
     }
     logger.info({ port }, "Server listening");
+    startQueueWorker();
   });
 }
 
