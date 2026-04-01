@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "RAGvMFMs6AiG_IU1YIdX_"
+uri = "file://artifacts/community-website/public/images/tallaght-event.png"
+type = "image"
+title = "Tallaght community gathering event"
+
+[[generated]]
+id = "2Fy4A1ppI9Kd5KtBrhO-e"
+uri = "file://artifacts/community-website/public/images/tallaght-sport.png"
+type = "image"
+title = "Local football match in Tallaght"
+
+[[generated]]
+id = "YwhE1kwACdu0mJkf5lVT6"
+uri = "file://artifacts/community-website/public/images/tallaght-business.png"
+type = "image"
+title = "Tallaght local business street"
+
+[[generated]]
+id = "2UF-F3WxzoU7PfTmxET5V"
+uri = "file://artifacts/community-website/public/images/tallaght-news.png"
+type = "image"
+title = "Scenic view of Tallaght neighbourhood"
