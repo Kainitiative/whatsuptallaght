@@ -1,33 +1,46 @@
 import { db } from "@workspace/db";
 import { platformSettingsTable } from "@workspace/db/schema";
-import { sql } from "drizzle-orm";
 
 const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
-  // ── General Platform ────────────────────────────────────────────────────────
+
+  // ── General Platform ─────────────────────────────────────────────────────────
+
   {
     key: "platform_name",
     label: "Platform Name",
-    description: "The public name of your community platform, shown in the header and on social posts.",
+    description:
+      "The public name shown in the website header, page titles, and on every social media post. " +
+      "Choose something short and local — for example 'Tallaght Today' or 'Tallaght Community News'. " +
+      "You can change this at any time and the update takes effect immediately across the site.",
     category: "general",
     isSecret: false,
     isRequired: true,
     isConfigured: false,
     displayOrder: 1,
   },
+
   {
     key: "platform_url",
     label: "Platform URL",
-    description: "The full public URL of your website, e.g. https://tallaghttoday.ie — used in social post links.",
+    description:
+      "The full web address of your public website, including https://. " +
+      "Example: https://tallaghttoday.ie. " +
+      "This is added to the end of every Facebook and Instagram post so people can click through to read the full article. " +
+      "Make sure there is no trailing slash at the end.",
     category: "general",
     isSecret: false,
     isRequired: true,
     isConfigured: false,
     displayOrder: 2,
   },
+
   {
     key: "platform_whatsapp_display_number",
     label: "WhatsApp Display Number",
-    description: "The WhatsApp number shown publicly on the website for community submissions, e.g. +353 87 123 4567.",
+    description:
+      "The WhatsApp number shown on the website so community members know where to send their stories. " +
+      "Enter it in international format with the country code, e.g. +353 87 123 4567. " +
+      "This should be the same number you registered with Meta — the one people will message to submit content.",
     category: "general",
     isSecret: false,
     isRequired: true,
@@ -35,11 +48,27 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 3,
   },
 
-  // ── OpenAI ──────────────────────────────────────────────────────────────────
+  // ── OpenAI ───────────────────────────────────────────────────────────────────
+
   {
     key: "openai_api_key",
     label: "OpenAI API Key",
-    description: "Your OpenAI API key. Used for GPT-4o article writing, GPT-4o-mini classification, Whisper voice transcription, and DALL-E header image generation. Get yours at platform.openai.com/api-keys.",
+    description:
+      "Your OpenAI API key. This is what powers the entire AI pipeline — article writing, voice transcription, " +
+      "image understanding, safety checking, and header image generation. " +
+      "\n\n" +
+      "HOW TO GET YOUR KEY:\n" +
+      "Step 1 — Go to platform.openai.com and sign up or log in.\n" +
+      "Step 2 — Click your profile icon (top right) and choose 'API Keys', or go directly to platform.openai.com/api-keys.\n" +
+      "Step 3 — Click 'Create new secret key'. Give it a name like 'Tallaght Community Platform'.\n" +
+      "Step 4 — Copy the key immediately — OpenAI only shows it once. It starts with 'sk-'.\n" +
+      "Step 5 — Paste it here and save.\n" +
+      "\n" +
+      "BILLING:\n" +
+      "You also need to add a payment method at platform.openai.com/settings/organization/billing. " +
+      "OpenAI is pay-as-you-go — there is no monthly fee. At typical early volume (10 posts per day), " +
+      "costs run approximately €1–3 per day. You can set a monthly spending limit in the billing settings " +
+      "to avoid surprises.",
     helpUrl: "https://platform.openai.com/api-keys",
     category: "openai",
     isSecret: true,
@@ -48,11 +77,23 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 10,
   },
 
-  // ── WhatsApp / Meta ─────────────────────────────────────────────────────────
+  // ── WhatsApp / Meta ──────────────────────────────────────────────────────────
+
   {
     key: "whatsapp_access_token",
     label: "WhatsApp Access Token",
-    description: "The permanent access token for your Meta App. Found in the Meta Developer Portal under WhatsApp > API Setup. This is the long-lived token — not the temporary one shown on first login.",
+    description:
+      "The permanent access token that allows this platform to receive and send WhatsApp messages on behalf of your Meta App. " +
+      "\n\n" +
+      "HOW TO GET YOUR TOKEN:\n" +
+      "Step 1 — Go to developers.facebook.com and log in with your Facebook account.\n" +
+      "Step 2 — Open your app (or create one: click 'My Apps' > 'Create App' > choose 'Business').\n" +
+      "Step 3 — In the left sidebar, click 'WhatsApp' then 'API Setup'.\n" +
+      "Step 4 — You will see a temporary access token at the top. Do not use this — it expires in 24 hours.\n" +
+      "Step 5 — To get a permanent token: go to Business Settings > System Users > Add a system user with 'Admin' role. " +
+      "Then generate a token for that system user, selecting your WhatsApp app and the whatsapp_business_messaging permission. " +
+      "This token does not expire.\n" +
+      "Step 6 — Copy the permanent token and paste it here.",
     helpUrl: "https://developers.facebook.com/docs/whatsapp/business-management-api/get-started",
     category: "whatsapp",
     isSecret: true,
@@ -60,10 +101,20 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     isConfigured: false,
     displayOrder: 20,
   },
+
   {
     key: "whatsapp_phone_number_id",
     label: "WhatsApp Phone Number ID",
-    description: "The numeric ID Meta assigns to your registered WhatsApp phone number. Found in the Meta Developer Portal under WhatsApp > API Setup after registering your number. It looks like: 123456789012345.",
+    description:
+      "The numeric ID that Meta assigns to your registered WhatsApp phone number. " +
+      "This is different from the phone number itself — it is a long number that Meta uses internally to identify your line. " +
+      "\n\n" +
+      "HOW TO FIND YOUR PHONE NUMBER ID:\n" +
+      "Step 1 — Go to developers.facebook.com and open your app.\n" +
+      "Step 2 — Click 'WhatsApp' in the left sidebar, then 'API Setup'.\n" +
+      "Step 3 — Under 'From', you will see your registered phone number with a dropdown. " +
+      "Just below or beside it is a field labelled 'Phone Number ID' — it looks like a 15–16 digit number.\n" +
+      "Step 4 — Copy that number and paste it here.",
     helpUrl: "https://developers.facebook.com/docs/whatsapp/cloud-api/get-started",
     category: "whatsapp",
     isSecret: false,
@@ -71,20 +122,43 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     isConfigured: false,
     displayOrder: 21,
   },
+
   {
     key: "whatsapp_webhook_verify_token",
     label: "Webhook Verify Token",
-    description: "A secret string you create yourself — any random phrase. You enter this here AND in the Meta Developer Portal under Webhooks > Verify Token. It proves to Meta that this server owns the webhook URL. Example: my-tallaght-webhook-2024.",
+    description:
+      "A secret passphrase that you invent yourself. It is used to prove to Meta that this server is the " +
+      "genuine owner of the webhook URL. You enter the same phrase here and in the Meta Developer Portal, " +
+      "and Meta checks they match when setting up the connection. " +
+      "\n\n" +
+      "HOW TO SET THIS UP:\n" +
+      "Step 1 — Choose any random phrase. It can be anything — make it unique and hard to guess. " +
+      "Example: 'tallaght-webhook-secret-2024' or a random string like 'xK9mP2qL8nR'. Write it down.\n" +
+      "Step 2 — Paste that phrase here and save.\n" +
+      "Step 3 — Go to developers.facebook.com, open your app, click 'WhatsApp' > 'Configuration'.\n" +
+      "Step 4 — Under Webhooks, click 'Edit'. Enter your platform's webhook URL " +
+      "(it will be: https://your-domain.ie/api/webhooks/whatsapp) and paste the same phrase into the 'Verify token' field.\n" +
+      "Step 5 — Click 'Verify and Save'. Meta will ping your server to confirm the tokens match.",
     category: "whatsapp",
     isSecret: true,
     isRequired: true,
     isConfigured: false,
     displayOrder: 22,
   },
+
   {
     key: "whatsapp_app_secret",
     label: "Meta App Secret",
-    description: "The App Secret for your Meta Developer App. Found in the Meta Developer Portal under App Settings > Basic. Used to verify that incoming webhook payloads genuinely came from Meta and not a third party.",
+    description:
+      "A secret key tied to your Meta Developer App. The platform uses this to verify that every incoming " +
+      "webhook message genuinely came from Meta and has not been tampered with. Without it, anyone who knows " +
+      "your webhook URL could potentially send fake messages to your platform. " +
+      "\n\n" +
+      "HOW TO FIND YOUR APP SECRET:\n" +
+      "Step 1 — Go to developers.facebook.com and open your app.\n" +
+      "Step 2 — In the left sidebar, click 'App Settings', then 'Basic'.\n" +
+      "Step 3 — Look for the 'App Secret' field. Click 'Show' to reveal it (you may need to re-enter your Facebook password).\n" +
+      "Step 4 — Copy the app secret and paste it here.",
     helpUrl: "https://developers.facebook.com/apps",
     category: "whatsapp",
     isSecret: true,
@@ -93,21 +167,47 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 23,
   },
 
-  // ── Facebook ─────────────────────────────────────────────────────────────────
+  // ── Facebook ──────────────────────────────────────────────────────────────────
+
   {
     key: "facebook_page_id",
     label: "Facebook Page ID",
-    description: "The numeric ID of your Facebook Page. To find it: go to your Facebook Page, click About, then scroll to Page Transparency — the ID is listed there. It looks like: 123456789012345.",
+    description:
+      "The unique numeric ID of your Facebook Page. Every published article is automatically posted to this page. " +
+      "\n\n" +
+      "HOW TO FIND YOUR PAGE ID:\n" +
+      "Step 1 — Go to your Facebook Page.\n" +
+      "Step 2 — Click 'About' in the left menu.\n" +
+      "Step 3 — Scroll down to the 'Page Transparency' section — your Page ID is listed there. " +
+      "It is a long number like 123456789012345.\n" +
+      "Alternatively: go to your page, look at the URL. If it shows a username (e.g. /TallaghtToday), " +
+      "go to facebook.com/TallaghtToday/about and the ID will be in the Page Transparency section.\n" +
+      "Step 4 — Copy that number and paste it here.",
     category: "facebook",
     isSecret: false,
     isRequired: true,
     isConfigured: false,
     displayOrder: 30,
   },
+
   {
     key: "facebook_page_access_token",
     label: "Facebook Page Access Token",
-    description: "A long-lived Page Access Token for posting to your Facebook Page. Generate it in the Meta Developer Portal using the Graph API Explorer: select your App, select your Page, request pages_manage_posts permission, then generate and extend the token.",
+    description:
+      "A long-lived access token that allows this platform to post articles to your Facebook Page automatically. " +
+      "\n\n" +
+      "HOW TO GENERATE YOUR PAGE ACCESS TOKEN:\n" +
+      "Step 1 — Go to developers.facebook.com/tools/explorer.\n" +
+      "Step 2 — In the top-right dropdown, select your Meta App.\n" +
+      "Step 3 — Click 'Generate Access Token' and log in with the Facebook account that manages your Page.\n" +
+      "Step 4 — Click 'Get Page Access Token', then select your Page from the list.\n" +
+      "Step 5 — Add the permission 'pages_manage_posts' — click 'Add a Permission', search for it, and tick it.\n" +
+      "Step 6 — Copy the token shown. This is a short-lived token (valid 1 hour). To make it permanent:\n" +
+      "Step 7 — Go to developers.facebook.com/tools/debug/accesstoken, paste the token, and click 'Extend Access Token'. " +
+      "Copy the new long-lived token (valid 60 days).\n" +
+      "Step 8 — For a never-expiring token, use a System User token from Business Settings > System Users instead " +
+      "(recommended for production — see the WhatsApp Access Token instructions for the System User approach).\n" +
+      "Step 9 — Paste the token here.",
     helpUrl: "https://developers.facebook.com/tools/explorer",
     category: "facebook",
     isSecret: true,
@@ -116,11 +216,26 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 31,
   },
 
-  // ── Instagram ─────────────────────────────────────────────────────────────────
+  // ── Instagram ──────────────────────────────────────────────────────────────────
+
   {
     key: "instagram_account_id",
     label: "Instagram Account ID",
-    description: "The numeric ID of your Instagram Professional Account connected to your Facebook Page. To find it: in the Meta Developer Portal, use the Graph API Explorer and query /me/accounts, then find your page, then query /{page-id}?fields=instagram_business_account.",
+    description:
+      "The numeric ID of your Instagram Professional Account (Business or Creator account). " +
+      "This must be connected to the same Facebook Page you entered above. " +
+      "Every published article is automatically posted to this Instagram account. " +
+      "\n\n" +
+      "HOW TO FIND YOUR INSTAGRAM ACCOUNT ID:\n" +
+      "Step 1 — Make sure your Instagram account is a Professional Account (Business or Creator) " +
+      "and is linked to your Facebook Page. To link: on Instagram, go to Settings > Account > Linked Accounts, or " +
+      "on your Facebook Page go to Settings > Instagram.\n" +
+      "Step 2 — Go to developers.facebook.com/tools/explorer.\n" +
+      "Step 3 — Select your Meta App and generate an access token with the instagram_basic permission.\n" +
+      "Step 4 — In the query field, type: /me/accounts and click Submit. Find your Page in the results and note its ID.\n" +
+      "Step 5 — Now query: /{your-page-id}?fields=instagram_business_account and click Submit.\n" +
+      "Step 6 — The result will show an 'instagram_business_account' object with an 'id' field. That is your Instagram Account ID.\n" +
+      "Step 7 — Copy that ID and paste it here.",
     helpUrl: "https://developers.facebook.com/docs/instagram-api/getting-started",
     category: "instagram",
     isSecret: false,
@@ -135,6 +250,17 @@ export async function seedSettings(): Promise<void> {
     await db
       .insert(platformSettingsTable)
       .values(setting)
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: platformSettingsTable.key,
+        set: {
+          label: setting.label,
+          description: setting.description,
+          helpUrl: setting.helpUrl ?? null,
+          category: setting.category,
+          isSecret: setting.isSecret,
+          isRequired: setting.isRequired,
+          displayOrder: setting.displayOrder,
+        },
+      });
   }
 }
