@@ -519,6 +519,82 @@ export const CreateRssFeedBody = zod.object({
 });
 
 /**
+ * Returns all setting definitions. Secret values are masked. Non-secret values are returned in plain text.
+ * @summary List all platform settings
+ */
+export const ListSettingsResponseItem = zod.object({
+  id: zod.number(),
+  key: zod.string(),
+  label: zod.string(),
+  description: zod.string(),
+  helpUrl: zod.string().nullish(),
+  category: zod.string(),
+  isSecret: zod.boolean(),
+  isRequired: zod.boolean(),
+  isConfigured: zod.boolean(),
+  displayOrder: zod.number(),
+  value: zod
+    .string()
+    .nullish()
+    .describe(
+      "Plain text for non-secret settings, masked (••••••••) for secrets that are configured, null if not configured.",
+    ),
+  updatedAt: zod.coerce.date().nullish(),
+});
+export const ListSettingsResponse = zod.array(ListSettingsResponseItem);
+
+/**
+ * Returns a per-category breakdown of how many required settings are configured, and whether the encryption key is set.
+ * @summary Setup completion status
+ */
+export const GetSettingsStatusResponse = zod.object({
+  encryptionKeySet: zod.boolean(),
+  allComplete: zod.boolean(),
+  categories: zod.record(
+    zod.string(),
+    zod.object({
+      total: zod.number(),
+      configured: zod.number(),
+      complete: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Set a setting value
+ */
+export const UpdateSettingParams = zod.object({
+  key: zod.coerce.string(),
+});
+
+export const UpdateSettingBody = zod.object({
+  value: zod.string(),
+});
+
+export const UpdateSettingResponse = zod.object({
+  key: zod.string(),
+  label: zod.string(),
+  isConfigured: zod.boolean(),
+  isSecret: zod.boolean(),
+  updatedAt: zod.coerce.date().nullish(),
+});
+
+/**
+ * @summary Clear a setting value
+ */
+export const ClearSettingParams = zod.object({
+  key: zod.coerce.string(),
+});
+
+export const ClearSettingResponse = zod.object({
+  key: zod.string(),
+  label: zod.string(),
+  isConfigured: zod.boolean(),
+  isSecret: zod.boolean(),
+  updatedAt: zod.coerce.date().nullish(),
+});
+
+/**
  * @summary Platform summary statistics
  */
 export const GetStatsSummaryResponse = zod.object({

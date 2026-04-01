@@ -298,6 +298,50 @@ export interface DistributionLog {
   succeededAt?: string | null;
 }
 
+export interface PlatformSetting {
+  id: number;
+  key: string;
+  label: string;
+  description: string;
+  helpUrl?: string | null;
+  category: string;
+  isSecret: boolean;
+  isRequired: boolean;
+  isConfigured: boolean;
+  displayOrder: number;
+  /** Plain text for non-secret settings, masked (••••••••) for secrets that are configured, null if not configured. */
+  value?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface UpdateSettingRequest {
+  value: string;
+}
+
+export interface SettingUpdateResponse {
+  key: string;
+  label: string;
+  isConfigured: boolean;
+  isSecret: boolean;
+  updatedAt?: string | null;
+}
+
+export interface SettingsCategoryStatus {
+  total: number;
+  configured: number;
+  complete: boolean;
+}
+
+export type SettingsStatusCategories = {
+  [key: string]: SettingsCategoryStatus;
+};
+
+export interface SettingsStatus {
+  encryptionKeySet: boolean;
+  allComplete: boolean;
+  categories: SettingsStatusCategories;
+}
+
 export type ListPostsParams = {
   status?: PostStatus;
   categorySlug?: string;

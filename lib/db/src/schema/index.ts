@@ -7,3 +7,4 @@ export * from "./rss";
 export * from "./queue";
 export * from "./golden-examples";
 export * from "./distribution";
+export * from "./settings";

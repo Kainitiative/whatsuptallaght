@@ -7,6 +7,7 @@ import contributorsRouter from "./contributors";
 import adminRouter from "./admin";
 import rssRouter from "./rss";
 import statsRouter from "./stats";
+import settingsRouter from "./settings";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(contributorsRouter);
 router.use(adminRouter);
 router.use(rssRouter);
 router.use(statsRouter);
+router.use(settingsRouter);
 
 export default router;

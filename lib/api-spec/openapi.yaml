@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: settings
+    description: Platform configuration and integration settings
   - name: posts
     description: Published articles and content
   - name: categories
@@ -579,6 +581,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RssFeed"
+
+  # ── Settings ─────────────────────────────────────────────────────────────────
+
+  /admin/settings:
+    get:
+      operationId: listSettings
+      tags: [settings]
+      summary: List all platform settings
+      description: Returns all setting definitions. Secret values are masked. Non-secret values are returned in plain text.
+      responses:
+        "200":
+          description: List of settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlatformSetting"
+
+  /admin/settings/status:
+    get:
+      operationId: getSettingsStatus
+      tags: [settings]
+      summary: Setup completion status
+      description: Returns a per-category breakdown of how many required settings are configured, and whether the encryption key is set.
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsStatus"
+
+  /admin/settings/{key}:
+    put:
+      operationId: updateSetting
+      tags: [settings]
+      summary: Set a setting value
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingRequest"
+      responses:
+        "200":
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingUpdateResponse"
+        "404":
+          description: Setting key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: clearSetting
+      tags: [settings]
+      summary: Clear a setting value
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Setting cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingUpdateResponse"
+        "404":
+          description: Setting key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # ── Stats ────────────────────────────────────────────────────────────────────
 
@@ -1238,3 +1326,107 @@ components:
         - platform
         - status
         - attemptedAt
+
+    # ── Settings ───────────────────────────────────────────────────────────────
+
+    PlatformSetting:
+      type: object
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        helpUrl:
+          type: string
+          nullable: true
+        category:
+          type: string
+        isSecret:
+          type: boolean
+        isRequired:
+          type: boolean
+        isConfigured:
+          type: boolean
+        displayOrder:
+          type: integer
+        value:
+          type: string
+          nullable: true
+          description: Plain text for non-secret settings, masked (••••••••) for secrets that are configured, null if not configured.
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - key
+        - label
+        - description
+        - category
+        - isSecret
+        - isRequired
+        - isConfigured
+        - displayOrder
+
+    UpdateSettingRequest:
+      type: object
+      properties:
+        value:
+          type: string
+      required:
+        - value
+
+    SettingUpdateResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        isConfigured:
+          type: boolean
+        isSecret:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - key
+        - label
+        - isConfigured
+        - isSecret
+
+    SettingsCategoryStatus:
+      type: object
+      properties:
+        total:
+          type: integer
+        configured:
+          type: integer
+        complete:
+          type: boolean
+      required:
+        - total
+        - configured
+        - complete
+
+    SettingsStatus:
+      type: object
+      properties:
+        encryptionKeySet:
+          type: boolean
+        allComplete:
+          type: boolean
+        categories:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SettingsCategoryStatus"
+      required:
+        - encryptionKeySet
+        - allComplete
+        - categories

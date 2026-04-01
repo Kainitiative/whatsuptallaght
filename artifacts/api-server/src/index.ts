@@ -1,5 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { seedSettings } from "./lib/seed-settings";
+import { isEncryptionKeySet } from "./lib/encryption";
 
 const rawPort = process.env["PORT"];
 
@@ -15,11 +17,28 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
+async function start() {
+  if (!isEncryptionKeySet()) {
+    logger.warn(
+      "SETTINGS_ENCRYPTION_KEY is not set. Settings are encrypted with a development fallback key — NOT safe for production. " +
+      "Generate a key with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\" " +
+      "and set it as the SETTINGS_ENCRYPTION_KEY environment variable."
+    );
   }
 
-  logger.info({ port }, "Server listening");
+  await seedSettings();
+  logger.info("Platform settings seeded");
+
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+    logger.info({ port }, "Server listening");
+  });
+}
+
+start().catch((err) => {
+  logger.error({ err }, "Failed to start server");
+  process.exit(1);
 });
