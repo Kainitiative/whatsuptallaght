@@ -211,6 +211,82 @@ When an article has no header image (most WhatsApp submissions and RSS articles)
 - `object-storage` skill already covers the upload pattern
 - Coordinate with the existing `headerImageUrl` field — no schema changes needed beyond `imagePrompt`
 
+#### Logo compositing extension (builds on top of DALL·E generation)
+For RSS feeds from clubs, organisations, or brands with a recognisable logo:
+- Add a `logoUrl` field to `rss_feeds` table — admin pastes in the URL of the feed's logo image once (e.g. `https://www.shamrockrovers.ie/wp-content/uploads/rovers-crest.png`)
+- After DALL·E generates the background scene, download the logo and composite it onto the image using **`sharp`** (Node.js, no extra API cost)
+- Placement: bottom-left or bottom-right corner, ~15% of image width, with a subtle white circle/badge background for visibility
+- For partnership articles (two clubs): composite both logos side by side with a thin divider or "×" between them
+- Logo fetch: download at runtime and cache in Object Storage so it's not re-fetched on every article
+- **Copyright note**: editorial use of club logos for news reporting is standard press practice. Avoid any framing that implies endorsement.
+
+---
+
+### Social media comments → AI opinion pieces
+
+#### Concept
+When an article is shared to Facebook or Instagram, public comments from the community on that post become a rich source of opinion. The AI can read those comments, run them through the same moderation + sentiment pipeline as WhatsApp reactions, and generate a "Community Reacts" companion piece — exactly like the WhatsApp hashtag reaction system, but sourced from social media engagement.
+
+#### How comment reading works
+Both Facebook and Instagram (Business) expose comments via their Graph API:
+- **Facebook**: `GET /{facebook-post-id}/comments` — returns commenter name, message, timestamp, likes count
+- **Instagram**: `GET /{instagram-media-id}/comments` — same structure
+
+When posting to social media (the planned social distribution feature), the API already receives back the platform post ID. That ID needs to be saved to the article record at post time.
+
+#### Data model additions
+**`posts` table — new columns:**
+- `facebook_post_id` — the Facebook page post ID returned after publishing (e.g. `123456_789012`)
+- `instagram_media_id` — the Instagram media ID returned after publishing
+
+**New `social_comments` table:**
+| Column | Notes |
+|---|---|
+| `id` | serial PK |
+| `article_id` | FK → `posts.id` |
+| `platform` | `facebook` \| `instagram` |
+| `platform_comment_id` | Platform's own comment ID (for deduplication) |
+| `commenter_name` | Display name (never shown publicly in generated piece) |
+| `raw_text` | Comment text |
+| `safety_passed` | Boolean — moderation result |
+| `sentiment` | `positive` \| `negative` \| `neutral` |
+| `included_in_piece` | Boolean — used in generated piece |
+| `likes_count` | Engagement signal — more-liked comments carry more weight |
+| `fetched_at` | Timestamp |
+
+#### Comment polling schedule
+- Fetch comments at: 2 hours, 6 hours, and 24 hours after posting — captures the initial rush and the slower tail
+- De-duplicate by `platform_comment_id` — safe to re-poll without creating duplicates
+- Filter out: very short comments (<5 words), obvious spam patterns, comments that are just emojis
+- Respect API rate limits: Facebook allows ~200 calls/hour per token
+
+#### Generation trigger
+Same as the WhatsApp reaction piece system — manual trigger from admin OR auto-trigger when 10+ safety-passed comments exist:
+- AI receives: original article + all approved comments + sentiment breakdown + engagement counts
+- Prompt instructs it to weight higher-liked comments more heavily as they represent broader agreement
+- Never attribute specific views to named commenters — "One local resident commented…", "Several people pointed out…"
+- Link back to the Facebook/Instagram post so readers can join the discussion
+
+#### Privacy considerations
+- Facebook commenter names are public (unlike WhatsApp) but should still NOT be published in generated pieces — editorial standards
+- Store names in DB for admin reference only (helps spot spam patterns)
+- Do not store profile pictures or profile links — unnecessary PII
+- GDPR: comments are publicly posted by users on a public post — no additional consent required for editorial analysis, but generated pieces should not identify individuals
+
+#### Admin controls needed
+- Article detail: show comment count by platform, sentiment breakdown, list of fetched comments with safety/sentiment status
+- "Fetch latest comments" manual refresh button
+- "Generate reaction piece" button (same as WhatsApp reaction flow)
+- Toggle per-article: "Monitor social comments" on/off
+
+#### API permissions required
+- Facebook: `pages_read_engagement`, `pages_manage_posts` — already needed for posting
+- Instagram: `instagram_manage_comments` — additional permission on top of posting permissions
+- No extra OAuth scopes for reading public post comments if the post was made by your own page
+
+#### Relationship to WhatsApp reaction pieces
+These are the same concept — community opinions synthesised into a companion piece. The two sources (WhatsApp hashtag replies + social media comments) can be merged into a single reaction piece if both exist, giving a richer cross-channel view of community opinion. The `article_reactions` table (WhatsApp) and `social_comments` table could be combined in the AI prompt for a single synthesis.
+
 ---
 
 ### Per-article AI cost display (Articles page & article detail)
