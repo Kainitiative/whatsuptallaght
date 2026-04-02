@@ -7,7 +7,8 @@
 // National feeds (Garda, TFI, Met Éireann) must still pass keyword matching
 // because they cover the whole country.
 const ALWAYS_RELEVANT_URL_FRAGMENTS = [
-  "sdcc.ie",  // South Dublin County Council — every item is about South Dublin
+  "sdcc.ie",           // South Dublin County Council — every item is about South Dublin
+  "shamrockrovers.ie", // Shamrock Rovers FC — home ground is Tallaght Stadium
 ];
 
 // Geographic and local keywords — any hit = relevant
