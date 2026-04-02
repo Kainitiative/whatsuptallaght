@@ -18,12 +18,18 @@ router.get("/storage/objects/*objectPath", async (req: Request, res: Response) =
     }
 
     const raw = req.params.objectPath as string | string[];
-    const objectPath = Array.isArray(raw) ? raw.join("/") : raw;
+    // Normalise: strip any leading slashes (double-slash URLs from early bug)
+    const rawPath = (Array.isArray(raw) ? raw.join("/") : raw).replace(/^\/+/, "");
 
     const bucket = objectStorageClient.bucket(bucketId);
-    const file = bucket.file(objectPath);
 
-    const [exists] = await file.exists();
+    // Try without leading slash first (new format), then with (old format)
+    let file = bucket.file(rawPath);
+    let [exists] = await file.exists();
+    if (!exists) {
+      file = bucket.file("/" + rawPath);
+      [exists] = await file.exists();
+    }
     if (!exists) {
       res.status(404).json({ error: "Not found" });
       return;

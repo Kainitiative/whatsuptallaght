@@ -30,8 +30,9 @@ async function uploadImageBuffer(buffer: Buffer, mimeType: string): Promise<stri
     }
     const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
     const objectId = randomUUID();
-    // GCS key: <privateDir>/whatsapp-images/<uuid>.<ext>
-    const gcsPath = `${privateDir}/whatsapp-images/${objectId}.${ext}`;
+    // Strip any leading slash from PRIVATE_OBJECT_DIR — GCS object names must not start with /
+    const cleanDir = privateDir.replace(/^\/+/, "");
+    const gcsPath = `${cleanDir}/whatsapp-images/${objectId}.${ext}`;
     const bucket = objectStorageClient.bucket(bucketId);
     const file = bucket.file(gcsPath);
     await file.save(buffer, { contentType: mimeType, resumable: false });
