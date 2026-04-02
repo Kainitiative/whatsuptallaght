@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, postCategoriesTable } from "@workspace/db/schema";
+import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, sql, ilike } from "drizzle-orm";
 
 const router = Router();
@@ -50,19 +50,58 @@ router.get("/posts", async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "20"))));
   const offset = (page - 1) * limit;
   const status = req.query.status as string | undefined;
+  const categorySlug = req.query.categorySlug as string | undefined;
+  const featured = req.query.featured === "true";
 
   try {
-    const conditions = status ? [eq(postsTable.status, status as any)] : [];
+    const conditions: ReturnType<typeof eq>[] = [];
+    if (status) conditions.push(eq(postsTable.status, status as any));
+    if (featured) conditions.push(eq(postsTable.isFeatured, true));
+
+    if (categorySlug) {
+      const [cat] = await db
+        .select({ id: categoriesTable.id })
+        .from(categoriesTable)
+        .where(eq(categoriesTable.slug, categorySlug))
+        .limit(1);
+      if (!cat) {
+        return res.json({ posts: [], pagination: { page, limit, total: 0, totalPages: 0 } });
+      }
+      conditions.push(eq(postsTable.primaryCategoryId, cat.id));
+    }
+
+    const whereClause = conditions.length ? and(...conditions) : undefined;
 
     const [{ total }] = await db
       .select({ total: count() })
       .from(postsTable)
-      .where(conditions.length ? and(...conditions) : undefined);
+      .where(whereClause);
 
     const posts = await db
-      .select()
+      .select({
+        id: postsTable.id,
+        title: postsTable.title,
+        slug: postsTable.slug,
+        body: postsTable.body,
+        excerpt: postsTable.excerpt,
+        headerImageUrl: postsTable.headerImageUrl,
+        status: postsTable.status,
+        confidenceScore: postsTable.confidenceScore,
+        wordCount: postsTable.wordCount,
+        primaryCategoryId: postsTable.primaryCategoryId,
+        sourceSubmissionId: postsTable.sourceSubmissionId,
+        isSponsored: postsTable.isSponsored,
+        isFeatured: postsTable.isFeatured,
+        starRating: postsTable.starRating,
+        publishedAt: postsTable.publishedAt,
+        createdAt: postsTable.createdAt,
+        updatedAt: postsTable.updatedAt,
+        sourceName: rssFeedsTable.name,
+      })
       .from(postsTable)
-      .where(conditions.length ? and(...conditions) : undefined)
+      .leftJoin(rssItemsTable, eq(rssItemsTable.postId, postsTable.id))
+      .leftJoin(rssFeedsTable, eq(rssFeedsTable.id, rssItemsTable.feedId))
+      .where(whereClause)
       .orderBy(desc(postsTable.createdAt))
       .limit(limit)
       .offset(offset);

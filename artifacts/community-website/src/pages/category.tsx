@@ -109,6 +109,7 @@ export default function Category() {
                   categoryName={getCategoryInfo(post.primaryCategoryId).name}
                   categorySlug={getCategoryInfo(post.primaryCategoryId).slug}
                   categoryColor={getCategoryInfo(post.primaryCategoryId).color}
+                  sourceName={(post as any).sourceName}
                 />
               ))}
             </div>

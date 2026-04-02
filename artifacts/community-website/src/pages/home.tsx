@@ -86,6 +86,7 @@ export default function Home() {
               categoryName={getCategoryInfo(featuredPost.primaryCategoryId).name}
               categorySlug={getCategoryInfo(featuredPost.primaryCategoryId).slug}
               categoryColor={getCategoryInfo(featuredPost.primaryCategoryId).color}
+              sourceName={(featuredPost as any).sourceName}
             />
           </div>
         ) : (
@@ -121,6 +122,7 @@ export default function Home() {
                   categoryName={getCategoryInfo(post.primaryCategoryId).name}
                   categorySlug={getCategoryInfo(post.primaryCategoryId).slug}
                   categoryColor={getCategoryInfo(post.primaryCategoryId).color}
+                  sourceName={(post as any).sourceName}
                 />
               ))}
             </div>
@@ -162,6 +164,7 @@ export default function Home() {
                   categoryName={getCategoryInfo(post.primaryCategoryId).name}
                   categorySlug={getCategoryInfo(post.primaryCategoryId).slug}
                   categoryColor={getCategoryInfo(post.primaryCategoryId).color}
+                  sourceName={(post as any).sourceName}
                 />
               ))}
             </div>

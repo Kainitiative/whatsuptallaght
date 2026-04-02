@@ -13,6 +13,7 @@ interface ArticleCardProps {
   categoryColor?: string;
   contributorName?: string | null;
   contributorArea?: string | null;
+  sourceName?: string | null;
   featured?: boolean;
 }
 
@@ -23,6 +24,7 @@ export function ArticleCard({
   categoryColor = "charcoal",
   contributorName,
   contributorArea,
+  sourceName,
   featured = false
 }: ArticleCardProps) {
   
@@ -44,9 +46,13 @@ export function ArticleCard({
 
   const badgeStyle = getCategoryBadgeStyle(categoryName, categoryColor);
   
-  const displayAuthor = contributorName 
-    ? `${contributorName}${contributorArea ? `, ${contributorArea}` : ''}`
-    : 'Local Resident';
+  const isRssSource = !!sourceName;
+  const displayAuthor = sourceName
+    ? sourceName
+    : contributorName
+      ? `${contributorName}${contributorArea ? `, ${contributorArea}` : ''}`
+      : 'Local Resident';
+  const authorPrefix = isRssSource ? 'Via' : 'Submitted by';
 
   if (featured) {
     return (
@@ -85,7 +91,7 @@ export function ArticleCard({
                 <User className="w-4 h-4" />
               </div>
               <div className="text-sm font-medium text-foreground">
-                <span className="text-muted-foreground font-normal">Submitted by </span>
+                <span className="text-muted-foreground font-normal">{authorPrefix} </span>
                 {displayAuthor}
               </div>
             </div>
@@ -124,7 +130,7 @@ export function ArticleCard({
             
             <div className="flex items-center gap-2">
               <div className="text-xs font-semibold text-foreground bg-black/5 px-2 py-1 rounded-md">
-                <span className="text-muted-foreground font-normal">By </span>
+                <span className="text-muted-foreground font-normal">{authorPrefix} </span>
                 {displayAuthor}
               </div>
             </div>
