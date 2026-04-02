@@ -143,7 +143,7 @@ router.patch("/posts/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
 
-  const { title, body, excerpt, headerImageUrl, status, confidenceScore, primaryCategoryId, isSponsored, isFeatured, publishedAt } = req.body;
+  const { title, body, excerpt, headerImageUrl, status, confidenceScore, primaryCategoryId, isSponsored, isFeatured, publishedAt, starRating } = req.body;
 
   try {
     const updates: Partial<typeof postsTable.$inferInsert> = {
@@ -160,6 +160,7 @@ router.patch("/posts/:id", async (req, res) => {
     if (isFeatured !== undefined) updates.isFeatured = isFeatured;
     if (publishedAt !== undefined) updates.publishedAt = new Date(publishedAt);
     if (status === "published" && !publishedAt) updates.publishedAt = new Date();
+    if (starRating !== undefined) updates.starRating = starRating === null ? null : Number(starRating);
 
     const [post] = await db
       .update(postsTable)

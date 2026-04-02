@@ -20,6 +20,7 @@ export const postsTable = pgTable("posts", {
   sourceSubmissionId: integer("source_submission_id").references(() => submissionsTable.id),
   isSponsored: boolean("is_sponsored").notNull().default(false),
   isFeatured: boolean("is_featured").notNull().default(false),
+  starRating: integer("star_rating"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

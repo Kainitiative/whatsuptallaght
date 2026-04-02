@@ -1,0 +1,65 @@
+import { Link, useLocation } from "wouter";
+import { clearToken } from "@/lib/api";
+
+const NAV = [
+  { href: "/", label: "Dashboard", icon: "⬛" },
+  { href: "/review", label: "Review Queue", icon: "🔶" },
+  { href: "/articles", label: "All Articles", icon: "📰" },
+  { href: "/golden", label: "Golden Examples", icon: "⭐" },
+  { href: "/settings", label: "Settings", icon: "⚙️" },
+];
+
+export default function Sidebar() {
+  const [location] = useLocation();
+
+  function logout() {
+    clearToken();
+    window.location.href = import.meta.env.BASE_URL + "login";
+  }
+
+  return (
+    <aside className="w-56 flex-shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
+      <div className="px-5 py-5 border-b border-sidebar-border">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
+            <span className="text-white font-bold text-sm">T</span>
+          </div>
+          <div>
+            <p className="font-bold text-sm text-sidebar-foreground leading-tight">Tallaght Admin</p>
+            <p className="text-xs text-sidebar-foreground/50">Community Hub</p>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {NAV.map((item) => {
+          const active = item.href === "/"
+            ? location === "/"
+            : location.startsWith(item.href);
+          return (
+            <Link key={item.href} href={item.href}>
+              <a className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                active
+                  ? "bg-sidebar-accent text-sidebar-foreground font-medium"
+                  : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+              }`}>
+                <span className="text-base leading-none">{item.icon}</span>
+                {item.label}
+              </a>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="px-3 py-4 border-t border-sidebar-border">
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+        >
+          <span className="text-base leading-none">🚪</span>
+          Sign out
+        </button>
+      </div>
+    </aside>
+  );
+}
