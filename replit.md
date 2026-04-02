@@ -462,6 +462,122 @@ Generated piece:
 
 ---
 
+## Monetisation Plan
+
+The platform has two natural revenue streams that can start generating income almost immediately, both without needing to build any self-serve infrastructure first. Everything in Phase 1 can be done manually while the platform grows.
+
+---
+
+### Stream 1 — Newsletter Sponsorship & Advertising
+
+#### Concept
+Each newsletter issue has a fixed number of paid slots. Businesses pay to appear in front of the subscriber list for that month. Price scales automatically with audience size — as the list grows, you raise prices, and the early sponsors who backed you at €30/month benefit from a price lock until they cancel.
+
+#### Ad slot types (within a newsletter issue)
+| Slot | What it is | Launch price | 1k subscribers | 2k+ subscribers |
+|---|---|---|---|---|
+| **Spot ad** | Small text block + logo, ~50 words, appears mid-newsletter | €30/month | €75/month | €150/month |
+| **Section sponsor** | "Sport this week is brought to you by X" — logo + one line at the top of a category section | €60/month | €125/month | €250/month |
+| **Issue sponsor** | "This month's Tallaght Community newsletter is presented by X" — top and bottom of full issue, 150-word editorial piece about the business, logo throughout | €120/month | €250/month | €500/month |
+
+- Maximum 2 paid slots per issue to maintain editorial quality and reader trust
+- Slots for the next issue become available after the current one sends
+- Long-term sponsors (paying 3+ months consecutively) get a 10% loyalty discount — rewards commitment and reduces churn
+
+#### Selling it (Phase 1 — no self-serve portal needed)
+- Reach out to local businesses by WhatsApp or phone — Tallaght is a community, direct is better
+- Send them the stats (subscriber count, open rate, WhatsApp delivery rate) as social proof
+- Collect payment via bank transfer or Revolut to start; move to Stripe when volumes justify it
+- Track bookings in a simple spreadsheet: business name, slot type, issue, paid/unpaid, renewal date
+- Give them a simple brief form (Google Form is fine) — they fill in: business name, tagline, offer (if any), logo image, contact details
+
+#### Admin tools needed (Phase 2)
+- Newsletter issue builder needs "ad slots" section — assign a booked business to Spot/Section/Sponsor position for that issue
+- The newsletter template automatically places their content at the correct position
+- Admin dashboard: "Sponsorship" page — list of all bookings, status (paid/unpaid/upcoming/expired), renewal alerts
+
+#### Stripe integration (Phase 3)
+- Monthly recurring subscriptions per slot type
+- Business receives invoice email automatically
+- Admin gets notified when a subscription cancels (slot becomes available)
+- Self-serve: business can log in to update their ad copy/logo before each issue
+
+---
+
+### Stream 2 — Business Listings & Featured Content
+
+This is where it gets interesting, because there are several models and it's worth understanding the tradeoffs before committing to one. The right choice depends on whether the priority is volume of businesses or revenue per business.
+
+#### Option A — AI-Written Business Feature Articles (recommended for early stage)
+A business pays for a professionally written article about them, placed permanently on the platform. The AI writes it from a brief they fill in (what the business does, their story, any current offer or news). It gets published just like any other article but labeled "Sponsored Content" or "Business Feature".
+
+**Why this works well for Tallaght:**
+- Local businesses can't afford a PR agency. A permanent, well-written article on a well-indexed local website is genuinely valuable — it helps their Google ranking for local searches
+- One-time cost means no ongoing commitment to scare them off
+- Low delivery overhead — AI writes the draft, admin reviews, publishes
+- Permanent benefit — unlike an ad that disappears, the article stays forever and keeps generating SEO value
+
+**Pricing:**
+- €75–150 per article (launch price €75, raise to €100+ as traffic grows)
+- Optional add-on: newsletter mention in the same month's issue (€30 — cheaper than standalone spot ad)
+
+**How the brief works:**
+- Business fills in a simple WhatsApp/form submission with: business name, what they do, their story, any special offer or news angle
+- This goes into the standard WhatsApp pipeline but is flagged as a paid submission
+- AI writes a 400-word editorial-style piece (same pipeline, but with a "business feature" system prompt variant that focuses on what makes the business unique to Tallaght)
+- Admin reviews and publishes — or sends the draft to the business for approval first
+
+#### Option B — Enhanced Business Directory Listings
+A permanent directory page on the website for each business, like a mini profile.
+
+| Tier | What's included | Price |
+|---|---|---|
+| **Free basic** | Name, category, phone, website link — automatically indexed if mentioned in an article | Free |
+| **Enhanced** (€12/month or €120/year) | Business photo, opening hours, short description, "Verified Local Business" badge, priority in directory search |
+| **Featured** (€30/month or €300/year) | Everything in Enhanced + prominent placement at top of category, mentioned in relevant newsletter sections, linked from related editorial articles |
+
+**Tradeoff**: A directory needs traffic before businesses will pay for enhanced listings. Works better in 6–12 months when the site is established than at launch.
+
+#### Option C — Category Sponsorship (hybrid approach)
+A business sponsors an entire content category on the website for a month. Their name/logo appears on every article in that category during the sponsorship period.
+
+Examples:
+- A local gym sponsors the "Sport" category — "*Sport coverage this month supported by [Gym]*"
+- A solicitor sponsors "News & Issues" — "*News coverage supported by [Solicitor]*"
+- A restaurant sponsors "Events & What's On"
+
+**Why this is easy to sell**: The pitch is simple and tangible. "Your logo appears on every sport article we publish this month." No confusion about what they're getting.
+
+**Pricing**: €80–200/month depending on category traffic. Sport and News likely command the highest rates.
+
+**Technical need**: A `sponsors` field on the categories table — admin assigns a monthly sponsor to a category. Article templates check if the category has a current sponsor and render the line if so.
+
+---
+
+### Recommended rollout order
+
+**Right now (no code needed):**
+1. Start selling newsletter spots for the first newsletter issue manually
+2. Offer AI Business Feature articles to a handful of local businesses at €75 launch price — this funds itself almost immediately (2 articles = €150, covers OpenAI costs for months)
+3. Reach out via WhatsApp to local businesses — Tallaght GAA sponsors, local gyms, solicitors, estate agents — these are the most likely early buyers
+
+**Phase 2 (after first 3 months):**
+4. Build newsletter ad slot management into admin
+5. Add "Sponsored Content" article type with proper labeling in admin
+6. Add simple billing records page to admin (manual payment tracking)
+
+**Phase 3 (when list hits 500+ subscribers):**
+7. Stripe integration for newsletter recurring subscriptions
+8. Business directory with enhanced/featured tiers
+9. Category sponsorship system
+
+---
+
+### Important note on editorial integrity
+Sponsored content must be clearly labeled — "Sponsored Content", "Business Feature", or "Supported by [X]" depending on the format. This protects the editorial credibility of the platform which is its most valuable long-term asset. Community trust is worth more than any individual ad deal.
+
+---
+
 ### Video upload handling (WhatsApp pipeline)
 - **Rule**: Any WhatsApp submission containing a video file must always be routed to `held` status — no auto-publish regardless of confidence score.
 - **AI assessment approach**:
