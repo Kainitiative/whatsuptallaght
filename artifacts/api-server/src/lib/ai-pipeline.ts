@@ -319,6 +319,7 @@ async function writeArticle(
     "   - If the submission says someone caught a fish at an event, do not add detail about what the event means, its philosophy, or its impact.",
     "   - Do not write about what organisations 'are known for' or 'are committed to' unless the submission says so.",
     "   - Do not add quotes, opinions, or motivational language that wasn't in the submission.",
+    "   - You may use simple connecting language to make the article read naturally, but do not introduce new facts.",
     "",
     "2. LENGTH must match the source. Short submission = short article.",
     "   - A one-sentence submission should produce a 2–4 sentence article. Do not pad it.",
