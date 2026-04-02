@@ -336,7 +336,15 @@ async function writeArticle(
     "- If the submission contains a [COMMUNITY MEMBER'S MESSAGE], that text is the story. The photo provides visual context only — do not let it override the text.",
     "- If there is no text (only an [ATTACHED PHOTO]), write from the image description.",
     ...(examplesBlock
-      ? ["", "Reference these published examples for the correct style and tone:", examplesBlock]
+      ? [
+          "",
+          "STYLE REFERENCE:",
+          "You will be given example articles written in the preferred style.",
+          "Match their tone, structure, and level of simplicity.",
+          "Write in a similar way, but do NOT copy phrases or sentences directly.",
+          "",
+          examplesBlock,
+        ]
       : []),
   ].join("\n");
 
