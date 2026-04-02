@@ -285,6 +285,11 @@ async function writeArticle(
     "- For events: include date, time, location, and what people need to know",
     "- For news: include who, what, where, when, and impact on the community",
     "- Output the article body only — no headline, no byline, no category label",
+    "",
+    "IMPORTANT — source priority:",
+    "- If the submission contains a [COMMUNITY MEMBER'S MESSAGE], that text is the story. Write the article based on what they wrote. The photo is supporting context.",
+    "- Only write an article based on an image if the submission contains no text — i.e. it is labelled [ATTACHED PHOTO — only source of information].",
+    "- Never let a photo description override or replace the story the person actually described in their message.",
     ...(examplesBlock
       ? ["", "Reference these published examples for the correct style and tone:", examplesBlock]
       : []),
@@ -408,8 +413,26 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   }
 
   // --- Build combined text for AI stages ---
-  const combinedParts = [rawText, ...transcripts, ...imageDescriptions].filter(Boolean);
-  const combinedText = combinedParts.join("\n\n");
+  // Text and voice transcripts are the PRIMARY story source.
+  // Image descriptions are SUPPLEMENTARY context — only the lead story if no text/audio exists.
+  const textParts = [rawText, ...transcripts].filter(Boolean);
+  const hasText = textParts.length > 0;
+  const hasImages = imageDescriptions.length > 0;
+
+  let combinedText: string;
+  if (hasText && hasImages) {
+    // Text leads — image is supporting context only
+    combinedText =
+      `[COMMUNITY MEMBER'S MESSAGE — primary story source]\n${textParts.join("\n\n")}` +
+      `\n\n[ATTACHED PHOTO — supporting visual context only, do not make this the story angle]\n${imageDescriptions.join("\n\n")}`;
+  } else if (hasText) {
+    combinedText = textParts.join("\n\n");
+  } else if (hasImages) {
+    // No text — image is all we have, let it lead
+    combinedText = `[ATTACHED PHOTO — only source of information for this submission]\n${imageDescriptions.join("\n\n")}`;
+  } else {
+    combinedText = "";
+  }
 
   if (!combinedText.trim()) {
     await db
