@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { getPosts, updatePost, deletePost, createGoldenExample, type Post } from "@/lib/api";
 import { formatDateShort, statusColour, confidenceColour } from "@/lib/utils";
 import StarRating from "@/components/StarRating";
+import ArticleEditModal from "@/components/ArticleEditModal";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -24,6 +25,7 @@ export default function Articles() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [working, setWorking] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [editPost, setEditPost] = useState<Post | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -90,8 +92,21 @@ export default function Articles() {
     }
   }
 
+  function handleEditSaved(updated: Post) {
+    setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    setEditPost(null);
+    showToast("Article saved");
+  }
+
   return (
     <div className="p-8 max-w-5xl">
+      {editPost && (
+        <ArticleEditModal
+          post={editPost}
+          onClose={() => setEditPost(null)}
+          onSaved={handleEditSaved}
+        />
+      )}
       {toast && (
         <div className="fixed top-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm shadow-lg z-50 animate-in fade-in slide-in-from-top-2">
           {toast}
@@ -162,6 +177,12 @@ export default function Articles() {
                       className="px-2.5 py-1.5 text-xs border border-border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       {expanded === post.id ? "Hide" : "Read"}
+                    </button>
+                    <button
+                      onClick={() => setEditPost(post)}
+                      className="px-2.5 py-1.5 text-xs border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      Edit
                     </button>
                     {(post.starRating ?? 0) >= 4 && (
                       <button

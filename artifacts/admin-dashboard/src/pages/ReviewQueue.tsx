@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { getPosts, updatePost, type Post } from "@/lib/api";
 import { formatDate, confidenceColour } from "@/lib/utils";
+import ArticleEditModal from "@/components/ArticleEditModal";
 
 export default function ReviewQueue() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [editPost, setEditPost] = useState<Post | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,8 +51,21 @@ export default function ReviewQueue() {
     );
   }
 
+  function handleEditSaved(updated: Post) {
+    setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p))
+      .filter((p) => updated.status === "held" ? true : p.id !== updated.id));
+    setEditPost(null);
+  }
+
   return (
     <div className="p-8 max-w-4xl">
+      {editPost && (
+        <ArticleEditModal
+          post={editPost}
+          onClose={() => setEditPost(null)}
+          onSaved={handleEditSaved}
+        />
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Review Queue</h1>
@@ -96,6 +111,12 @@ export default function ReviewQueue() {
                       className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       {expanded === post.id ? "Hide" : "Read"}
+                    </button>
+                    <button
+                      onClick={() => setEditPost(post)}
+                      className="px-3 py-1.5 text-xs border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      Edit
                     </button>
                     <button
                       onClick={() => reject(post)}
