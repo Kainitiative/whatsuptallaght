@@ -175,6 +175,44 @@ Phase 2c — RSS feed ingestion with Tallaght geo-filtering and AI rewriting.
 
 ## Planned Features (not yet built)
 
+### AI-generated article header images (DALL·E 3)
+
+#### Concept
+When an article has no header image (most WhatsApp submissions and RSS articles), the AI generates a contextually appropriate image using DALL·E 3 and stores it as the article's `headerImageUrl`. This dramatically improves visual impact on the home page and article pages.
+
+#### How it works
+- **Trigger**: After article writing (Stage 6 of the AI pipeline), if no image was submitted with the original content, add an optional Stage 7: image generation
+- **Prompt construction**: Use the article headline + key facts (already extracted in Stage 5) to build a DALL·E 3 prompt. The prompt should describe a scene relevant to the article — not logos or brands.
+- **Style guidance in prompt**: "photorealistic community news photography style, no text, no watermarks, vibrant but factual" — avoids AI-looking imagery
+- **Special cases**:
+  - **Sports/partnership articles**: use team colours and symbolic imagery (e.g. two sets of kit colours, trophies, stadium) rather than actual logos (DALL·E will not render real logos reliably)
+  - **Events**: crowd scenes, event venue, community gathering
+  - **Infrastructure/transport**: roads, buses, Luas, cycling lanes
+  - **Community notices**: local streets, community centre settings
+
+#### Image storage
+- Generated images are returned as URLs from OpenAI's CDN (expire after ~1 hour) — must be downloaded immediately and stored
+- Use Replit Object Storage (already configured in the project) to store images permanently
+- Store the public Object Storage URL in `posts.header_image_url`
+
+#### Cost
+- DALL·E 3 standard quality 1024×1024: ~$0.04 per image
+- Only generate when no image already exists — WhatsApp image submissions skip this step
+- Could be made opt-in per feed trust level (e.g. skip for "official" feeds that don't need it)
+- Admin toggle: "Auto-generate images" on/off in Settings
+
+#### Admin controls
+- Article detail view: "Regenerate image" button — re-runs DALL·E with the same prompt
+- "Edit prompt" — admin can tweak the image prompt before regenerating
+- Show the DALL·E prompt used so admin can understand why the image looks as it does
+
+#### Implementation notes
+- Add `imagePrompt` field to `posts` table (text, nullable) — stores the prompt used for transparency/debugging
+- `object-storage` skill already covers the upload pattern
+- Coordinate with the existing `headerImageUrl` field — no schema changes needed beyond `imagePrompt`
+
+---
+
 ### Per-article AI cost display (Articles page & article detail)
 - **What exists**: `ai_usage_log` table already records every OpenAI API call with token counts and USD cost, linked to each submission via `submission_id`. The AI Usage page shows platform-wide totals and breakdowns.
 - **What's missing**: Individual article cards / article detail view don't show how much that specific article cost to generate.
