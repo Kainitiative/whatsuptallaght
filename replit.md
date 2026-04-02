@@ -171,6 +171,21 @@ Phase 2c — RSS feed ingestion with Tallaght geo-filtering and AI rewriting.
 - `DEPRECATED_URLS` array in seed-rss-feeds.ts auto-disables old/broken URLs on each startup
 - `onConflictDoUpdate` now also syncs `isActive` so deactivations propagate correctly
 
+---
+
+## Planned Features (not yet built)
+
+### Video upload handling (WhatsApp pipeline)
+- **Rule**: Any WhatsApp submission containing a video file must always be routed to `held` status — no auto-publish regardless of confidence score.
+- **AI assessment approach**:
+  - Extract the audio track from the video and transcribe with Whisper (same as voice notes)
+  - Extract a sample of key frames (e.g. one every 5 seconds) and describe each with GPT-4o Vision
+  - Combine transcript + frame descriptions into a written AI assessment stored on the submission record
+- **Review Queue**: Show a "Contains video" badge on video submissions; display the AI assessment note so editors know what the video contains before approving or rejecting — without needing to watch it first
+- **Tooling note**: Will require `ffmpeg` to extract audio and frames from the video buffer before passing to OpenAI
+
+---
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
