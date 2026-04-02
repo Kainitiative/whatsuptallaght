@@ -322,6 +322,7 @@ async function writeArticle(
     "   - Do not write about what organisations 'are known for' or 'are committed to' unless the submission says so.",
     "   - Do not add quotes, opinions, or motivational language that wasn't in the submission.",
     "   - You may use simple connecting language to make the article read naturally, but do not introduce new facts.",
+    "   - If any detail in the submission is uncertain (e.g. 'I think', 'not sure'), reflect that uncertainty in the article. Do not present it as a confirmed fact.",
     "",
     "2. LENGTH must match the source. Short submission = short article.",
     "   - A one-sentence submission should produce a 2–4 sentence article. Do not pad it.",
