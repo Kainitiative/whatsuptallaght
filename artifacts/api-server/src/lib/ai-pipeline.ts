@@ -157,18 +157,26 @@ async function describeImage(openai: OpenAI, buffer: Buffer, mimeType: string, c
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
-    max_tokens: 400,
+    max_tokens: 600,
     messages: [
       {
         role: "user",
         content: [
           {
             type: "image_url",
-            image_url: { url: dataUrl, detail: "low" },
+            image_url: { url: dataUrl, detail: "high" },
           },
           {
             type: "text",
-            text: "Describe this image in detail for a local community news article. Focus on: any visible text, people, events, locations, damage, activities, or anything newsworthy about the Tallaght/Dublin area. Be factual and specific. If the image is not newsworthy or unclear, say so briefly.",
+            text: `Extract all factual information visible in this image for a local community news article.
+
+CRITICAL RULES:
+- Copy dates, times, prices, names, and locations EXACTLY as they appear in the image. Do not paraphrase, correct, or infer them.
+- If a date shows "Apr 18" write "April 18". If a time shows "5 pm", write "5 pm". Do not change these.
+- Only report what is explicitly visible. Do not add context, background, or interpretation.
+- If text is unclear or partially visible, say so rather than guessing.
+
+Report: event name, date, time, venue, organiser, ticket price, and a brief description of what the event is, using only what is written in the image.`,
           },
         ],
       },
