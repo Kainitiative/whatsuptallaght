@@ -9,6 +9,7 @@ import Articles from "@/pages/Articles";
 import GoldenExamples from "@/pages/GoldenExamples";
 import Settings from "@/pages/Settings";
 import Usage from "@/pages/Usage";
+import RssFeeds from "@/pages/RssFeeds";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -30,6 +31,7 @@ function ProtectedLayout() {
           <Route path="/review" component={ReviewQueue} />
           <Route path="/articles" component={Articles} />
           <Route path="/golden" component={GoldenExamples} />
+          <Route path="/rss" component={RssFeeds} />
           <Route path="/usage" component={Usage} />
           <Route path="/settings" component={Settings} />
           <Route>

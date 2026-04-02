@@ -91,6 +91,32 @@ export async function clearSetting(key: string) {
   return request<void>(`/admin/settings/${key}`, { method: "DELETE" });
 }
 
+export interface RssFeed {
+  id: number;
+  name: string;
+  url: string;
+  isActive: boolean;
+  checkIntervalMinutes: number;
+  lastFetchedAt: string | null;
+  createdAt: string;
+}
+
+export async function getRssFeeds() {
+  return request<RssFeed[]>("/rss/feeds");
+}
+
+export async function createRssFeed(data: { name: string; url: string; checkIntervalMinutes?: number }) {
+  return request<RssFeed>("/rss/feeds", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateRssFeed(id: number, data: Partial<Pick<RssFeed, "name" | "url" | "isActive" | "checkIntervalMinutes">>) {
+  return request<RssFeed>(`/rss/feeds/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteRssFeed(id: number) {
+  return request<void>(`/rss/feeds/${id}`, { method: "DELETE" });
+}
+
 export async function getGoldenExamples() {
   return request<GoldenExample[]>("/admin/golden-examples");
 }
