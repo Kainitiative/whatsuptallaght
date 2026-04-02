@@ -175,6 +175,19 @@ Phase 2c — RSS feed ingestion with Tallaght geo-filtering and AI rewriting.
 
 ## Planned Features (not yet built)
 
+### Per-article AI cost display (Articles page & article detail)
+- **What exists**: `ai_usage_log` table already records every OpenAI API call with token counts and USD cost, linked to each submission via `submission_id`. The AI Usage page shows platform-wide totals and breakdowns.
+- **What's missing**: Individual article cards / article detail view don't show how much that specific article cost to generate.
+- **Plan**:
+  - Add a `GET /posts/:id/cost` endpoint (or include cost in the existing post response) that sums all `ai_usage_log` entries for the article's `source_submission_id`
+  - Return total input tokens, output tokens, total cost USD, and a breakdown by stage (tone classify, info extract, write article, etc.)
+  - Display a small cost badge on each article card in the Articles page (e.g. "$0.009")
+  - Show a full cost breakdown in the article detail/edit view — which pipeline stages ran, what each cost, total spend
+- **Join path**: `posts.source_submission_id` → `ai_usage_log.submission_id`
+- **Note**: Articles processed before the usage tracking was added (the first 12) will show $0.00 — add a "legacy — no data" label for those rather than showing zero
+
+---
+
 ### Video upload handling (WhatsApp pipeline)
 - **Rule**: Any WhatsApp submission containing a video file must always be routed to `held` status — no auto-publish regardless of confidence score.
 - **AI assessment approach**:
