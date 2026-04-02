@@ -188,6 +188,85 @@ Phase 2c — RSS feed ingestion with Tallaght geo-filtering and AI rewriting.
 
 ---
 
+### Newsletter system (WhatsApp + Email delivery)
+
+#### Overview
+A monthly newsletter compiled from the best articles of that month, delivered via WhatsApp (free, using the 24-hour reply window) and/or email. Subscribers manage their own delivery preference. Sign-up available on the public website and via WhatsApp replies.
+
+#### Subscriber data model (`newsletter_subscribers` table)
+| Column | Notes |
+|---|---|
+| `phone` | WhatsApp number — optional, required for WhatsApp delivery |
+| `email` | Email address — optional, required for email delivery |
+| `delivery_pref` | `whatsapp_only` \| `email_only` \| `both` \| `unsubscribed` |
+| `source` | How they signed up: `website_form` \| `whatsapp_auto` \| `whatsapp_reply` |
+| `confirmed_at` | Timestamp of first confirmed contact |
+| `pref_updated_at` | Timestamp of last preference change |
+
+#### Newsletter issues (`newsletters` table)
+| Column | Notes |
+|---|---|
+| `month` | e.g. `2026-04` — unique, one per month |
+| `title` | e.g. "April 2026 — Tallaght Community Newsletter" |
+| `slug` | URL path, e.g. `/newsletter/april-2026` |
+| `body_html` | Full rendered HTML for email delivery |
+| `summary_text` | Short WhatsApp-friendly text summary (with link) |
+| `status` | `draft` \| `published` |
+| `published_at` | When it went live |
+| `article_ids` | Array of post IDs included in this issue |
+
+#### WhatsApp newsletter sends (`newsletter_wa_sends` table)
+Tracks which phone numbers have already received the current month's newsletter via WhatsApp auto-reply, to avoid sending it twice.
+| Column | Notes |
+|---|---|
+| `phone` | Recipient phone number |
+| `newsletter_month` | e.g. `2026-04` |
+| `sent_at` | Timestamp |
+
+#### Website sign-up form
+- Fields: **email** (required) + **phone number** (optional, labelled "Add your WhatsApp number for newsletter delivery")
+- Email only → `email_only` preference
+- Phone only → `whatsapp_only` preference
+- Both → `both` preference
+- Stores to `newsletter_subscribers` table; sends a confirmation reply/email immediately
+
+#### WhatsApp auto-delivery (free — within 24-hour session window)
+- When someone messages the WhatsApp number, the webhook checks: is there a published newsletter for this month, and has this number NOT already received it this month?
+- If yes → append newsletter link and preference prompt to the submission acknowledgment reply: *"While you wait — here's our April newsletter: [link]. Reply EMAIL to switch to email, BOTH for both, or STOP to unsubscribe."*
+- Mark the send in `newsletter_wa_sends` so it only happens once per number per month
+- This is **free** — it is a reply within the customer-initiated 24-hour window, not an outbound template message
+
+#### WhatsApp keyword detection (CRITICAL — must be pre-AI filter)
+Before any message is routed to the AI pipeline, check for control keywords. These must short-circuit immediately and never reach OpenAI:
+- `STOP` / `UNSUBSCRIBE` → mark subscriber as `unsubscribed`, reply confirmation
+- `EMAIL` → prompt for email address; on next reply containing `@`, store email and set `email_only`
+- `BOTH` → prompt for email address; on next reply containing `@`, store email and set `both`
+- `WHATSAPP` → set `whatsapp_only`, reply confirmation
+- A bare email address in a session where the bot is awaiting one → store it and confirm
+- **Note**: This requires a per-number "conversation state" flag (e.g. `awaiting_email`) in the contributors or subscribers table
+
+#### Email delivery
+- External sending service required — **Resend** recommended (3,000 emails/month free tier, simple API, excellent deliverability)
+- Monthly newsletter email: HTML email with top stories, images, and a "Read more on the website" CTA for each article
+- From address: e.g. `hello@[yourdomain].ie` — requires verified domain in Resend
+- Unsubscribe link in every email footer (legal requirement under GDPR)
+
+#### Admin: newsletter generation & publishing
+- New "Newsletter" section in admin dashboard
+- "Generate [Month] newsletter" button → AI selects top articles from the past month (best by category, diversity of topics)
+- Admin previews the selection, can add/remove articles, edit the intro paragraph
+- "Publish" → creates the newsletter page on the public website and queues delivery
+- Delivery queue: emails sent via Resend to all `email_only` and `both` subscribers; WhatsApp links queued for next-contact delivery to `whatsapp_only` and `both` subscribers
+- Stats: how many delivered by channel, open rate (email), click rate
+
+#### GDPR / compliance notes
+- Every email must have a one-click unsubscribe link
+- WhatsApp subscribers must have opted in (website form or explicit WhatsApp reply)
+- Store consent source and timestamp
+- Data deletion: admin should be able to delete a subscriber by phone/email on request
+
+---
+
 ### Video upload handling (WhatsApp pipeline)
 - **Rule**: Any WhatsApp submission containing a video file must always be routed to `held` status — no auto-publish regardless of confidence score.
 - **AI assessment approach**:
