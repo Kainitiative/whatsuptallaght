@@ -11,12 +11,14 @@ import statsRouter from "./stats";
 import settingsRouter from "./settings";
 import webhookRouter from "./webhook";
 import usageRouter from "./usage";
+import storageRouter from "./storage";
 import { adminAuth } from "../lib/admin-auth";
 
 const router: IRouter = Router();
 
 // Public routes
 router.use(healthRouter);
+router.use(storageRouter);
 router.use(categoriesRouter);
 router.use(postsRouter);
 router.use(submissionsRouter);

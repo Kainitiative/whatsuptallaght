@@ -13,6 +13,35 @@ import { getSettingValue } from "../routes/settings";
 import { downloadMedia } from "./whatsapp-client";
 import { sendTextMessage } from "./whatsapp-client";
 import { logger } from "./logger";
+import { objectStorageClient } from "./objectStorage";
+import { randomUUID } from "crypto";
+
+// ---------------------------------------------------------------------------
+// Server-side image upload to GCS
+// ---------------------------------------------------------------------------
+
+async function uploadImageBuffer(buffer: Buffer, mimeType: string): Promise<string | null> {
+  try {
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    const privateDir = process.env.PRIVATE_OBJECT_DIR;
+    if (!bucketId || !privateDir) {
+      logger.warn("Object storage not configured — image will not be saved");
+      return null;
+    }
+    const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
+    const objectId = randomUUID();
+    // GCS key: <privateDir>/whatsapp-images/<uuid>.<ext>
+    const gcsPath = `${privateDir}/whatsapp-images/${objectId}.${ext}`;
+    const bucket = objectStorageClient.bucket(bucketId);
+    const file = bucket.file(gcsPath);
+    await file.save(buffer, { contentType: mimeType, resumable: false });
+    // Serving URL: GET /api/storage/objects/<gcsPath>
+    return `/api/storage/objects/${gcsPath}`;
+  } catch (err) {
+    logger.error({ err }, "Failed to upload WhatsApp image to object storage");
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // OpenAI client
@@ -388,6 +417,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   const mediaUrls = submission.mediaUrls ?? [];
   const transcripts: string[] = [];
   const imageDescriptions: string[] = [];
+  let firstImagePath: string | null = null; // saved to GCS for use as article header
 
   for (const mediaId of mediaUrls) {
     try {
@@ -404,8 +434,15 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
           .where(eq(submissionsTable.id, submissionId));
       } else if (mimeType.startsWith("image/")) {
         logger.info({ submissionId, mediaId }, "AI pipeline: describing image");
-        const description = await describeImage(openai, buffer, mimeType, ctx);
+        const [description, storedPath] = await Promise.all([
+          describeImage(openai, buffer, mimeType, ctx),
+          uploadImageBuffer(buffer, mimeType),
+        ]);
         imageDescriptions.push(description);
+        if (!firstImagePath && storedPath) {
+          firstImagePath = storedPath;
+          logger.info({ submissionId, storedPath }, "AI pipeline: image uploaded to storage");
+        }
       }
     } catch (err) {
       logger.error({ err, submissionId, mediaId }, "AI pipeline: media processing failed");
@@ -525,6 +562,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
       primaryCategoryId: matchedCategory?.id ?? null,
       sourceSubmissionId: submissionId,
       publishedAt: postStatus === "published" ? new Date() : null,
+      headerImageUrl: firstImagePath ?? undefined,
     })
     .returning();
 
