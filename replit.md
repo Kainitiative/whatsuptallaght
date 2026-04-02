@@ -267,6 +267,87 @@ Before any message is routed to the AI pipeline, check for control keywords. The
 
 ---
 
+### Community reaction pieces ("Have Your Say" via WhatsApp hashtags)
+
+#### Concept
+When an article is published, it can be assigned a short reaction hashtag (e.g. `riot`, `watermain`, `busroute`). The social media post and/or article footer invites readers to WhatsApp their opinion using that tag: *"Have your say — WhatsApp us with #riot + your view."* Responses are collected for a set window, then the AI synthesises them into a companion "Community Reacts" article, which goes to the Review Queue for human approval before publishing.
+
+#### How the hashtag routing works (WhatsApp webhook)
+- Pre-AI filter: any incoming message whose text starts with `#` is treated as a reaction, not an article submission
+- Extract the hashtag (e.g. `riot` from `#riot these lads are a disgrace`)
+- Look up which published article has `reaction_hashtag = 'riot'`
+- If found → store as a reaction record; do NOT route to the AI article pipeline
+- If not found → treat as a normal submission (hashtag may be coincidental)
+- Acknowledge the sender: *"Thanks — your view has been noted and may be included in a community response piece."*
+
+#### Data model additions
+**`posts` table — new columns:**
+- `reaction_hashtag` — short tag admin assigns when publishing (e.g. `riot`). Unique. Null = reactions not enabled for this article.
+- `reaction_piece_id` — FK to the generated companion post once it's created
+
+**New `article_reactions` table:**
+| Column | Notes |
+|---|---|
+| `id` | serial PK |
+| `article_id` | FK → `posts.id` — the article this reaction belongs to |
+| `phone` | Submitter's phone number (never shown publicly) |
+| `hashtag` | The tag used (e.g. `riot`) |
+| `raw_text` | Their message, with the hashtag stripped out |
+| `safety_passed` | Boolean — individual moderation check result |
+| `sentiment` | `positive` \| `negative` \| `neutral` — quick AI classify |
+| `included_in_piece` | Boolean — whether this reaction was used in the generated piece |
+| `created_at` | Timestamp |
+
+#### Individual reaction processing
+Each reaction runs through:
+1. **Moderation check** (OpenAI Moderation API, free) — flag and exclude toxic/violating content
+2. **Quick sentiment classify** (GPT-4o-mini, ~0.0001 per reaction) — tag as positive/negative/neutral for balance in the generated piece
+3. Store result regardless — admin can see all reactions including flagged ones in the dashboard
+
+#### Generation trigger
+Two modes, both should exist:
+- **Auto-trigger**: a scheduled job checks every hour for articles where: `reaction_hashtag IS NOT NULL` AND at least 5 reactions have passed safety AND the article was published more than X hours ago (configurable per article, default 4 hours). Queues a `GENERATE_REACTION_PIECE` job.
+- **Manual trigger**: admin can click "Generate reaction piece" on any article in the dashboard at any time, regardless of threshold or timing.
+
+#### AI generation — the reaction piece
+The AI receives:
+- The original article body
+- All safety-passed reactions, with their sentiment labels
+- A count breakdown: e.g. "12 reactions total: 4 positive, 6 negative, 2 neutral"
+
+Prompt instructs it to:
+- Write a 200–400 word companion piece headlined *"Community Reacts: [Original Headline]"* or *"In Their Own Words: [Topic]"*
+- Present a balanced synthesis of views — do not cherry-pick only one sentiment
+- Never quote anyone by name or attribute specific views to identifiable individuals — use *"one resident said"*, *"several people expressed"*, *"others pointed out"*
+- Reference the number of responses received: *"More than a dozen Tallaght residents shared their views…"*
+- Link the piece back to the original article
+
+Generated piece:
+- Always goes to `held` status — never auto-published
+- Tagged as a companion to the original article via `posts.reaction_piece_id`
+- Appears in Review Queue with a "Community Reaction" badge
+- Admin approves, edits if needed, then publishes
+
+#### Admin dashboard additions needed
+- Article edit/detail view: field to set `reaction_hashtag`, toggle to enable/disable reactions
+- Reactions tab on each article: list of all received reactions with safety status, sentiment, phone (admin-only), and included/excluded flag
+- "Generate reaction piece" button (manual trigger)
+- Reaction piece count shown on article cards (e.g. "14 reactions")
+
+#### Cost per reaction piece
+- Moderation per reaction: free
+- Sentiment classify per reaction: ~$0.0001 (GPT-4o-mini, tiny prompt)
+- Reaction piece generation: ~$0.002–0.005 (GPT-4o-mini, short synthesis)
+- A 20-reaction article costs roughly $0.005 total — negligible
+
+#### Edge cases to handle
+- **Duplicate reactions from same number**: allow (people may send multiple thoughts), store all, but flag if more than 3 from one number (possible spam)
+- **No reactions after 24 hours**: auto-expire the hashtag, no piece generated
+- **All reactions flagged by moderation**: do not generate a piece; notify admin
+- **Hashtag clash**: enforce uniqueness in the DB; admin UI warns if tag is already in use
+
+---
+
 ### Video upload handling (WhatsApp pipeline)
 - **Rule**: Any WhatsApp submission containing a video file must always be routed to `held` status — no auto-publish regardless of confidence score.
 - **AI assessment approach**:
