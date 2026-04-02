@@ -161,3 +161,62 @@ export interface Pagination {
   total: number;
   totalPages: number;
 }
+
+export interface UsageTotals {
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
+export interface UsageByModel {
+  model: string;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
+export interface UsageByStage {
+  stage: string;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+}
+
+export interface UsageDaySeries {
+  day: string;
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  submissions: number;
+}
+
+export interface UsageEntry {
+  id: number;
+  submissionId: number | null;
+  jobId: number | null;
+  model: string;
+  stage: string;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: string;
+  createdAt: string;
+}
+
+export interface UsageData {
+  totals: {
+    today: UsageTotals;
+    week: UsageTotals;
+    month: UsageTotals;
+    allTime: UsageTotals;
+  };
+  byModel: UsageByModel[];
+  byStage: UsageByStage[];
+  dailySeries: UsageDaySeries[];
+  recentEntries: UsageEntry[];
+}
+
+export async function getUsage() {
+  return request<UsageData>("/admin/usage");
+}

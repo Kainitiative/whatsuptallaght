@@ -6,6 +6,7 @@ const NAV = [
   { href: "/review", label: "Review Queue", icon: "🔶" },
   { href: "/articles", label: "All Articles", icon: "📰" },
   { href: "/golden", label: "Golden Examples", icon: "⭐" },
+  { href: "/usage", label: "AI Usage", icon: "📊" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 

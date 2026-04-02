@@ -8,6 +8,7 @@ import ReviewQueue from "@/pages/ReviewQueue";
 import Articles from "@/pages/Articles";
 import GoldenExamples from "@/pages/GoldenExamples";
 import Settings from "@/pages/Settings";
+import Usage from "@/pages/Usage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -29,6 +30,7 @@ function ProtectedLayout() {
           <Route path="/review" component={ReviewQueue} />
           <Route path="/articles" component={Articles} />
           <Route path="/golden" component={GoldenExamples} />
+          <Route path="/usage" component={Usage} />
           <Route path="/settings" component={Settings} />
           <Route>
             <div className="p-8">

@@ -10,6 +10,7 @@ import rssRouter from "./rss";
 import statsRouter from "./stats";
 import settingsRouter from "./settings";
 import webhookRouter from "./webhook";
+import usageRouter from "./usage";
 import { adminAuth } from "../lib/admin-auth";
 
 const router: IRouter = Router();
@@ -29,5 +30,6 @@ router.use(adminRouter); // contains POST /admin/auth — must be unprotected
 router.use(adminAuth);
 router.use(settingsRouter);
 router.use(goldenExamplesRouter);
+router.use("/admin/usage", usageRouter);
 
 export default router;

@@ -6,6 +6,7 @@ import {
   categoriesTable,
   goldenExamplesTable,
   rssItemsTable,
+  aiUsageLogTable,
 } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSettingValue } from "../routes/settings";
@@ -21,6 +22,47 @@ async function getOpenAI(): Promise<OpenAI> {
   const apiKey = (await getSettingValue("openai_api_key")) ?? process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OpenAI API key is not configured");
   return new OpenAI({ apiKey });
+}
+
+// ---------------------------------------------------------------------------
+// Usage tracking
+// ---------------------------------------------------------------------------
+
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  "gpt-4o": { input: 2.50, output: 10.00 },
+  "gpt-4o-mini": { input: 0.15, output: 0.60 },
+};
+
+function calcCostUsd(model: string, inputTokens: number, outputTokens: number): number {
+  const pricing = MODEL_PRICING[model] ?? { input: 2.50, output: 10.00 };
+  return (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output;
+}
+
+type UsageCtx = { submissionId: number; jobId?: number };
+
+function logUsage(
+  ctx: UsageCtx,
+  model: string,
+  stage: string,
+  usage: { prompt_tokens: number; completion_tokens: number } | undefined,
+): void {
+  if (!usage) return;
+  const inputTokens = usage.prompt_tokens;
+  const outputTokens = usage.completion_tokens;
+  const costUsd = calcCostUsd(model, inputTokens, outputTokens);
+
+  db.insert(aiUsageLogTable)
+    .values({
+      submissionId: ctx.submissionId,
+      jobId: ctx.jobId,
+      model,
+      stage,
+      inputTokens,
+      outputTokens,
+      estimatedCostUsd: costUsd.toFixed(6),
+    })
+    .execute()
+    .catch((err) => logger.warn({ err }, "Failed to log AI usage"));
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +121,7 @@ async function transcribeAudio(
 // Stage 3 — Image understanding (GPT-4o Vision)
 // ---------------------------------------------------------------------------
 
-async function describeImage(openai: OpenAI, buffer: Buffer, mimeType: string): Promise<string> {
+async function describeImage(openai: OpenAI, buffer: Buffer, mimeType: string, ctx: UsageCtx): Promise<string> {
   const base64 = buffer.toString("base64");
   const dataUrl = `data:${mimeType};base64,${base64}`;
 
@@ -103,6 +145,7 @@ async function describeImage(openai: OpenAI, buffer: Buffer, mimeType: string): 
     ],
   });
 
+  logUsage(ctx, "gpt-4o", "image_describe", response.usage ?? undefined);
   return response.choices[0].message.content ?? "";
 }
 
@@ -116,7 +159,7 @@ interface ToneResult {
   confidence: number;
 }
 
-async function classifyTone(openai: OpenAI, combinedText: string): Promise<ToneResult> {
+async function classifyTone(openai: OpenAI, combinedText: string, ctx: UsageCtx): Promise<ToneResult> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
@@ -138,6 +181,7 @@ Respond in JSON: { "tone": string, "suggestedCategory": string, "confidence": nu
     ],
   });
 
+  logUsage(ctx, "gpt-4o-mini", "tone_classify", response.usage ?? undefined);
   try {
     return JSON.parse(response.choices[0].message.content ?? "{}") as ToneResult;
   } catch {
@@ -159,7 +203,7 @@ interface ExtractedInfo {
   completenessScore: number;
 }
 
-async function extractInfo(openai: OpenAI, combinedText: string): Promise<ExtractedInfo> {
+async function extractInfo(openai: OpenAI, combinedText: string, ctx: UsageCtx): Promise<ExtractedInfo> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
@@ -183,6 +227,7 @@ Respond in JSON:
     ],
   });
 
+  logUsage(ctx, "gpt-4o-mini", "info_extract", response.usage ?? undefined);
   try {
     return JSON.parse(response.choices[0].message.content ?? "{}") as ExtractedInfo;
   } catch {
@@ -208,6 +253,7 @@ async function writeArticle(
   info: ExtractedInfo,
   tone: ToneResult,
   goldenExamples: { inputText: string; outputText: string }[],
+  ctx: UsageCtx,
 ): Promise<string> {
   const examplesBlock =
     goldenExamples.length > 0
@@ -259,6 +305,7 @@ async function writeArticle(
     ],
   });
 
+  logUsage(ctx, "gpt-4o", "write_article", response.usage ?? undefined);
   return response.choices[0].message.content?.trim() ?? "";
 }
 
@@ -272,8 +319,9 @@ export interface PipelinePayload {
   contributorId: number;
 }
 
-export async function processWhatsAppSubmission(payload: PipelinePayload): Promise<void> {
-  const { submissionId, phoneNumber, contributorId } = payload;
+export async function processWhatsAppSubmission(payload: PipelinePayload & { jobId?: number }): Promise<void> {
+  const { submissionId, phoneNumber, contributorId, jobId } = payload;
+  const ctx: UsageCtx = { submissionId, jobId };
 
   logger.info({ submissionId }, "AI pipeline: starting");
 
@@ -345,7 +393,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload): Promi
           .where(eq(submissionsTable.id, submissionId));
       } else if (mimeType.startsWith("image/")) {
         logger.info({ submissionId, mediaId }, "AI pipeline: describing image");
-        const description = await describeImage(openai, buffer, mimeType);
+        const description = await describeImage(openai, buffer, mimeType, ctx);
         imageDescriptions.push(description);
       }
     } catch (err) {
@@ -372,11 +420,11 @@ export async function processWhatsAppSubmission(payload: PipelinePayload): Promi
 
   // --- Stage 4: Tone classification ---
   logger.info({ submissionId }, "AI pipeline: classifying tone");
-  const toneResult = await classifyTone(openai, combinedText);
+  const toneResult = await classifyTone(openai, combinedText, ctx);
 
   // --- Stage 5: Information extraction ---
   logger.info({ submissionId }, "AI pipeline: extracting info");
-  const infoResult = await extractInfo(openai, combinedText);
+  const infoResult = await extractInfo(openai, combinedText, ctx);
 
   // --- Resolve category from DB ---
   const allCategories = await db.select().from(categoriesTable);
@@ -395,7 +443,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload): Promi
 
   // --- Stage 7: Write article ---
   logger.info({ submissionId }, "AI pipeline: writing article");
-  const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples);
+  const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx);
 
   // --- Stage 8: Confidence score and routing ---
   const confidence =
@@ -487,8 +535,9 @@ export interface RssPipelinePayload {
   link: string;
 }
 
-export async function processRssSubmission(payload: RssPipelinePayload): Promise<void> {
-  const { submissionId, rssItemId, feedName, feedUrl, trustLevel, title, content, link } = payload;
+export async function processRssSubmission(payload: RssPipelinePayload & { jobId?: number }): Promise<void> {
+  const { submissionId, rssItemId, feedName, feedUrl, trustLevel, title, content, link, jobId } = payload;
+  const ctx: UsageCtx = { submissionId, jobId };
 
   logger.info({ submissionId, feedName }, "RSS pipeline: starting");
 
@@ -527,8 +576,8 @@ export async function processRssSubmission(payload: RssPipelinePayload): Promise
 
   // --- Tone + info extraction ---
   const [toneResult, infoResult] = await Promise.all([
-    classifyTone(openai, combinedText),
-    extractInfo(openai, combinedText),
+    classifyTone(openai, combinedText, ctx),
+    extractInfo(openai, combinedText, ctx),
   ]);
 
   // --- Resolve category ---
@@ -558,6 +607,7 @@ export async function processRssSubmission(payload: RssPipelinePayload): Promise
     ],
   });
 
+  logUsage(ctx, "gpt-4o-mini", "rss_rewrite", rssArticleResponse.usage ?? undefined);
   const articleBody = rssArticleResponse.choices[0].message.content?.trim() ?? content;
 
   // --- Confidence and routing ---
