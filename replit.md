@@ -578,6 +578,88 @@ Sponsored content must be clearly labeled — "Sponsored Content", "Business Fea
 
 ---
 
+### Entity Library (organisation & person image store)
+
+#### Concept
+A database of named entities — local organisations, people, venues, clubs, and recurring figures — each with a stored image (logo, headshot, team crest). When the AI writes an article, it checks whether any known entities are mentioned and automatically uses the matching image as the header image if no photo was submitted with the original message.
+
+#### How it works end to end
+1. A contributor sends a photo of the Tallaght Rehabilitation logo with a caption like *"Tallaght Rehabilitation are hosting an open day."*
+2. The image classifier detects it is a logo/branding asset (not a scene or event photo) and the admin is prompted: *"Save this as an entity image for Tallaght Rehabilitation?"*
+3. The entity record is created: name, aliases, type, stored image URL
+4. Future: any submission mentioning "Tallaght Rehabilitation" (or any alias) — even with no image — gets the stored logo as its header image automatically
+5. If a submission includes both an event photo and the entity is matched, the submitted photo takes priority (scenes trump logos)
+
+#### Entity record structure (`entities` table)
+| Column | Notes |
+|---|---|
+| `id` | serial PK |
+| `name` | Primary name (e.g. "Tallaght Rehabilitation") |
+| `aliases` | JSON array of alternate names (e.g. ["Tallaght Rehab", "TR"]) |
+| `type` | `organisation` \| `person` \| `venue` \| `team` \| `event` |
+| `imageUrl` | Stored image path (Object Storage) |
+| `website` | Optional |
+| `description` | Short summary (used as AI context when entity is matched) |
+| `createdAt` | Timestamp |
+
+#### AI matching step
+After article writing, the AI receives the entity list and the article body and returns any entities it finds mentioned. Confidence threshold applies — low-confidence matches do not override submitted images.
+
+#### Image precedence rules
+1. Submitted event/scene photo — always first choice
+2. Entity match — used when no photo submitted, or when submitted image is itself a logo
+3. DALL·E generated image — fallback if no entity match and no submitted image
+4. No image — last resort
+
+#### Monetisation angle
+Businesses with paid listings (Option A/B/C) get their logo/image stored as an entity — meaning every editorial article that mentions their business automatically uses their brand image. This is a tangible premium benefit that can be included in paid packages.
+
+#### Admin controls needed
+- Entity Library page in admin — list, add, edit, delete entities
+- On article detail: show which entity was matched (if any) and allow override
+- Image upload for entity logos directly in admin (no need to send via WhatsApp)
+- Alias management — "also known as" field for fuzzy matching
+
+---
+
+### Multi-image grouping (WhatsApp)
+
+#### The problem
+When a contributor sends two or more images at the same time in WhatsApp, each image arrives as a separate webhook event — milliseconds apart but with no shared identifier. The system currently treats each one as an independent submission and creates a separate article per image.
+
+#### Recommended approach: time-window + album detection (two layers)
+
+**Layer 1 — WhatsApp album metadata:**
+When a contributor uses WhatsApp's native multi-select (tap and hold to select multiple photos before sending), Meta's webhook includes a shared `context` field on each message linking them to the same album. If this field is present and matches a previous message, they are definitively the same submission. No delay required.
+
+**Layer 2 — Time-window grouping (fallback):**
+When images arrive individually (not as an album), the system holds each message in a pending state for 10 seconds before processing begins. Any additional message arriving from the same phone number within that window is merged into the same submission. After the window closes with no further messages, processing starts on the combined group.
+
+#### How grouping changes the pipeline
+- The submission record gains a `mediaItems` array (instead of a single image)
+- The image description stage describes all images and produces a combined summary
+- The AI article writer receives all descriptions and any caption text to produce one article
+- The first image (or best compositional image, per AI ranking) becomes the header image
+- Remaining images are stored and associated with the article for potential gallery display
+
+#### Precedence for caption text
+When multiple images are sent, the caption typically only appears on the first image. The pipeline should collect captions from all messages in the group and join them as the primary text source.
+
+#### Photo gallery on the website
+Once multi-image grouping works, an article can display a full photo gallery — multiple images stored and shown as a slideshow or grid on the article page. This is a significant quality upgrade for event coverage (e.g. 5 photos from a football match → one rich article with a gallery, not five thin articles).
+
+#### Admin controls needed
+- Merge tool: select two articles and ask the AI to combine them into one (for cases where automatic grouping missed it)
+- Article detail: show all images associated with the article, reorder them, set which is the header
+- Review Queue: "Combined submission" badge showing how many images were grouped
+
+#### Edge cases
+- Someone sends an image now and another image two hours later about a completely different topic — the 10-second window prevents false grouping
+- All images in a group fail the safety check — treat same as single rejected submission
+- Caption on second image but not first — still collected and used
+
+---
+
 ### Video upload handling (WhatsApp pipeline)
 - **Rule**: Any WhatsApp submission containing a video file must always be routed to `held` status — no auto-publish regardless of confidence score.
 - **AI assessment approach**:
