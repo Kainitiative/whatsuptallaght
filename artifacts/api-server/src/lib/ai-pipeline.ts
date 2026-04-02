@@ -159,23 +159,29 @@ interface ToneResult {
   confidence: number;
 }
 
-async function classifyTone(openai: OpenAI, combinedText: string, ctx: UsageCtx): Promise<ToneResult> {
+async function classifyTone(
+  openai: OpenAI,
+  combinedText: string,
+  ctx: UsageCtx,
+  categories: { name: string; description: string | null }[],
+): Promise<ToneResult> {
+  const categoryList = categories
+    .map((c) => `- "${c.name}"${c.description ? ` — ${c.description}` : ""}`)
+    .join("\n");
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
-        content: `You are an editor for a Tallaght, Dublin community news platform. Classify the tone of the following submission and suggest the best category.
+        content: `You are an editor for a Tallaght, Dublin community news platform. Classify the tone of the following submission and suggest the best category from the list below.
 
 Categories available:
-- "Events & What's On" — local events, activities, things to do
-- "Community & Notices" — community announcements, lost/found, notices, safety alerts
-- "News & Issues" — local news, politics, planning, infrastructure issues
-- "Sport" — local sports teams, results, fixtures, sports news
-- "Business & Local Services" — new businesses, closures, local services
+${categoryList}
 
-Respond in JSON: { "tone": string, "suggestedCategory": string, "confidence": number (0–1) }`,
+Respond in JSON: { "tone": string, "suggestedCategory": string, "confidence": number (0–1) }
+The suggestedCategory must exactly match one of the category names listed above.`,
       },
       { role: "user", content: combinedText },
     ],
@@ -185,7 +191,7 @@ Respond in JSON: { "tone": string, "suggestedCategory": string, "confidence": nu
   try {
     return JSON.parse(response.choices[0].message.content ?? "{}") as ToneResult;
   } catch {
-    return { tone: "news", suggestedCategory: "News & Issues", confidence: 0.5 };
+    return { tone: "news", suggestedCategory: categories[0]?.name ?? "News & Issues", confidence: 0.5 };
   }
 }
 
@@ -418,16 +424,18 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     return;
   }
 
+  // --- Resolve categories from DB (used by tone classifier + matching) ---
+  const allCategories = await db.select().from(categoriesTable);
+
   // --- Stage 4: Tone classification ---
   logger.info({ submissionId }, "AI pipeline: classifying tone");
-  const toneResult = await classifyTone(openai, combinedText, ctx);
+  const toneResult = await classifyTone(openai, combinedText, ctx, allCategories);
 
   // --- Stage 5: Information extraction ---
   logger.info({ submissionId }, "AI pipeline: extracting info");
   const infoResult = await extractInfo(openai, combinedText, ctx);
 
-  // --- Resolve category from DB ---
-  const allCategories = await db.select().from(categoriesTable);
+  // --- Resolve category ---
   const matchedCategory =
     allCategories.find(
       (c) => c.name.toLowerCase() === toneResult.suggestedCategory.toLowerCase(),
@@ -574,14 +582,16 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     .set({ safetyCheckPassed: "true", updatedAt: new Date() })
     .where(eq(submissionsTable.id, submissionId));
 
+  // --- Resolve categories from DB ---
+  const allCategories = await db.select().from(categoriesTable);
+
   // --- Tone + info extraction ---
   const [toneResult, infoResult] = await Promise.all([
-    classifyTone(openai, combinedText, ctx),
+    classifyTone(openai, combinedText, ctx, allCategories),
     extractInfo(openai, combinedText, ctx),
   ]);
 
   // --- Resolve category ---
-  const allCategories = await db.select().from(categoriesTable);
   const matchedCategory =
     allCategories.find(
       (c) => c.name.toLowerCase() === toneResult.suggestedCategory.toLowerCase(),

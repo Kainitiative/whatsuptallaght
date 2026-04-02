@@ -171,7 +171,7 @@ export async function seedDemoContent(): Promise<void> {
     const [created] = await db
       .insert(categoriesTable)
       .values(cat)
-      .onConflictDoUpdate({ target: categoriesTable.slug, set: { color: cat.color } })
+      .onConflictDoUpdate({ target: categoriesTable.slug, set: { color: cat.color, description: cat.description } })
       .returning();
     categoryMap[cat.slug] = created.id;
   }

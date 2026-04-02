@@ -7,6 +7,7 @@ export const categoriesTable = pgTable("categories", {
   name: text("name").notNull().unique(),
   slug: text("slug").notNull().unique(),
   color: text("color").notNull().default("#C0392B"),
+  description: text("description"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

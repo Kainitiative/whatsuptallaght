@@ -154,7 +154,20 @@ export interface Category {
   id: number;
   name: string;
   slug: string;
-  colour: string | null;
+  color: string;
+  description: string | null;
+}
+
+export async function createCategory(data: { name: string; slug: string; color?: string; description?: string | null }) {
+  return request<Category>("/categories", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateCategory(id: number, data: Partial<Pick<Category, "name" | "slug" | "color" | "description">>) {
+  return request<Category>(`/categories/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function deleteCategory(id: number) {
+  return request<{ success: boolean }>(`/categories/${id}`, { method: "DELETE" });
 }
 
 export interface Setting {
