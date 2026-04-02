@@ -146,7 +146,16 @@ async function handleIncomingMessage(
   }
 
   // --- Handle text commands ---
-  const rawText = message.text?.body ?? "";
+  // Captions on photos/videos are NOT in message.text.body — they're in message.image.caption etc.
+  const rawText = [
+    message.text?.body,
+    message.image?.caption,
+    message.video?.caption,
+    message.document?.caption,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
   if (rawText && isCommand(rawText)) {
     await handleCommand(phoneNumber, contributor.id, rawText);
