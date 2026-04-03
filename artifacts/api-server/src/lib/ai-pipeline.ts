@@ -288,6 +288,80 @@ Respond in JSON:
 }
 
 // ---------------------------------------------------------------------------
+// Stage 6b — Header image generation (DALL·E 3, optional)
+// ---------------------------------------------------------------------------
+
+function buildDallePrompt(headline: string, keyFacts: string[], tone: string): string {
+  const facts = keyFacts.slice(0, 3).filter(Boolean).join(", ");
+  const styleByTone: Record<string, string> = {
+    news: "editorial documentary photography, realistic, candid community scene",
+    event: "community event photography, bright and welcoming atmosphere, people gathered",
+    sport: "sports action photography, outdoor pitch, athletic movement",
+    community: "community documentary photography, warm neighbourhood feel",
+    business: "local business photography, storefront or interior, professional",
+    warning: "documentary photography, Tallaght street scene, overcast mood",
+    memorial: "respectful and dignified photography, flowers, quiet public space",
+    other: "photorealistic community news photography, Irish urban setting",
+  };
+  const style = styleByTone[tone] ?? styleByTone.other;
+  const factsClause = facts ? ` Scene relates to: ${facts}.` : "";
+  return `${style}. Subject: ${headline}.${factsClause} Set in Tallaght or Dublin, Ireland. No text overlays, no watermarks, no readable signs, no identifiable faces. High-quality editorial photography, natural lighting.`;
+}
+
+async function downloadBuffer(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download image: ${res.status}`);
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+async function generateHeaderImage(
+  openai: OpenAI,
+  headline: string,
+  keyFacts: string[],
+  tone: string,
+  ctx: UsageCtx,
+): Promise<{ imageUrl: string; imagePrompt: string } | null> {
+  try {
+    const prompt = buildDallePrompt(headline, keyFacts, tone);
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1024",
+      quality: "standard",
+      response_format: "url",
+    });
+
+    const tempUrl = response.data?.[0]?.url;
+    if (!tempUrl) return null;
+
+    const buffer = await downloadBuffer(tempUrl);
+    const storedPath = await uploadImageBuffer(buffer, "image/jpeg");
+    if (!storedPath) return null;
+
+    db.insert(aiUsageLogTable)
+      .values({
+        submissionId: ctx.submissionId,
+        jobId: ctx.jobId,
+        model: "dall-e-3",
+        stage: "generate_image",
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedCostUsd: "0.040000",
+      })
+      .execute()
+      .catch((err) => logger.warn({ err }, "Failed to log DALL·E usage"));
+
+    logger.info({ submissionId: ctx.submissionId }, "AI pipeline: header image generated");
+    return { imageUrl: storedPath, imagePrompt: prompt };
+  } catch (err) {
+    logger.error({ err, submissionId: ctx.submissionId }, "AI pipeline: DALL·E generation failed (non-fatal)");
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stage 6 — Article writing (GPT-4o)
 // ---------------------------------------------------------------------------
 
@@ -542,6 +616,21 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   logger.info({ submissionId }, "AI pipeline: writing article");
   const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx);
 
+  // --- Stage 7b: Generate header image if none submitted ---
+  let generatedImagePath: string | null = null;
+  let generatedImagePrompt: string | null = null;
+  if (!firstImagePath) {
+    const autoGenerate = await getSettingValue("auto_generate_images");
+    if (autoGenerate === "true") {
+      logger.info({ submissionId }, "AI pipeline: generating header image");
+      const generated = await generateHeaderImage(openai, infoResult.headline, infoResult.keyFacts, toneResult.tone, ctx);
+      if (generated) {
+        generatedImagePath = generated.imageUrl;
+        generatedImagePrompt = generated.imagePrompt;
+      }
+    }
+  }
+
   // --- Stage 8: Confidence score and routing ---
   const confidence =
     (infoResult.completenessScore * 0.5 +
@@ -591,7 +680,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
       primaryCategoryId: matchedCategory?.id ?? null,
       sourceSubmissionId: submissionId,
       publishedAt: postStatus === "published" ? new Date() : null,
-      headerImageUrl: firstImagePath ?? undefined,
+      headerImageUrl: firstImagePath ?? generatedImagePath ?? undefined,
+      imagePrompt: generatedImagePrompt ?? undefined,
     })
     .returning();
 
@@ -712,6 +802,19 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   logUsage(ctx, "gpt-4o-mini", "rss_rewrite", rssArticleResponse.usage ?? undefined);
   const articleBody = rssArticleResponse.choices[0].message.content?.trim() ?? content;
 
+  // --- Generate header image (RSS articles never have images) ---
+  let rssImagePath: string | null = null;
+  let rssImagePrompt: string | null = null;
+  const autoGenerate = await getSettingValue("auto_generate_images");
+  if (autoGenerate === "true") {
+    logger.info({ submissionId }, "RSS pipeline: generating header image");
+    const generated = await generateHeaderImage(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
+    if (generated) {
+      rssImagePath = generated.imageUrl;
+      rssImagePrompt = generated.imagePrompt;
+    }
+  }
+
   // --- Confidence and routing ---
   // Official sources get auto-published; news/general sources are held for review
   const baseConfidence = trustLevel === "official" ? 0.85 : trustLevel === "news" ? 0.6 : 0.5;
@@ -739,6 +842,8 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
       primaryCategoryId: matchedCategory?.id ?? null,
       sourceSubmissionId: submissionId,
       publishedAt: postStatus === "published" ? new Date() : null,
+      headerImageUrl: rssImagePath ?? undefined,
+      imagePrompt: rssImagePrompt ?? undefined,
     })
     .returning();
 
@@ -758,4 +863,20 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     { submissionId, postId: newPost.id, status: postStatus, feedName },
     "RSS pipeline: complete",
   );
+}
+
+// ---------------------------------------------------------------------------
+// Standalone: regenerate header image for an existing post (admin action)
+// ---------------------------------------------------------------------------
+
+export async function regeneratePostImage(
+  postId: number,
+  headline: string,
+  keyFacts: string[],
+  tone: string,
+  submissionId: number,
+): Promise<{ imageUrl: string; imagePrompt: string } | null> {
+  const openai = await getOpenAI();
+  const ctx: UsageCtx = { submissionId };
+  return generateHeaderImage(openai, headline, keyFacts, tone, ctx);
 }

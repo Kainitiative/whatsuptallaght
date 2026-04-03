@@ -259,3 +259,26 @@ export interface UsageData {
 export async function getUsage() {
   return request<UsageData>("/admin/usage");
 }
+
+export interface PostCostStage {
+  stage: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: string;
+  createdAt: string;
+}
+
+export interface PostCost {
+  hasData: boolean;
+  totalCostUsd: string;
+  stages: PostCostStage[];
+}
+
+export async function getPostCost(id: number) {
+  return request<PostCost>(`/posts/${id}/cost`);
+}
+
+export async function regeneratePostImage(id: number) {
+  return request<Post>(`/posts/${id}/regenerate-image`, { method: "POST" });
+}

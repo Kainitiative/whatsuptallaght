@@ -51,6 +51,21 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
   // ── OpenAI ───────────────────────────────────────────────────────────────────
 
   {
+    key: "auto_generate_images",
+    label: "Auto-Generate Article Images",
+    description:
+      "When enabled, the AI will automatically generate a header image for every article that does not have one " +
+      "(text-only WhatsApp submissions and all RSS articles). Images are created using DALL·E 3 and stored permanently. " +
+      "Cost: approximately $0.04 per image. Set to 'true' to enable or 'false' to disable. " +
+      "WhatsApp submissions that include a photo are not affected — submitted photos are always used.",
+    category: "openai",
+    isSecret: false,
+    isRequired: false,
+    isConfigured: false,
+    displayOrder: 11,
+  },
+
+  {
     key: "openai_api_key",
     label: "OpenAI API Key",
     description:

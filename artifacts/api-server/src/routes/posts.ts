@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable, submissionsTable, contributorsTable } from "@workspace/db/schema";
-import { eq, and, desc, count, sql, ilike } from "drizzle-orm";
+import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable, submissionsTable, contributorsTable, aiUsageLogTable } from "@workspace/db/schema";
+import { eq, and, desc, count, sql, ilike, sum } from "drizzle-orm";
 import { sendTextMessage } from "../lib/whatsapp-client";
 import { getSettingValue } from "./settings";
+import { regeneratePostImage } from "../lib/ai-pipeline";
 
 const router = Router();
 
@@ -243,6 +244,95 @@ router.patch("/posts/:id", async (req, res) => {
     }
   } catch (err) {
     res.status(500).json({ error: "internal_error", message: "Failed to update post" });
+  }
+});
+
+router.get("/posts/:id/cost", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
+
+  try {
+    const [post] = await db
+      .select({ sourceSubmissionId: postsTable.sourceSubmissionId })
+      .from(postsTable)
+      .where(eq(postsTable.id, id))
+      .limit(1);
+
+    if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
+
+    if (!post.sourceSubmissionId) {
+      return res.json({ hasData: false, totalCostUsd: "0.000000", stages: [] });
+    }
+
+    const usage = await db
+      .select()
+      .from(aiUsageLogTable)
+      .where(eq(aiUsageLogTable.submissionId, post.sourceSubmissionId))
+      .orderBy(aiUsageLogTable.createdAt);
+
+    if (usage.length === 0) {
+      return res.json({ hasData: false, totalCostUsd: "0.000000", stages: [] });
+    }
+
+    const totalCost = usage.reduce((sum, r) => sum + parseFloat(r.estimatedCostUsd), 0);
+
+    return res.json({
+      hasData: true,
+      totalCostUsd: totalCost.toFixed(6),
+      stages: usage.map((r) => ({
+        stage: r.stage,
+        model: r.model,
+        inputTokens: r.inputTokens,
+        outputTokens: r.outputTokens,
+        costUsd: r.estimatedCostUsd,
+        createdAt: r.createdAt,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: "internal_error", message: "Failed to fetch cost data" });
+  }
+});
+
+router.post("/posts/:id/regenerate-image", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
+
+  try {
+    const [post] = await db
+      .select()
+      .from(postsTable)
+      .where(eq(postsTable.id, id))
+      .limit(1);
+
+    if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
+
+    const keyFacts = post.body
+      .split(". ")
+      .slice(0, 3)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const generated = await regeneratePostImage(
+      id,
+      post.title,
+      keyFacts,
+      "news",
+      post.sourceSubmissionId ?? id,
+    );
+
+    if (!generated) {
+      return res.status(500).json({ error: "generation_failed", message: "Image generation failed — check OpenAI key and object storage config" });
+    }
+
+    const [updated] = await db
+      .update(postsTable)
+      .set({ headerImageUrl: generated.imageUrl, imagePrompt: generated.imagePrompt, updatedAt: new Date() })
+      .where(eq(postsTable.id, id))
+      .returning();
+
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: "internal_error", message: err.message ?? "Failed to regenerate image" });
   }
 });
 

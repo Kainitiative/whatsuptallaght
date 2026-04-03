@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { getPosts, updatePost, deletePost, createGoldenExample, type Post } from "@/lib/api";
+import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, type Post, type PostCost } from "@/lib/api";
 import { formatDateShort, statusColour, confidenceColour } from "@/lib/utils";
 import StarRating from "@/components/StarRating";
 import ArticleEditModal from "@/components/ArticleEditModal";
@@ -26,6 +26,7 @@ export default function Articles() {
   const [working, setWorking] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [editPost, setEditPost] = useState<Post | null>(null);
+  const [costs, setCosts] = useState<Record<number, PostCost>>({});
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -98,6 +99,30 @@ export default function Articles() {
     showToast("Article saved");
   }
 
+  async function handleExpand(postId: number) {
+    const next = expanded === postId ? null : postId;
+    setExpanded(next);
+    if (next && !costs[next]) {
+      try {
+        const cost = await getPostCost(next);
+        setCosts((prev) => ({ ...prev, [next]: cost }));
+      } catch {}
+    }
+  }
+
+  async function handleRegenerateImage(post: Post) {
+    setWorking(post.id);
+    try {
+      const updated = await regeneratePostImage(post.id);
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? updated : p)));
+      showToast("✅ New image generated");
+    } catch (err: any) {
+      showToast(`❌ ${err.message ?? "Image generation failed"}`);
+    } finally {
+      setWorking(null);
+    }
+  }
+
   return (
     <div className="p-8 max-w-5xl">
       {editPost && (
@@ -157,6 +182,11 @@ export default function Articles() {
                           {Math.round(parseFloat(post.confidenceScore) * 100)}%
                         </span>
                       )}
+                      {costs[post.id]?.hasData && (
+                        <span className="text-xs font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                          ${parseFloat(costs[post.id].totalCostUsd).toFixed(4)}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">{formatDateShort(post.createdAt)}</span>
                     </div>
                     <h3 className="font-medium text-foreground mt-1 leading-tight">{post.title}</h3>
@@ -173,7 +203,7 @@ export default function Articles() {
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                     <button
-                      onClick={() => setExpanded(expanded === post.id ? null : post.id)}
+                      onClick={() => handleExpand(post.id)}
                       className="px-2.5 py-1.5 text-xs border border-border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       {expanded === post.id ? "Hide" : "Read"}
@@ -221,10 +251,54 @@ export default function Articles() {
                   </div>
                 </div>
                 {expanded === post.id && (
-                  <div className="border-t border-border px-5 py-4 bg-gray-50">
+                  <div className="border-t border-border px-5 py-4 bg-gray-50 space-y-4">
                     <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto">
                       {post.body}
                     </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <button
+                        onClick={() => handleRegenerateImage(post)}
+                        disabled={working === post.id}
+                        className="px-3 py-1.5 text-xs bg-purple-50 border border-purple-200 text-purple-800 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors"
+                      >
+                        🎨 Regenerate Image
+                      </button>
+                    </div>
+                    {costs[post.id] && (
+                      <div className="border-t border-border pt-3">
+                        {!costs[post.id].hasData ? (
+                          <p className="text-xs text-muted-foreground italic">No AI cost data — this article predates cost tracking.</p>
+                        ) : (
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-2">
+                              AI cost breakdown — total: <span className="text-emerald-700 font-mono">${parseFloat(costs[post.id].totalCostUsd).toFixed(4)}</span>
+                            </p>
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-muted-foreground">
+                                  <th className="text-left font-medium pb-1">Stage</th>
+                                  <th className="text-left font-medium pb-1">Model</th>
+                                  <th className="text-right font-medium pb-1">In</th>
+                                  <th className="text-right font-medium pb-1">Out</th>
+                                  <th className="text-right font-medium pb-1">Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {costs[post.id].stages.map((s, i) => (
+                                  <tr key={i} className="text-foreground">
+                                    <td className="py-0.5">{s.stage.replace(/_/g, " ")}</td>
+                                    <td className="py-0.5 text-muted-foreground">{s.model}</td>
+                                    <td className="py-0.5 text-right font-mono">{s.inputTokens.toLocaleString()}</td>
+                                    <td className="py-0.5 text-right font-mono">{s.outputTokens.toLocaleString()}</td>
+                                    <td className="py-0.5 text-right font-mono text-emerald-700">${parseFloat(s.costUsd).toFixed(4)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

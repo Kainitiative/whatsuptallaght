@@ -181,6 +181,25 @@ Phase 2c — RSS feed ingestion with Tallaght geo-filtering and AI rewriting.
 
 ---
 
+## Completed Features
+
+### Feature 1 — AI-generated article header images (DALL·E 3) ✅ BUILT
+
+**Backend**: `imagePrompt` column on `posts`; `generateHeaderImage()` in AI pipeline (Stage 6b); integrated into WhatsApp + RSS pipelines; `regeneratePostImage()` + `POST /posts/:id/regenerate-image` endpoint; `auto_generate_images` setting seeded (defaults off).
+**Frontend**: Admin Articles page — "Regenerate Image" button in expanded article view; sends `POST /posts/:id/regenerate-image`; updates the post in place with a toast notification.
+
+### Feature 2 — Full-text search ✅ BUILT
+
+**Backend**: `GET /api/public/search?q=` — PostgreSQL `tsvector`/`tsquery` across title, excerpt, body; ranked results, paginated.
+**Frontend**: Community website — search icon in header (expands to inline input, submits to `/search`); `/search` page with result cards showing thumbnail, title, excerpt, timestamp; "no results → WhatsApp us" CTA; Search link in footer.
+
+### Feature 3 — Per-article AI cost display ✅ BUILT
+
+**Backend**: `GET /posts/:id/cost` — sums all `ai_usage_log` entries for a post's source submission; returns per-stage breakdown + total USD.
+**Frontend**: Admin Articles page — cost badge (green, monospace) shown next to confidence score once article is expanded; full per-stage breakdown table shown below article body; auto-fetched on first expand.
+
+---
+
 ## Planned Features (not yet built)
 
 ### AI-generated article header images (DALL·E 3)

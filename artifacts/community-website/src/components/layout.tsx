@@ -1,10 +1,29 @@
+import { useState, useRef } from "react";
 import { ReactNode } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Menu } from "lucide-react";
+import { MessageCircle, Menu, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export function Layout({ children }: { children: ReactNode }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [, navigate] = useLocation();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  function openSearch() {
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (searchQuery.trim().length < 2) return;
+    setSearchOpen(false);
+    navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    setSearchQuery("");
+  }
+
   const NavLinks = () => (
     <>
       <Link href="/" className="text-sm font-medium hover:text-primary transition-colors data-[active]:text-primary">
@@ -40,14 +59,33 @@ export function Layout({ children }: { children: ReactNode }) {
             </nav>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {searchOpen ? (
+              <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search articles…"
+                  className="w-48 sm:w-64 px-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <Button type="button" variant="ghost" size="icon" onClick={() => setSearchOpen(false)} className="text-muted-foreground">
+                  ✕
+                </Button>
+              </form>
+            ) : (
+              <Button variant="ghost" size="icon" onClick={openSearch} aria-label="Search" data-testid="button-search">
+                <Search className="h-5 w-5" />
+              </Button>
+            )}
             <Link href="/about">
               <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full hidden sm:flex font-semibold shadow-sm" data-testid="button-whatsapp-header">
                 <MessageCircle className="w-4 h-4 mr-2" />
                 Send us your story
               </Button>
             </Link>
-            
+
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="md:hidden" data-testid="button-mobile-menu">
@@ -103,6 +141,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <h4 className="font-semibold text-foreground">Explore</h4>
               <ul className="space-y-2">
                 <li><Link href="/" className="text-muted-foreground hover:text-primary transition-colors text-sm">Home</Link></li>
+                <li><Link href="/search" className="text-muted-foreground hover:text-primary transition-colors text-sm">Search</Link></li>
                 <li><Link href="/contributors" className="text-muted-foreground hover:text-primary transition-colors text-sm">Contributors</Link></li>
                 <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors text-sm">How it works</Link></li>
               </ul>
