@@ -31,6 +31,7 @@ export default function Terms() {
           <section>
             <h2 className="text-xl font-semibold mb-3">3. Editorial control</h2>
             <p>We reserve the right to reject, edit, or remove any submission at our discretion. We do not guarantee publication of any submitted content.</p>
+            <p className="mt-3">We reserve the right to remove or modify published content at any time without notice.</p>
           </section>
 
           <section>
