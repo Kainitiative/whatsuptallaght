@@ -828,11 +828,35 @@ This question is treated as a clarification record (same `submission_clarificati
 - Skips tone scoring and topic extraction — listing type is already established
 - Review Queue shows a "Lost & Found" badge and displays whether the contributor consented to number sharing
 
+#### Natural resolution — no commands needed
+When the contributor who submitted the original lost/found listing sends a follow-up message, the AI checks whether it sounds like a resolution:
+- "We found her!", "She's home safe", "Got him back", "Keys turned up", "Someone handed it in"
+- Natural positive language after a period of a live lost/found listing
+
+**How the link is made:**
+The system looks up the contributor's most recent active (unresolved) lost/found listing by their phone hash. If one exists and the new message reads as a resolution, it is treated as a resolution update — not a new submission.
+
+**What happens:**
+1. The listing is automatically marked as **Resolved** in the database
+2. The listing card on the website updates to show "✓ Reunited" or "✓ Claimed"
+3. The contributor receives a warm reply: "Delighted to hear that! We've updated your listing. 🐾" (tone adjusted for pets vs objects)
+4. No admin action required — the resolution is instant
+
+**Ambiguity handling:**
+If the AI isn't confident the message is a resolution (e.g. it could be a new submission unrelated to the listing), it asks:
+> "Great news! Does this mean [dog/item description] has been found? Reply YES to close your listing or NO if this is something else."
+
+**Edge cases:**
+- If the contributor has no active listing → treated as a normal submission
+- If the contributor has multiple active listings → AI asks which one: "Is this about your lost [description]? Reply YES or NO."
+- Resolution messages are never published as new articles
+
 #### Website display
 - Lost & Found category page shows cards, not article previews
 - Each card: photo (if any) + short listing text + "Lost" or "Found" badge + date posted
 - Cards expire (archived, not deleted) after 30 days, or when admin marks as "Resolved"
 - "Resolved" cards show a ✓ Reunited or ✓ Claimed label — positive community signal
+- Resolved cards stay visible for 7 days then archive — gives the community the feel-good moment before it disappears
 
 #### Introducing the section — link to Admin Trigger Phrases
 The admin would use the `ANNOUNCE:` trigger (see above) to write and publish an introductory article explaining the new section — written by the AI in the platform's editorial voice, published under "Tallaght Community Hub". This is the connection between the two features.
