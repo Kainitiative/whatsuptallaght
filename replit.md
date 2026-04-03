@@ -990,6 +990,205 @@ The admin would use the `ANNOUNCE:` trigger (see above) to write and publish an 
 
 ---
 
+### Story Deduplication & Live Article Updates
+
+#### The problem
+When a major local incident occurs (fire, accident, flooding), multiple people WhatsApp about it simultaneously or in quick succession. Without deduplication, the system publishes multiple near-identical articles about the same event.
+
+#### Concept: event matching + article enrichment
+When a submission arrives, before processing it runs a **duplicate check** against recently published and in-progress articles. If it matches an existing story, instead of creating a new article, it enriches the existing one with any new information and updates the published article in place.
+
+#### How matching works
+- After Stage 5 (info extraction), the extracted facts (location, event type, date/time) are compared against articles published in the last 6 hours
+- Matching is semantic, not keyword — the AI judges whether two submissions are clearly about the same real-world event
+- Match confidence threshold: configurable, default 0.8 (must be very confident before merging)
+- If unsure → create a separate article (better to have two than to wrongly merge unrelated stories)
+
+#### What happens on a match
+1. The new submission's facts are merged into the existing article — any genuinely new detail is added (e.g. John submitted "massive fire on M50", Mary adds "2 cars crashed")
+2. The article body is rewritten by the AI with the combined information
+3. The article gains a **"Updated [time]"** timestamp visible on the website
+4. The article is tagged as **"Multiple contributors"** — shown as a badge on the article and in the admin
+5. Both contributor records are linked to the article (`article_contributors` join table)
+6. The new contributor receives a different acknowledgment: "Thanks — your update has been added to our existing story on this."
+7. If the article was already published, the update goes live immediately (no re-review needed for factual additions). If it changes the core facts significantly, it is re-routed to the Review Queue
+
+#### Data model additions
+- `article_contributors` table: `articleId`, `contributorId`, `submissionId`, `role` (`original` | `update`)
+- `articles` table: `lastUpdatedAt` (timestamp), `isMultiContributor` (boolean), `updateCount` (integer)
+
+#### Admin visibility
+- Review Queue shows "Updated story" badge on enriched articles
+- Article detail shows full contribution history: who submitted what and when
+- Admin can revert an update if it was incorrectly merged
+
+---
+
+### Contributor Reputation Tiers
+
+#### Concept
+A contributor with 50 accurate published articles should be treated differently from a first-time anonymous sender. Reputation tiers give trusted contributors lower barriers to publication and higher trust weighting in the AI pipeline.
+
+#### Tier system
+| Tier | Name | Criteria | Benefit |
+|---|---|---|---|
+| 0 | New | First submission | Full pipeline, consent required, standard thresholds |
+| 1 | Regular | 3+ published articles, no violations | Confidence threshold reduced by 0.05 |
+| 2 | Trusted | 10+ published, no violations in 90 days | Confidence threshold reduced by 0.10, skips Stage 1 moderation |
+| 3 | Verified | Admin-manually assigned | Auto-publish regardless of confidence, bypasses Review Queue |
+
+#### How tiers are calculated
+- Tiers 0–2 are calculated automatically based on `publishedCount` and violation history on the contributor record
+- Tier 3 (Verified) is admin-assigned only — for known community figures, local organisations, councillors, trusted sources
+- Tier is recalculated each time a submission is processed — no separate scheduler needed
+
+#### Data model additions
+- `contributors` table: `reputationTier` integer (0–3), `violationCount` integer, `lastViolationAt` timestamp
+- A violation is recorded when a submission is rejected at moderation (Stage 1) or manually rejected by admin with a "quality" or "violation" reason
+
+#### Admin visibility
+- Contributor profile shows tier, published count, violation count
+- Admin can manually promote to Tier 3 (Verified) or demote back to Tier 0
+- Review Queue shows contributor tier badge next to each submission — helps admin prioritise review
+
+---
+
+### WhatsApp 24-Hour Messaging Window — Constraint & Workarounds
+
+#### The constraint
+Meta's WhatsApp Business API only allows a business to send **outbound messages** to a user within **24 hours of the user's last message** to the business. After that window closes, any attempt to message them fails. This is called the "Customer Service Window."
+
+#### Where this affects the platform
+1. **AI Clarification Loop** — if a clarification question isn't answered and the window closes, follow-up messages can't be sent. The question must be asked within 24 hours of the original submission.
+2. **Publication notifications** — if a submission takes more than 24 hours to process and publish (e.g. a manual Review Queue hold), the "your article is live" notification cannot be sent.
+3. **Contributor pre-publish review** (see below) — the review request must be sent and responded to within 24 hours.
+
+#### Workarounds and design rules
+- **Acknowledge immediately** — the current system already sends "👍 Got it!" the moment a submission arrives. This opens the 24-hour window. Any subsequent clarification questions or notifications must fire before that window closes.
+- **Priority processing** — submissions from contributors with an open window should be processed with higher urgency. The queue worker should track window expiry times.
+- **Graceful degradation** — if the window has closed when the system tries to send a notification, log it silently and don't crash. The article still publishes — the contributor just doesn't get notified. This is acceptable.
+- **Message Templates** — for messages sent outside the 24-hour window (e.g. if a delayed notification is important), Meta allows pre-approved Message Templates. These are fixed-format messages submitted to Meta for approval in advance. Planning needed: which notifications (if any) are important enough to warrant a template.
+- **`windowExpiresAt` field** — add to the `contributors` table: timestamp of when the current 24-hour window closes. Updated every time the contributor sends a message. The pipeline checks this before attempting outbound messages.
+
+---
+
+### Events Calendar & Directory
+
+#### Concept
+Event-type submissions (community clean-up, library workshop, GAA match, school fundraiser) are detected by the AI and handled in two ways simultaneously: an article is generated as normal, AND the event is added to a structured Events directory on the public website. Two outputs from one submission.
+
+#### How the AI detects events
+Stage 4 classification gains a new type: `event`. Signals the AI looks for:
+- Explicit future date or day ("this Saturday", "next Tuesday", "April 12th")
+- Location + time pattern ("at the library at 2pm")
+- Invitation or call-to-participation language ("everyone welcome", "free entry", "all ages")
+- Event vocabulary: "workshop", "clean-up", "fundraiser", "match", "ceremony", "opening"
+
+#### What gets generated
+1. **An article** — written normally through the full pipeline, published under a Community/Events category
+2. **An event record** — stored in a new `events` table with structured fields: `title`, `date`, `time`, `location`, `description`, `articleId` (linked), `submittedBy`, `status` (`upcoming` | `past` | `cancelled`)
+
+#### Events directory on the website
+- A dedicated `/events` page showing upcoming events in calendar/list view
+- Events are sorted by date; past events auto-archive
+- Each event links through to its full article
+- Can be submitted via WhatsApp naturally — "there's a free kids art workshop at Tallaght Library this Saturday at 11am, all welcome" — no form required
+- Admin can add, edit, or cancel events manually from the dashboard
+
+#### Data model — `events` table
+- `id`, `articleId` (FK, nullable — events can exist without an article), `title`, `eventDate`, `eventTime`, `location`, `description`, `status`, `createdAt`
+
+---
+
+### Contributor Pre-Publish Review (WhatsApp approval loop)
+
+#### Concept
+Before an article is published, the AI sends a summary back to the contributor via WhatsApp and asks them to approve it. This improves accuracy, builds trust with contributors, and catches factual errors before they go public. The contributor replies YES or NO; a NO triggers a correction loop.
+
+#### The flow
+1. AI writes the article (Stage 6 complete)
+2. Instead of routing to Review Queue immediately, the system sends the contributor a preview via WhatsApp:
+   > "Here's the article we've written based on your message — please read it and let us know if it's correct.\n\n[article headline]\n[article body — first 2 paragraphs]\n\nReply YES to approve, or NO and tell us what needs changing."
+3. Contributor replies:
+   - **YES** → article moves to Review Queue (or auto-publishes if confidence is high enough). Contributor gets: "Great, it's now with our editor for final review."
+   - **NO + reason** → the reason is fed back into the AI with an instruction to revise. The revised article is sent back for re-approval. Maximum 2 revision rounds before it falls back to admin manual review.
+   - **No reply within 24 hours** → article moves to Review Queue anyway (contributor had their chance). Noted in the Review Queue as "contributor did not review."
+
+#### When pre-publish review is triggered
+Not every article needs this — it adds delay and costs a WhatsApp message. Triggered when:
+- Submission confidence score is between 0.50 and 0.74 (uncertain enough to warrant a check)
+- Submission contains a personal name (higher stakes)
+- Submission is the contributor's first or second article (build trust early)
+- Admin has enabled "always review" for a specific contributor
+
+High-confidence articles from Tier 2+ contributors skip this and go straight to Review Queue.
+
+#### WhatsApp 24-hour window note
+The preview must be sent within the 24-hour window (see above). If the window has expired, skip the pre-publish review and route directly to admin Review Queue with a note.
+
+---
+
+### Analytics Integrations — Google & Meta
+
+#### Concept
+The admin dashboard connects to Google Analytics, Google Search Console, and the Meta Business Suite to pull in performance data. No need to log into three separate platforms — key metrics are surfaced directly in the admin.
+
+#### Google Analytics (website traffic)
+- Embed the GA4 tracking script in the public website (one-line addition to `index.html`)
+- Admin dashboard pulls from GA4 API: daily/weekly unique visitors, page views, top articles by traffic, traffic sources (direct, social, search)
+- Requires: Google Analytics account, GA4 property, API credentials stored as environment secrets
+
+#### Google Search Console (SEO performance)
+- Verify the public website domain in Search Console
+- Admin dashboard pulls: top search queries driving traffic, click-through rates, average position for key local terms ("Tallaght news", "what's happening in Tallaght")
+- Requires: Search Console property, API credentials
+
+#### Meta Business Suite (social media insights)
+- Connect via Meta Graph API (same credentials used for WhatsApp sending)
+- Pull: Facebook page reach, post engagement (likes, comments, shares) per post, follower growth, best-performing posts
+- Match social post engagement back to the article that was posted — admin can see which article types drive the most Facebook engagement
+- Requires: Facebook Page connected to the same Meta Business account as the WhatsApp number
+
+#### Admin analytics dashboard
+A dedicated Analytics page in the admin showing:
+- Website: visitors this week vs last week, top 5 articles, traffic sources
+- Search: top 10 queries, average position for target terms
+- Social: reach this week, top performing post, follower count
+- Content: submissions received this week, published count, auto-published vs held vs rejected breakdown
+- WhatsApp: new contributors this week, consent rate (% who reply YES)
+
+#### Note on Google Analytics vs privacy
+GA4 uses cookies. The Privacy Policy already states "we do not use tracking cookies" — this will need to be updated if GA4 is added, and a cookie consent banner added to the website (GDPR requirement).
+
+---
+
+### Search
+
+#### Concept
+Full-text search across all published articles, available from the public website from day one. Local residents should be able to search for "Tallaght fire", "Jobstown flooding", "Old Bawn road" and find relevant articles instantly.
+
+#### Implementation approach
+- PostgreSQL has built-in full-text search (`tsvector` / `tsquery`) — no additional search infrastructure needed
+- A `searchVector` computed column is added to the `articles` table, updated automatically when an article is published or edited
+- The public website gets a search bar in the header; the `/search?q=...` route queries the database
+
+#### What gets indexed
+- Article headline (highest weight)
+- Article body text
+- Category name
+- Location extracted during AI processing (if stored on the article)
+- Tags (once a tagging system exists)
+
+#### Search result display
+- Ranked by relevance score (PostgreSQL handles this natively)
+- Each result shows: headline, category, date, first 2 sentences of body
+- If no results → "No articles found for '[query]'. Got a story about this? WhatsApp us." — turns a zero result into a submission prompt
+
+#### Admin search
+The admin dashboard also gets search — searching across submissions (including unpublished), contributors, and the Review Queue.
+
+---
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
