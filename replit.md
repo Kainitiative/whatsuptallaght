@@ -749,6 +749,57 @@ The name question should always fire if a name is detected, regardless of anythi
 
 ---
 
+### Social Media Distribution — AI Caption Agent
+
+#### The core idea
+The AI that writes articles (factual, careful, no embellishment) is the wrong voice for social media. Social needs scroll-stopping energy — a hook in the first line, a reason to click, a question that pulls people in. A separate AI stage runs after an article is approved, using a completely different role prompt to generate platform-specific social captions.
+
+#### The Social Media Agent — role prompt
+The system prompt for this stage is built around a persona, not just instructions:
+
+> *"You are the social media manager for Tallaght Community Hub, a hyper-local community page serving Tallaght, Dublin. You know the area inside out. You write in a warm, direct, local voice — the way a well-informed neighbour would share news, not the way a media company would. You understand what makes people in Tallaght stop scrolling: local names, local places, things that affect their daily life directly. Your job is to write short, punchy captions that feel human and local. The first line must make someone stop. Never write like a press release. Never say 'we are delighted to announce'. Never use corporate language. Write like you're texting a mate who'd want to know."*
+
+This gives the AI a character to write from, not just a list of rules. The quality difference between a role-prompted social post and a generic summarisation is significant.
+
+#### What the agent produces per article
+For each article approved for social publishing, the agent returns:
+- **Hook line** — the first sentence, written to stop the scroll (question, surprising fact, or local name/place)
+- **Body** — 1–2 follow-up sentences with the key detail
+- **Call to action** — "Full story at the link 👇" or "What do you think? Let us know in the comments"
+- **Hashtags** — 3–5 relevant ones from a managed list: `#Tallaght #SouthDublin #Dublin #TallaghtCommunity` + any article-specific tags (e.g. `#TallaghtFire`, `#SDCCUpdate`)
+- **Platform variant** — slightly different phrasing for Facebook vs Instagram vs X
+- **Post recommendation** — the agent also flags if the article genuinely isn't social-worthy (e.g. a dry planning notice). Admin can override.
+- **Suggested post time** — morning commute (7–9am), lunchtime (12–1pm), or evening (6–8pm) based on content type
+
+#### Platform differences
+| Platform | Style | Length | Special |
+|---|---|---|---|
+| Facebook | Conversational, can spark discussion | 2–4 sentences | End with a question to drive comments |
+| Instagram | Punchy, more visual | 1–2 sentences | Hashtags matter more; emoji acceptable |
+| X / Twitter | Very short, punchy | 1 sentence + link | Under 200 chars ideally |
+
+#### Posting cadence rules (enforced by the system)
+- Maximum **4 posts per day** per platform — excess articles queued to the next day
+- Minimum **1 hour between posts** — no back-to-back flooding
+- Priority order if capped: breaking/urgent news first, then community human interest, then RSS rewrites last
+- Lost & Found listings: posted immediately, bypass the queue (time-sensitive)
+- Campaign submissions (Local Heroes, etc.): posted in the evening slot — feel-good content performs better then
+
+#### Admin controls
+- Per-article: preview the generated caption before it posts, edit it, approve or reject the post
+- Global toggle: pause all social posting (e.g. if something sensitive is happening in the area)
+- Per-platform toggles: enable/disable Facebook, Instagram, X independently
+- Posting schedule: admin sets the daily posting slots (default: 8am, 12pm, 5pm, 7pm)
+- "Post now" override for breaking news — bypasses the queue
+
+#### Golden Examples for social (mirrors the article system)
+Just like the article Golden Examples system, the admin can mark a social post as a training example. Over time the agent learns what gets engagement for this specific page and audience.
+
+#### Connection to campaigns
+When a submission matches an active campaign, the social agent receives the campaign name and style note. A "Local Heroes" post gets written differently from a traffic update — warmer, more celebratory, tagged differently.
+
+---
+
 ### Campaign Engine (admin-configurable community engagement)
 
 #### The problem
