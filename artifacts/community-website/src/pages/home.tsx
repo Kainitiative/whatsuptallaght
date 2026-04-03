@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useListPosts, getListPostsQueryKey, useListCategories, getListCategoriesQueryKey } from "@workspace/api-client-react";
 import { ArticleCard } from "@/components/article-card";
 import { CategoryFilter } from "@/components/category-filter";
+import { WhatsAppSubmit } from "@/components/whatsapp-submit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, AlertCircle } from "lucide-react";
@@ -135,6 +136,11 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* WhatsApp Submit CTA */}
+      <section className="container mx-auto px-4 mb-12">
+        <WhatsAppSubmit />
+      </section>
 
       {/* Main Feed */}
       <section className="container mx-auto px-4">
