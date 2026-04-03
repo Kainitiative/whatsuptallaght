@@ -334,6 +334,7 @@ async function writeArticle(
     "   - Avoid phrases like 'distressing situation', 'highlighted', 'ensuring', or similar formal wording.",
     "   - Keep language simple and grounded.",
     "4. Credit the source as 'a local resident', 'a community member', or by name if given.",
+    "   - Do not introduce unnamed sources such as 'a community member said' unless it is explicitly included in the submission.",
     "5. Output the article body only — no headline, no byline, no category label.",
     "",
     "SOURCE PRIORITY:",
