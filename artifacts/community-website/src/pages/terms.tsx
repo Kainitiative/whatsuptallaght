@@ -38,7 +38,12 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">5. Prohibited content</h2>
+            <h2 className="text-xl font-semibold mb-3">5. Limitation of liability</h2>
+            <p>Tallaght Community Hub acts as a platform for community-submitted information. While we moderate and review content, we are not responsible for the accuracy of user submissions. We disclaim liability for any loss, damage, or harm arising from published content to the fullest extent permitted by law.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3">6. Prohibited content</h2>
             <p>You must not submit content that:</p>
             <ul className="list-disc pl-6 space-y-2 mt-3">
               <li>Is false, misleading, or defamatory</li>
@@ -51,17 +56,17 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">6. Withdrawing consent</h2>
+            <h2 className="text-xl font-semibold mb-3">7. Withdrawing consent</h2>
             <p>You may withdraw your consent to publish at any time by contacting us. To stop receiving messages from our WhatsApp number, reply <strong>STOP</strong> at any time.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">7. Changes to these terms</h2>
+            <h2 className="text-xl font-semibold mb-3">8. Changes to these terms</h2>
             <p>We may update these terms from time to time. Continued use of our WhatsApp submission service after changes are published constitutes acceptance of the updated terms.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">8. Contact</h2>
+            <h2 className="text-xl font-semibold mb-3">9. Contact</h2>
             <p>If you have questions about these terms, contact us via WhatsApp or through our social media channels.</p>
           </section>
 
