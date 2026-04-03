@@ -101,7 +101,15 @@ Phase 2b — WhatsApp ingestion and AI processing pipeline. All files live in th
 - Phone numbers are hashed (SHA-256) before storage — never stored in plaintext
 - Contributors auto-created on first message; duplicate-safe
 - Checks `isBanned` before processing
-- Recognises commands (HELP, MY POSTS, STATUS, DELETE, STOP) and routes them to the command handler
+- STOP/HELP commands work without consent (always handled)
+- **GDPR consent flow** (implemented):
+  1. New contributor → submission held as `awaiting_consent`, consent message sent with Terms/Privacy links
+  2. Contributor replies **YES** → `consentStatus` set to `consented`, all held `awaiting_consent` submissions re-queued for AI processing
+  3. Contributor replies **NO** → `consentStatus` set to `declined`, no further processing; reminder offered
+  4. Already-consented → normal flow
+  5. Declined contributor sends message → reminded they can reply YES to change mind
+- `contributors` table: `consentStatus` (`pending` | `consented` | `declined`), `consentGivenAt` timestamp
+- `submissions` table: `awaiting_consent` status added to enum for held submissions
 
 **WhatsApp client** (`src/lib/whatsapp-client.ts`):
 - `sendTextMessage(to, body)` — sends via Meta Cloud API

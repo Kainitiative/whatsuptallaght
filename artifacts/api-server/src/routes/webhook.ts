@@ -6,7 +6,7 @@ import {
   contributorsTable,
   jobQueueTable,
 } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getSettingValue } from "./settings";
 import { sendTextMessage } from "../lib/whatsapp-client";
 import { isCommand, handleCommand } from "../lib/commands";
@@ -145,8 +145,7 @@ async function handleIncomingMessage(
     return;
   }
 
-  // --- Handle text commands ---
-  // Captions on photos/videos are NOT in message.text.body — they're in message.image.caption etc.
+  // --- Extract raw text (captions on photos/videos live outside message.text.body) ---
   const rawText = [
     message.text?.body,
     message.image?.caption,
@@ -157,20 +156,123 @@ async function handleIncomingMessage(
     .join(" ")
     .trim();
 
+  // --- STOP/HELP commands always work regardless of consent ---
   if (rawText && isCommand(rawText)) {
     await handleCommand(phoneNumber, contributor.id, rawText);
     return;
   }
 
-  // --- Collect media IDs ---
-  const mediaIds: string[] = [];
+  // --- Consent flow ---
+  const consentStatus = contributor.consentStatus ?? "pending";
 
+  if (consentStatus === "pending") {
+    const reply = rawText.trim().toUpperCase();
+
+    if (reply === "YES") {
+      // --- Grant consent ---
+      await db
+        .update(contributorsTable)
+        .set({ consentStatus: "consented", consentGivenAt: new Date(), updatedAt: new Date() })
+        .where(eq(contributorsTable.id, contributor.id));
+
+      logger.info({ phoneHash }, "Contributor consented");
+
+      // Re-queue any submissions held while awaiting consent
+      const heldSubmissions = await db
+        .select()
+        .from(submissionsTable)
+        .where(
+          and(
+            eq(submissionsTable.contributorId, contributor.id),
+            eq(submissionsTable.status, "awaiting_consent"),
+          ),
+        );
+
+      for (const held of heldSubmissions) {
+        await db
+          .update(submissionsTable)
+          .set({ status: "pending", updatedAt: new Date() })
+          .where(eq(submissionsTable.id, held.id));
+
+        await db.insert(jobQueueTable).values({
+          jobType: "PROCESS_WHATSAPP_SUBMISSION",
+          payload: { submissionId: held.id, phoneNumber, contributorId: contributor.id },
+          status: "pending",
+          maxAttempts: 3,
+        });
+
+        logger.info({ submissionId: held.id, phoneHash }, "Queued held submission after consent");
+      }
+
+      await sendTextMessage(
+        phoneNumber,
+        heldSubmissions.length > 0
+          ? "✅ Thank you for agreeing to our terms! Your message is now being processed and we'll let you know when it's published."
+          : "✅ Thank you! You're now registered as a contributor. Send us your next story and we'll get it published.",
+      ).catch(() => {});
+      return;
+    }
+
+    if (reply === "NO") {
+      // --- Decline consent ---
+      await db
+        .update(contributorsTable)
+        .set({ consentStatus: "declined", updatedAt: new Date() })
+        .where(eq(contributorsTable.id, contributor.id));
+
+      logger.info({ phoneHash }, "Contributor declined consent");
+
+      await sendTextMessage(
+        phoneNumber,
+        "No problem. Your message won't be published. If you change your mind, reply YES at any time to agree to our terms and start contributing.",
+      ).catch(() => {});
+      return;
+    }
+
+    // --- New contributor or pending — hold submission and request consent ---
+    const siteUrl = (await getSettingValue("site_url")) ?? "https://tallaghtcommunity.ie";
+
+    const mediaIds: string[] = [];
+    if (message.image?.id) mediaIds.push(message.image.id);
+    if (message.audio?.id) mediaIds.push(message.audio.id);
+    if (message.video?.id) mediaIds.push(message.video.id);
+    if (message.document?.id) mediaIds.push(message.document.id);
+
+    if (rawText || mediaIds.length > 0) {
+      await db.insert(submissionsTable).values({
+        contributorId: contributor.id,
+        source: "whatsapp",
+        rawText: rawText || null,
+        mediaUrls: mediaIds.length > 0 ? mediaIds : null,
+        status: "awaiting_consent",
+      });
+
+      logger.info({ phoneHash }, "Submission held pending consent");
+    }
+
+    await sendTextMessage(
+      phoneNumber,
+      `👋 Welcome to Tallaght Community!\n\nBefore we can publish your story, we need your agreement.\n\nBy replying YES, you confirm that:\n• You agree to our Terms of Use: ${siteUrl}/terms\n• You agree to our Privacy Policy: ${siteUrl}/privacy\n• Your message may be used anonymously in published content\n\nReply YES to agree, or NO to decline.`,
+    ).catch((err) => logger.error({ err }, "Failed to send consent request"));
+    return;
+  }
+
+  if (consentStatus === "declined") {
+    // Previously declined — remind them they can change their mind
+    await sendTextMessage(
+      phoneNumber,
+      "You previously chose not to agree to our terms. Reply YES at any time if you change your mind and would like to start contributing.",
+    ).catch(() => {});
+    return;
+  }
+
+  // --- Consented — normal submission flow ---
+  const mediaIds: string[] = [];
   if (message.image?.id) mediaIds.push(message.image.id);
   if (message.audio?.id) mediaIds.push(message.audio.id);
   if (message.video?.id) mediaIds.push(message.video.id);
   if (message.document?.id) mediaIds.push(message.document.id);
 
-  // Skip if no text and no media
   if (!rawText && mediaIds.length === 0) {
     logger.info({ phoneHash, type: message.type }, "No processable content — skipping");
     return;
@@ -191,18 +293,13 @@ async function handleIncomingMessage(
   // --- Queue AI processing job ---
   await db.insert(jobQueueTable).values({
     jobType: "PROCESS_WHATSAPP_SUBMISSION",
-    payload: {
-      submissionId: submission.id,
-      phoneNumber,
-      contributorId: contributor.id,
-    },
+    payload: { submissionId: submission.id, phoneNumber, contributorId: contributor.id },
     status: "pending",
     maxAttempts: 3,
   });
 
   logger.info({ submissionId: submission.id, phoneHash }, "Submission queued for AI processing");
 
-  // --- Immediate acknowledgment to the sender ---
   await sendTextMessage(
     phoneNumber,
     "👍 Got it! We're reviewing your story and will let you know when it's published. Reply HELP for more options.",

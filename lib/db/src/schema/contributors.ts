@@ -13,6 +13,8 @@ export const contributorsTable = pgTable("contributors", {
   publishedCount: integer("published_count").notNull().default(0),
   isVerified: boolean("is_verified").notNull().default(false),
   isBanned: boolean("is_banned").notNull().default(false),
+  consentStatus: text("consent_status").notNull().default("pending"),
+  consentGivenAt: timestamp("consent_given_at", { withTimezone: true }),
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

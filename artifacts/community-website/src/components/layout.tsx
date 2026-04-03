@@ -116,8 +116,12 @@ export function Layout({ children }: { children: ReactNode }) {
               </ul>
             </div>
           </div>
-          <div className="border-t mt-12 pt-8 text-center text-sm text-muted-foreground">
+          <div className="border-t mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} Tallaght Community Platform. Made for Tallaght.</p>
+            <div className="flex items-center gap-4">
+              <Link href="/terms" className="hover:text-primary transition-colors">Terms of Use</Link>
+              <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+            </div>
           </div>
         </div>
       </footer>

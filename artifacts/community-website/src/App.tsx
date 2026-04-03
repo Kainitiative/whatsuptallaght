@@ -10,6 +10,8 @@ import Category from "@/pages/category";
 import Contributors from "@/pages/contributors";
 import About from "@/pages/about";
 import Advertise from "@/pages/advertise";
+import Terms from "@/pages/terms";
+import Privacy from "@/pages/privacy";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +32,8 @@ function Router() {
         <Route path="/contributors" component={Contributors} />
         <Route path="/about" component={About} />
         <Route path="/advertise" component={Advertise} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/privacy" component={Privacy} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

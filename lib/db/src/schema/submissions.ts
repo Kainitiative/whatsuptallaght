@@ -10,6 +10,7 @@ export const submissionStatusEnum = pgEnum("submission_status", [
   "processed",
   "rejected",
   "failed",
+  "awaiting_consent",
 ]);
 
 export const submissionsTable = pgTable("submissions", {
