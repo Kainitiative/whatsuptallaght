@@ -749,6 +749,90 @@ The name question should always fire if a name is detected, regardless of anythi
 
 ---
 
+### Admin WhatsApp Trigger Phrases (owner-submitted tasks)
+
+#### The problem
+The platform owner needs a way to submit instructions to the AI pipeline via WhatsApp — not as a public contribution, but as an internal task. For example: "Write an announcement article introducing the new Lost & Found section." This is fundamentally different from a community submission and needs to be routed separately.
+
+#### Concept: admin trigger phrases
+- The admin's phone number(s) are registered in Settings as `admin_whatsapp_numbers` (comma-separated list of hashed numbers, or stored plaintext since it's the owner's own number)
+- Any message from a registered admin number that begins with a trigger prefix is treated as an **admin task**, not a public submission
+- Suggested prefixes (configurable in settings): `TASK:`, `ANNOUNCE:`, `WRITE:`, `PUBLISH:`
+- Non-prefixed messages from admin numbers still go through the normal contributor pipeline (admin may also be a regular contributor)
+
+#### How admin tasks differ from submissions
+| | Contributor submission | Admin task |
+|---|---|---|
+| Source | Community member | Platform owner |
+| Pipeline | Full AI pipeline (Stage 1–7) | Simplified — skips moderation, goes straight to article writing |
+| Default routing | Confidence-based (auto-publish or hold) | Always goes to Review Queue — admin still approves before publishing |
+| Consent gate | Required | Skipped (owner is operating the platform) |
+| Attribution | "A local resident" | Can be set to "Editorial" or "Tallaght Community Hub" |
+
+#### Example usage
+Admin sends via WhatsApp:
+> `ANNOUNCE: We've just launched a new Lost & Found section. People can now submit found or lost items via WhatsApp and we'll publish them here. Encourage neighbours to use it.`
+
+The system:
+1. Detects the `ANNOUNCE:` prefix and admin number match
+2. Skips consent/moderation — goes straight to a tailored AI article prompt
+3. AI writes a short community announcement article
+4. Lands in Review Queue with an "Admin task" badge for final approval
+5. Admin publishes it — it goes live like any other article
+
+#### Settings needed
+- `admin_whatsapp_numbers` — list of hashed phone numbers that get admin routing
+- `admin_task_prefixes` — comma-separated list of recognised prefixes (default: `TASK:,ANNOUNCE:,WRITE:,PUBLISH:`)
+
+#### Article attribution for admin tasks
+- Byline: "Tallaght Community Hub" (not "a local resident")
+- Category: admin selects in Review Queue before publishing (or can be detected from the instruction)
+
+---
+
+### Lost & Found — Listing Mode (category-specific submission type)
+
+#### Concept
+Lost & Found is fundamentally different from a news article. It's a structured short listing — a brief description, a photo if available, a location, and a way to get in touch. The full AI article pipeline (300-word articles) is the wrong format. Lost & Found needs a **listing mode**: short, structured, card-based output.
+
+#### Two submission styles the AI needs to handle
+**LOST submissions** — submitted by someone who has lost something:
+- Trigger: message begins with `LOST:` (case-insensitive)
+- AI formats it as: "LOST — [description], last seen [location] on [date]. If found, [contact instruction]."
+- Photo attached → included as the listing image
+
+**FOUND submissions** — submitted by someone who has found something:
+- Trigger: message begins with `FOUND:` (case-insensitive)
+- AI formats it as: "FOUND — [description], found near [location] on [date]. To claim, [contact instruction]."
+- Photo attached → included as the listing image
+
+#### What the AI does differently in listing mode
+- Does NOT write a 300-word article — target is 2–4 sentences
+- Does NOT invent detail — only uses what was given
+- Fills in gaps: if no date, uses "recently"; if no location, omits it rather than guessing
+- Strips personal details (phone numbers, full addresses) from the published text — contributor is attributed anonymously and told to reply via WhatsApp to the platform number
+- Always goes to Review Queue — no auto-publish for listings
+
+#### Contact handling (important)
+Lost & Found listings should never publish the contributor's phone number directly. Instead:
+- Published listing says: "Contact us via WhatsApp and we'll put you in touch: [platform WhatsApp number]"
+- Admin manually forwards contact details when someone claims a found item
+
+#### Category routing
+- Submissions starting with `LOST:` or `FOUND:` are automatically assigned to the Lost & Found category
+- They skip the tone classification and topic extraction stages — category is already known
+- Listing mode prompt is used instead of the standard Stage 6 article prompt
+
+#### Website display
+- Lost & Found category page shows cards, not article previews
+- Each card: photo (if any) + short listing text + "Lost" or "Found" badge + date
+- Cards expire (are archived) after 30 days automatically, or when admin marks as "Resolved"
+
+#### Introducing the section — link to Admin Trigger Phrases
+The admin would use the `ANNOUNCE:` trigger (see above) to write and publish an introductory article explaining the new section — written by the AI in the platform's editorial voice, published under "Tallaght Community Hub". This is the connection between the two features.
+
+---
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
