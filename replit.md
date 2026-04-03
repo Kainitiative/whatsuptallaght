@@ -700,6 +700,53 @@ Once multi-image grouping works, an article can display a full photo gallery —
 - **Review Queue**: Show a "Contains video" badge on video submissions; display the AI assessment note so editors know what the video contains before approving or rejecting — without needing to watch it first
 - **Tooling note**: Will require `ffmpeg` to extract audio and frames from the video buffer before passing to OpenAI
 
+### AI Clarification Loop (WhatsApp pipeline)
+
+#### Concept
+After the AI extracts key facts from a submission (Stage 5), before writing the article it checks whether anything needs confirming with the contributor. If so, it sends a WhatsApp question and waits for the reply before proceeding to Stage 6. One question at a time, one reply needed.
+
+#### What triggers a clarification question
+- **Name detected in submission** — AI asks: "We noticed the name [Name] in your message — is that your own name, or someone else's? Reply MY NAME or SOMEONE ELSE." If confirmed as their own: "Would you like to be named in the article, or stay anonymous? Reply NAMED or ANONYMOUS."
+- **Vague location** — e.g. "up the road", "near the shops" → AI asks: "Where exactly did this happen? (e.g. Old Bawn Road, Tallaght Town Centre)"
+- **Vague time** — e.g. "yesterday", "earlier" → AI asks: "When did this happen? Reply with a date or day."
+- **Very short/incomplete submission** — AI asks: "Can you tell us a bit more about what happened?"
+- **Unverified claim** — e.g. "I heard that…" → AI asks: "Do you have any more details or do you know who said this?"
+
+#### Data model additions
+**New `submission_clarifications` table:**
+- `id` — serial primary key
+- `submission_id` — FK to submissions
+- `contributor_id` — FK to contributors (for fast webhook lookup)
+- `question_type` — enum: `name_attribution` | `location` | `date` | `detail` | `custom`
+- `question_text` — the exact message sent to the contributor
+- `status` — enum: `pending` | `answered` | `timed_out`
+- `answer` — text, the contributor's reply
+- `asked_at` — timestamp
+- `answered_at` — timestamp (nullable)
+
+**Submissions table — new `pending_clarification` status** added to `submissionStatusEnum`.
+
+#### Webhook changes
+When a consented contributor sends a message, check first if they have an open (`pending`) clarification record. If yes, their reply is treated as the answer (not a new submission):
+1. Store the reply as `answer` on the clarification record, mark `answered`
+2. Check if there are more pending clarifications for the same submission
+3. If no more → update submission status back to `pending`, re-queue for Stage 6 with all clarification answers injected into the context
+4. If more → send the next question
+
+#### AI pipeline changes
+- After Stage 5 (info extraction), a new **Stage 5b** generates clarification questions if needed
+- Returns a structured list: `[{ type, question }]` — empty array if no clarifications needed
+- If questions exist: insert rows into `submission_clarifications`, set submission status to `pending_clarification`, send first question via WhatsApp
+- Stage 6 prompt receives a `clarifications` block: "Contributor confirmed: name is their own, prefers to stay anonymous. Location confirmed: Rossfield Estate."
+
+#### Timeout handling
+- A background job checks for clarifications where `asked_at` is older than 24 hours and status is still `pending`
+- On timeout: mark as `timed_out`, check if remaining questions can be skipped, re-queue submission for Stage 6 without the clarification
+- Contributor receives: "No worries — we'll process your story with the information you gave us."
+
+#### Name attribution — editorial priority
+The name question should always fire if a name is detected, regardless of anything else. Publishing someone's name without explicit consent is the highest-risk outcome; this is the one clarification that should never be skipped or timed out silently.
+
 ---
 
 ### `scripts` (`@workspace/scripts`)
