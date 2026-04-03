@@ -795,38 +795,44 @@ The system:
 #### Concept
 Lost & Found is fundamentally different from a news article. It's a structured short listing — a brief description, a photo if available, a location, and a way to get in touch. The full AI article pipeline (300-word articles) is the wrong format. Lost & Found needs a **listing mode**: short, structured, card-based output.
 
-#### Two submission styles the AI needs to handle
-**LOST submissions** — submitted by someone who has lost something:
-- Trigger: message begins with `LOST:` (case-insensitive)
-- AI formats it as: "LOST — [description], last seen [location] on [date]. If found, [contact instruction]."
-- Photo attached → included as the listing image
+Crucially, **the public never needs to use a prefix or keyword**. Someone just sends a natural message — "I lost me dog, it's a black lab, if anyone sees it please get in touch" — and the AI detects that this is a lost/found submission from the content itself.
 
-**FOUND submissions** — submitted by someone who has found something:
-- Trigger: message begins with `FOUND:` (case-insensitive)
-- AI formats it as: "FOUND — [description], found near [location] on [date]. To claim, [contact instruction]."
-- Photo attached → included as the listing image
+#### How the AI detects lost/found submissions
+Stage 4 (tone classification) is extended with a new classification type: `lost_and_found`. The AI looks for natural language signals:
+- "I lost...", "has anyone seen...", "missing since...", "can't find..."
+- "I found...", "found a...", "handed in...", "nobody claimed..."
+- Mentions of pets, keys, wallets, phones, bags, bikes
+- An appeal for contact ("please get in touch", "if you see her")
+
+If the classification returns `lost_and_found`, the submission bypasses the standard Stage 6 article prompt and uses the listing mode prompt instead.
+
+#### Contact consent — the follow-up question (links to AI Clarification Loop)
+After detecting a lost/found submission, before writing anything, the system sends one clarification question via WhatsApp:
+
+> "Will we share your WhatsApp number with anyone who says they've found it? Reply YES or NO."
+
+- **YES** → the published listing includes: "To get in touch, WhatsApp [platform number] and we'll connect you."  The contributor's number is stored privately on the listing record so admin can pass it on when someone responds.
+- **NO** → the published listing says: "If you have information, WhatsApp [platform number] and we'll pass on the message." Contact is always mediated through the platform.
+
+This question is treated as a clarification record (same `submission_clarifications` table as the AI Clarification Loop). The listing is not published until the contributor replies, or until 24 hours pass (in which case it defaults to NO — never share without explicit consent).
 
 #### What the AI does differently in listing mode
-- Does NOT write a 300-word article — target is 2–4 sentences
+- Does NOT write a 300-word article — target is 2–4 sentences max
 - Does NOT invent detail — only uses what was given
-- Fills in gaps: if no date, uses "recently"; if no location, omits it rather than guessing
-- Strips personal details (phone numbers, full addresses) from the published text — contributor is attributed anonymously and told to reply via WhatsApp to the platform number
-- Always goes to Review Queue — no auto-publish for listings
-
-#### Contact handling (important)
-Lost & Found listings should never publish the contributor's phone number directly. Instead:
-- Published listing says: "Contact us via WhatsApp and we'll put you in touch: [platform WhatsApp number]"
-- Admin manually forwards contact details when someone claims a found item
+- Fills in gaps naturally: if no date, uses "recently"; if no location, omits it rather than guessing
+- Strips raw phone numbers or personal addresses from the published text
+- Always goes to Review Queue — no auto-publish for lost/found listings
 
 #### Category routing
-- Submissions starting with `LOST:` or `FOUND:` are automatically assigned to the Lost & Found category
-- They skip the tone classification and topic extraction stages — category is already known
-- Listing mode prompt is used instead of the standard Stage 6 article prompt
+- `lost_and_found` classification → automatically assigned to the Lost & Found category
+- Skips tone scoring and topic extraction — listing type is already established
+- Review Queue shows a "Lost & Found" badge and displays whether the contributor consented to number sharing
 
 #### Website display
 - Lost & Found category page shows cards, not article previews
-- Each card: photo (if any) + short listing text + "Lost" or "Found" badge + date
-- Cards expire (are archived) after 30 days automatically, or when admin marks as "Resolved"
+- Each card: photo (if any) + short listing text + "Lost" or "Found" badge + date posted
+- Cards expire (archived, not deleted) after 30 days, or when admin marks as "Resolved"
+- "Resolved" cards show a ✓ Reunited or ✓ Claimed label — positive community signal
 
 #### Introducing the section — link to Admin Trigger Phrases
 The admin would use the `ANNOUNCE:` trigger (see above) to write and publish an introductory article explaining the new section — written by the AI in the platform's editorial voice, published under "Tallaght Community Hub". This is the connection between the two features.
