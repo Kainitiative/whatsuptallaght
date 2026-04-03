@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "RAGvMFMs6AiG_IU1YIdX_"
@@ -24,3 +23,9 @@ id = "2UF-F3WxzoU7PfTmxET5V"
 uri = "file://artifacts/community-website/public/images/tallaght-news.png"
 type = "image"
 title = "Scenic view of Tallaght neighbourhood"
+
+[[outputs]]
+id = "OESh0ppvIhUNpwjyEN8Vv"
+uri = "file://PLATFORM_OVERVIEW.md"
+type = "text"
+title = "Tallaght Community Platform — Full Overview"
