@@ -785,12 +785,36 @@ For each article approved for social publishing, the agent returns:
 - Lost & Found listings: posted immediately, bypass the queue (time-sensitive)
 - Campaign submissions (Local Heroes, etc.): posted in the evening slot — feel-good content performs better then
 
+#### Daily Editorial Scheduler — how posting actually works
+Rather than posting articles the moment they're published, the social agent runs a daily scheduling job each morning (default: 6am). It looks at all articles published in the last 24 hours that haven't been posted to social yet, selects the best ones for that day, writes the captions, and sets the posting times. Fully automatic — nothing to do.
+
+**The daily job step by step:**
+1. **Collect** — fetch all articles published yesterday that are flagged as social-eligible and not yet posted
+2. **Score & rank** — the agent reads each article and scores it for social worthiness: How local is it? How specific? Human interest or dry admin? Time-sensitive or evergreen?
+3. **Select** — picks the top N articles based on score (N is configurable in settings, default 4). If fewer than N articles are worth posting, it posts fewer — never pads with weak content
+4. **Write captions** — for each selected article, generates platform-specific captions (Facebook, Instagram, X) using the Social Media Agent role prompt
+5. **Schedule** — assigns each post a time slot across the day based on content type:
+   - Urgent/breaking → first slot of the day (8am)
+   - Community human interest → lunchtime (12:30pm) or evening (6pm)
+   - Feel-good campaign content → evening (7pm)
+   - Multiple posts in the same slot → spread them 90 minutes apart
+6. **Queue** — inserts scheduled posts into a `social_post_queue` table with their post times
+7. A separate **posting worker** polls the queue every minute and sends anything whose scheduled time has passed
+
+**What carries over:**
+Articles that scored well but didn't make the daily cut aren't lost — they're marked as `queued_next_day` and included in tomorrow's pool. Content that's more than 3 days old is retired from the social queue (too stale).
+
+**Settings the admin controls:**
+- `social_daily_post_limit` — max posts per day per platform (default: 4)
+- `social_scheduler_time` — what time the daily job runs (default: 6am)
+- `social_posting_slots` — the time slots posts are distributed across (default: 8am, 12:30pm, 5pm, 7pm)
+
 #### Admin controls
-- Per-article: preview the generated caption before it posts, edit it, approve or reject the post
-- Global toggle: pause all social posting (e.g. if something sensitive is happening in the area)
+- **Daily schedule preview** — each morning, after the scheduler runs, the admin can see what's been selected and scheduled for today. Edit a caption, swap an article, or remove a post before it goes live
+- Per-article override: "Post now" bypasses the scheduler for breaking news
+- Global pause: stop all scheduled posts immediately (e.g. during a sensitive local situation)
 - Per-platform toggles: enable/disable Facebook, Instagram, X independently
-- Posting schedule: admin sets the daily posting slots (default: 8am, 12pm, 5pm, 7pm)
-- "Post now" override for breaking news — bypasses the queue
+- View history: see what was posted each day and its engagement (once social API integration provides that data back)
 
 #### Golden Examples for social (mirrors the article system)
 Just like the article Golden Examples system, the admin can mark a social post as a training example. Over time the agent learns what gets engagement for this specific page and audience.
