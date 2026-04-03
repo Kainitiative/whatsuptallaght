@@ -252,7 +252,7 @@ async function handleIncomingMessage(
 
     await sendTextMessage(
       phoneNumber,
-      `👋 Welcome to Tallaght Community!\n\nBefore we can publish your story, we need your agreement.\n\n📄 Terms of Use: ${siteUrl}/terms\n🔒 Privacy Policy: ${siteUrl}/privacy\n\nBy replying YES, you confirm that you have read and agree to our Terms of Use and Privacy Policy, and consent to your message being processed and used (anonymously) in published content.\n\n• You will not submit content that makes allegations or claims about identifiable individuals or businesses\n\nReply YES to agree and continue, or NO to decline (we will not process your submission).`,
+      `👋 Welcome to Tallaght Community!\n\nBefore we can publish your story, we need your agreement.\n\n📄 Terms of Use: ${siteUrl}/terms\n🔒 Privacy Policy: ${siteUrl}/privacy\n\n• You will not submit content that makes allegations or claims about identifiable individuals or businesses\n\nBy replying YES, you confirm that you have read and agree to our Terms of Use and Privacy Policy, and consent to your message being processed and used (anonymously) in published content.\n\nReply YES to agree and continue, or NO to decline (we will not process your submission).`,
     ).catch((err) => logger.error({ err }, "Failed to send consent request"));
     return;
   }
