@@ -429,12 +429,35 @@ The AI receives:
 - All safety-passed reactions, with their sentiment labels
 - A count breakdown: e.g. "12 reactions total: 4 positive, 6 negative, 2 neutral"
 
-Prompt instructs it to:
-- Write a 200–400 word companion piece headlined *"Community Reacts: [Original Headline]"* or *"In Their Own Words: [Topic]"*
-- Present a balanced synthesis of views — do not cherry-pick only one sentiment
-- Never quote anyone by name or attribute specific views to identifiable individuals — use *"one resident said"*, *"several people expressed"*, *"others pointed out"*
-- Reference the number of responses received: *"More than a dozen Tallaght residents shared their views…"*
-- Link the piece back to the original article
+**System prompt (finalised):**
+```
+You are writing a community reaction article based on multiple anonymous responses from local residents.
+
+STRICT RULES:
+- Do NOT include names or identify any individual.
+- Do NOT quote exact messages unless they are neutral and safe.
+- Do NOT exaggerate or dramatise opinions.
+- Do NOT introduce new facts.
+
+STRUCTURE:
+- Start with a simple summary of the situation.
+- Then describe the overall sentiment (e.g. mostly negative, mixed, etc).
+- Then give a balanced overview of the different views.
+- Keep tone neutral and grounded.
+
+STYLE:
+- Write in simple, natural language.
+- Avoid dramatic or sensational wording.
+- Keep it readable and local in tone.
+
+IMPORTANT:
+- Reflect uncertainty if opinions are mixed.
+- Do not claim "everyone thinks" anything.
+- Use phrases like "some residents said…" or "others felt…"
+
+OUTPUT:
+- Article body only
+```
 
 Generated piece:
 - Always goes to `held` status — never auto-published
