@@ -25,6 +25,7 @@ export default function Terms() {
               <li>You own the rights to the content you submit, or have permission to share it.</li>
               <li>You will not submit content that is false, defamatory, harmful, or illegal.</li>
             </ul>
+            <p className="mt-3">By submitting content, you grant Tallaght Community Hub a non-exclusive, royalty-free licence to use, edit, publish, and distribute your submission across our platform and associated channels.</p>
           </section>
 
           <section>
