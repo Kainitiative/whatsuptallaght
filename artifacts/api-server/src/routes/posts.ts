@@ -188,7 +188,15 @@ router.patch("/posts/:id", async (req, res) => {
   const { title, body, excerpt, headerImageUrl, status, confidenceScore, primaryCategoryId, isSponsored, isFeatured, publishedAt, starRating } = req.body;
 
   try {
-    const [currentPost] = await db.select({ status: postsTable.status, sourceSubmissionId: postsTable.sourceSubmissionId }).from(postsTable).where(eq(postsTable.id, id));
+    const [currentPost] = await db
+      .select({
+        status: postsTable.status,
+        sourceSubmissionId: postsTable.sourceSubmissionId,
+        headerImageUrl: postsTable.headerImageUrl,
+        imagePrompt: postsTable.imagePrompt,
+      })
+      .from(postsTable)
+      .where(eq(postsTable.id, id));
     if (!currentPost) return res.status(404).json({ error: "not_found", message: "Post not found" });
 
     const updates: Partial<typeof postsTable.$inferInsert> = {
@@ -215,6 +223,38 @@ router.patch("/posts/:id", async (req, res) => {
 
     if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
     res.json(post);
+
+    // --- Auto-generate header image when a held article is published ---
+    // The pipeline saves the prompt but skips DALL·E for held articles to avoid wasted spend.
+    // Now that the admin has approved it, generate the image if one isn't already set.
+    if (
+      status === "published" &&
+      currentPost.status !== "published" &&
+      !currentPost.headerImageUrl &&
+      currentPost.imagePrompt
+    ) {
+      getSettingValue("auto_generate_images").then(async (autoGenerate) => {
+        if (autoGenerate !== "true") return;
+        try {
+          const keyFacts = post.body.split(". ").slice(0, 3).map((s: string) => s.trim()).filter(Boolean);
+          const generated = await regeneratePostImage(
+            post.id,
+            post.title,
+            keyFacts,
+            "news",
+            post.sourceSubmissionId ?? post.id,
+          );
+          if (generated) {
+            await db
+              .update(postsTable)
+              .set({ headerImageUrl: generated.imageUrl, imagePrompt: generated.imagePrompt, updatedAt: new Date() })
+              .where(eq(postsTable.id, post.id));
+          }
+        } catch (err) {
+          // Non-fatal — image generation failure should never block publish
+        }
+      }).catch(() => {});
+    }
 
     // --- Notify contributor when manually published ---
     if (status === "published" && currentPost.status !== "published" && currentPost.sourceSubmissionId) {

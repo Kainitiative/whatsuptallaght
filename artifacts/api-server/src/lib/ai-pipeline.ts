@@ -616,21 +616,6 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   logger.info({ submissionId }, "AI pipeline: writing article");
   const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx);
 
-  // --- Stage 7b: Generate header image if none submitted ---
-  let generatedImagePath: string | null = null;
-  let generatedImagePrompt: string | null = null;
-  if (!firstImagePath) {
-    const autoGenerate = await getSettingValue("auto_generate_images");
-    if (autoGenerate === "true") {
-      logger.info({ submissionId }, "AI pipeline: generating header image");
-      const generated = await generateHeaderImage(openai, infoResult.headline, infoResult.keyFacts, toneResult.tone, ctx);
-      if (generated) {
-        generatedImagePath = generated.imageUrl;
-        generatedImagePrompt = generated.imagePrompt;
-      }
-    }
-  }
-
   // --- Stage 8: Confidence score and routing ---
   const confidence =
     (infoResult.completenessScore * 0.5 +
@@ -660,6 +645,28 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
 
   // --- Create the post ---
   const postStatus = confidence >= 0.75 ? "published" : "held";
+
+  // --- Stage 7b: Generate header image (only for articles that will be published) ---
+  // For held articles we save the prompt text only — image is generated when admin publishes.
+  let generatedImagePath: string | null = null;
+  let generatedImagePrompt: string | null = null;
+  if (!firstImagePath) {
+    // Always build and store the prompt so it's ready when the article is published
+    generatedImagePrompt = buildDallePrompt(infoResult.headline, infoResult.keyFacts, toneResult.tone);
+    if (postStatus === "published") {
+      const autoGenerate = await getSettingValue("auto_generate_images");
+      if (autoGenerate === "true") {
+        logger.info({ submissionId }, "AI pipeline: generating header image (auto-published)");
+        const generated = await generateHeaderImage(openai, infoResult.headline, infoResult.keyFacts, toneResult.tone, ctx);
+        if (generated) {
+          generatedImagePath = generated.imageUrl;
+          generatedImagePrompt = generated.imagePrompt;
+        }
+      }
+    } else {
+      logger.info({ submissionId }, "AI pipeline: skipping image generation — article held for review");
+    }
+  }
 
   const [newPost] = await db
     .insert(postsTable)
@@ -802,24 +809,29 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   logUsage(ctx, "gpt-4o-mini", "rss_rewrite", rssArticleResponse.usage ?? undefined);
   const articleBody = rssArticleResponse.choices[0].message.content?.trim() ?? content;
 
-  // --- Generate header image (RSS articles never have images) ---
-  let rssImagePath: string | null = null;
-  let rssImagePrompt: string | null = null;
-  const autoGenerate = await getSettingValue("auto_generate_images");
-  if (autoGenerate === "true") {
-    logger.info({ submissionId }, "RSS pipeline: generating header image");
-    const generated = await generateHeaderImage(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
-    if (generated) {
-      rssImagePath = generated.imageUrl;
-      rssImagePrompt = generated.imagePrompt;
-    }
-  }
-
   // --- Confidence and routing ---
   // Official sources get auto-published; news/general sources are held for review
   const baseConfidence = trustLevel === "official" ? 0.85 : trustLevel === "news" ? 0.6 : 0.5;
   const confidence = Math.min(1, baseConfidence + infoResult.completenessScore * 0.15);
   const postStatus = confidence >= 0.75 ? "published" : "held";
+
+  // --- Generate header image (only for articles that will be published) ---
+  // For held articles we save the prompt text only — image is generated when admin publishes.
+  let rssImagePath: string | null = null;
+  let rssImagePrompt: string | null = buildDallePrompt(infoResult.headline || title, infoResult.keyFacts, toneResult.tone);
+  if (postStatus === "published") {
+    const autoGenerate = await getSettingValue("auto_generate_images");
+    if (autoGenerate === "true") {
+      logger.info({ submissionId }, "RSS pipeline: generating header image (auto-published)");
+      const generated = await generateHeaderImage(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
+      if (generated) {
+        rssImagePath = generated.imageUrl;
+        rssImagePrompt = generated.imagePrompt;
+      }
+    }
+  } else {
+    logger.info({ submissionId }, "RSS pipeline: skipping image generation — article held for review");
+  }
 
   const slug =
     infoResult.headline
