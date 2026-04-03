@@ -25,6 +25,7 @@ export default function Privacy() {
               <li><strong>Message content</strong> — text, photos, and voice notes you send to us.</li>
               <li><strong>Consent record</strong> — the date and time you agreed to our terms.</li>
             </ul>
+            <p className="mt-3">Messages are transmitted via WhatsApp, which processes your data according to its own privacy policy.</p>
             <p className="mt-3">If you sign up to our newsletter, we also collect your email address.</p>
           </section>
 
