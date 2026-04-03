@@ -749,6 +749,58 @@ The name question should always fire if a name is detected, regardless of anythi
 
 ---
 
+### Campaign Engine (admin-configurable community engagement)
+
+#### The problem
+The platform owner needs to be able to launch new types of community engagement — Local Heroes, Valentine's messages, Back to School stories, Christmas memories — without any code changes. Each campaign has its own tone, category, and AI writing style. The system needs to recognise submissions that belong to a campaign naturally, without making the public use keywords or tags.
+
+#### Concept: campaigns as admin-created objects
+The admin creates a campaign in the admin dashboard. That campaign is stored in the database and injected into the AI pipeline at runtime. No deployments, no code changes — just fill in a form and switch it on.
+
+#### Data model — `campaigns` table
+- `id` — serial primary key
+- `name` — e.g. "Local Heroes", "Valentine's Messages", "Christmas Memories"
+- `description` — plain English description used by the AI to recognise matching submissions (e.g. "Nominations or celebrations of a local person who has done something positive for their community in Tallaght")
+- `categorySlug` — which category submissions are published under
+- `aiStyleNote` — optional extra instruction for Stage 6 (e.g. "Write warmly and celebrate the person. Keep it uplifting and personal.")
+- `acknowledgmentMessage` — optional custom WhatsApp reply sent to the contributor after they submit (e.g. "Thanks! We love hearing about Tallaght's local heroes 🌟")
+- `isActive` — boolean, toggleable from admin
+- `startsAt` — optional date (campaign activates automatically)
+- `endsAt` — optional date (campaign deactivates automatically)
+- `createdAt`, `updatedAt`
+
+#### How the AI detects campaign matches
+At Stage 4 (classification), the prompt receives a list of all currently active campaigns (name + description). The AI returns either a standard content type OR a `campaign_match` with the matched campaign ID. No keywords needed from the public — the AI reads the submission and decides whether it fits.
+
+Example: active campaign "Local Heroes" with description "A local person being celebrated or nominated for their contribution to the community". Submission: *"My neighbour has been cutting the grass outside the flats for the elderly residents for years, never asks for anything, just does it."* → AI matches `campaign: local_heroes`.
+
+#### What changes when a campaign is matched
+- Stage 6 uses the campaign's `aiStyleNote` instead of the standard article prompt tone
+- The article is assigned to the campaign's `categorySlug`
+- The contributor receives the campaign's `acknowledgmentMessage` instead of the standard "👍 Got it!"
+- The article lands in Review Queue with a campaign badge so the admin knows which campaign it belongs to
+- Auto-publish threshold may be lower for campaigns (admin-configurable per campaign) — softer content, lower risk
+
+#### Admin dashboard — Campaigns page
+- List of all campaigns: name, status (active/inactive/scheduled/expired), submission count, published count
+- "New Campaign" button → form: name, description, category, AI style note, acknowledgment message, date range, confidence threshold
+- Toggle active/inactive instantly
+- Click a campaign → see all submissions received under it
+
+#### Seasonal / time-limited campaigns
+- Valentine's Day: active Feb 1–14 only
+- Christmas: active Dec 1–25
+- Back to School: active late August
+- The platform automatically activates and deactivates based on `startsAt` / `endsAt` — admin sets it once and forgets it
+
+#### Connection to Lost & Found
+Lost & Found is a special-case campaign with extra behaviour (listing mode, contact consent, resolution detection). When the campaign engine is built, Lost & Found should be migrated into it as a campaign type with `listingMode: true`. The campaign engine becomes the single system that handles all non-standard submission types.
+
+#### Connection to Admin Trigger Phrases
+When an admin creates a new campaign, the natural next step is to publish an announcement article using the `ANNOUNCE:` trigger. The two features work together: campaign engine handles inbound submissions; admin trigger phrase handles the outbound announcement that tells people the campaign exists.
+
+---
+
 ### Admin WhatsApp Trigger Phrases (owner-submitted tasks)
 
 #### The problem
