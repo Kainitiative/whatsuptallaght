@@ -51,6 +51,7 @@ export default function Terms() {
               <li>Is discriminatory on the basis of race, religion, gender, sexuality, disability, or any other characteristic</li>
               <li>Promotes illegal activity</li>
               <li>Infringes the copyright or privacy of any third party</li>
+              <li>Makes allegations, accusations, or claims about identifiable individuals or businesses that could harm their reputation</li>
             </ul>
             <p className="mt-3">Submissions that violate these rules will be removed and the contributor may be blocked from submitting further content.</p>
           </section>
