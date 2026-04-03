@@ -40,23 +40,28 @@ export default function Privacy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">4. AI processing</h2>
+            <h2 className="text-xl font-semibold mb-3">4. Legal basis for processing</h2>
+            <p>We process your data based on your consent when you submit content and agree to our terms.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3">5. AI processing</h2>
             <p>Submissions are processed using AI tools (including OpenAI's services) to assist with writing and editing articles. Your message content is sent to these services as part of that process. OpenAI's data handling is governed by their own privacy policy.</p>
             <p className="mt-2">Published articles are written by AI based on your submission and do not reproduce your original message verbatim.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">5. Anonymity</h2>
+            <h2 className="text-xl font-semibold mb-3">6. Anonymity</h2>
             <p>Published articles do not include your phone number, name, or any personally identifying information unless you have explicitly provided your name and agreed to its use. Contributors are referred to as "a local resident" or "a community member" by default.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">6. Data retention</h2>
-            <p>We retain submission records for as long as the associated article remains published, or for up to 2 years. You may request deletion of your data at any time (see Section 8).</p>
+            <h2 className="text-xl font-semibold mb-3">7. Data retention</h2>
+            <p>We retain submission records for as long as the associated article remains published, or for up to 2 years. You may request deletion of your data at any time (see Section 9).</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">7. Your rights under GDPR</h2>
+            <h2 className="text-xl font-semibold mb-3">8. Your rights under GDPR</h2>
             <p>You have the right to:</p>
             <ul className="list-disc pl-6 space-y-2 mt-3">
               <li><strong>Access</strong> — request a copy of the data we hold about you</li>
@@ -70,17 +75,17 @@ export default function Privacy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">8. Withdrawing consent</h2>
+            <h2 className="text-xl font-semibold mb-3">9. Withdrawing consent</h2>
             <p>You may withdraw your consent at any time by replying <strong>STOP</strong> to our WhatsApp number. This will stop us from sending you messages. To request deletion of your submission history, contact us directly.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">9. Cookies</h2>
+            <h2 className="text-xl font-semibold mb-3">10. Cookies</h2>
             <p>Our website uses only functional cookies necessary for the site to work. We do not use tracking or advertising cookies.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">10. Contact & complaints</h2>
+            <h2 className="text-xl font-semibold mb-3">11. Contact & complaints</h2>
             <p>If you have questions or concerns about how we handle your data, contact us via WhatsApp or our social media channels.</p>
             <p className="mt-2">You also have the right to lodge a complaint with the Data Protection Commission (DPC) at <a href="https://www.dataprotection.ie" target="_blank" rel="noreferrer" className="text-primary hover:underline">dataprotection.ie</a>.</p>
           </section>
