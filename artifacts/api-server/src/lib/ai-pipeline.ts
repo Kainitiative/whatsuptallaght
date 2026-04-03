@@ -605,9 +605,11 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
 
   // --- Notify the submitter ---
   if (postStatus === "published") {
+    const siteUrl = (await getSettingValue("site_url")) ?? "https://tallaghtcommunity.ie";
+    const articleUrl = `${siteUrl}/article/${newPost.slug}`;
     await sendTextMessage(
       phoneNumber,
-      `✅ Your story is live!\n\n"${infoResult.headline}"\n\nThank you for contributing to Tallaght Community! 🏘️`,
+      `✅ Your story is live on Tallaght Community!\n\n"${infoResult.headline}"\n\n🔗 ${articleUrl}\n\nFeel free to share it with friends and family! 🏘️`,
     ).catch(() => {});
   } else {
     await sendTextMessage(

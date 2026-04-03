@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable } from "@workspace/db/schema";
+import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable, submissionsTable, contributorsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, sql, ilike } from "drizzle-orm";
+import { sendTextMessage } from "../lib/whatsapp-client";
+import { getSettingValue } from "./settings";
 
 const router = Router();
 
@@ -185,6 +187,9 @@ router.patch("/posts/:id", async (req, res) => {
   const { title, body, excerpt, headerImageUrl, status, confidenceScore, primaryCategoryId, isSponsored, isFeatured, publishedAt, starRating } = req.body;
 
   try {
+    const [currentPost] = await db.select({ status: postsTable.status, sourceSubmissionId: postsTable.sourceSubmissionId }).from(postsTable).where(eq(postsTable.id, id));
+    if (!currentPost) return res.status(404).json({ error: "not_found", message: "Post not found" });
+
     const updates: Partial<typeof postsTable.$inferInsert> = {
       updatedAt: new Date(),
     };
@@ -209,6 +214,33 @@ router.patch("/posts/:id", async (req, res) => {
 
     if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
     res.json(post);
+
+    // --- Notify contributor when manually published ---
+    if (status === "published" && currentPost.status !== "published" && currentPost.sourceSubmissionId) {
+      try {
+        const [submission] = await db
+          .select({ contributorId: submissionsTable.contributorId })
+          .from(submissionsTable)
+          .where(eq(submissionsTable.id, currentPost.sourceSubmissionId));
+
+        if (submission?.contributorId) {
+          const [contributor] = await db
+            .select({ phoneNumber: contributorsTable.phoneNumber })
+            .from(contributorsTable)
+            .where(eq(contributorsTable.id, submission.contributorId));
+
+          if (contributor?.phoneNumber) {
+            const siteUrl = (await getSettingValue("site_url")) ?? "https://tallaghtcommunity.ie";
+            const articleUrl = `${siteUrl}/article/${post.slug}`;
+            await sendTextMessage(
+              contributor.phoneNumber,
+              `✅ Your story is live on Tallaght Community!\n\n"${post.title}"\n\n🔗 ${articleUrl}\n\nFeel free to share it with friends and family! 🏘️`,
+            ).catch(() => {});
+          }
+        }
+      } catch {
+      }
+    }
   } catch (err) {
     res.status(500).json({ error: "internal_error", message: "Failed to update post" });
   }

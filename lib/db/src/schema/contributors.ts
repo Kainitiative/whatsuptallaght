@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const contributorsTable = pgTable("contributors", {
   id: serial("id").primaryKey(),
   phoneHash: text("phone_hash").notNull().unique(),
+  phoneNumber: text("phone_number"),
   displayName: text("display_name"),
   area: text("area"),
   bio: text("bio"),

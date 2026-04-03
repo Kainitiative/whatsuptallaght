@@ -172,7 +172,7 @@ async function handleIncomingMessage(
       // --- Grant consent ---
       await db
         .update(contributorsTable)
-        .set({ consentStatus: "consented", consentGivenAt: new Date(), updatedAt: new Date() })
+        .set({ consentStatus: "consented", consentGivenAt: new Date(), phoneNumber, updatedAt: new Date() })
         .where(eq(contributorsTable.id, contributor.id));
 
       logger.info({ phoneHash }, "Contributor consented");
