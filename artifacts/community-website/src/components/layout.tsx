@@ -24,21 +24,21 @@ export function Layout({ children }: { children: ReactNode }) {
     setSearchQuery("");
   }
 
-  const NavLinks = () => (
+  const NavLinks = ({ dark = false }: { dark?: boolean }) => (
     <>
-      <Link href="/" className="text-sm font-medium hover:text-primary transition-colors data-[active]:text-primary">
+      <Link href="/" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Home
       </Link>
-      <Link href="/events" className="text-sm font-medium hover:text-primary transition-colors">
+      <Link href="/events" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Events
       </Link>
-      <Link href="/contributors" className="text-sm font-medium hover:text-primary transition-colors">
+      <Link href="/contributors" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Contributors
       </Link>
-      <Link href="/advertise" className="text-sm font-medium hover:text-primary transition-colors">
+      <Link href="/advertise" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Advertise
       </Link>
-      <Link href="/about" className="text-sm font-medium hover:text-primary transition-colors">
+      <Link href="/about" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         About
       </Link>
     </>
@@ -46,14 +46,15 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col w-full bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Dark header — Option A logo */}
+      <header className="sticky top-0 z-50 w-full bg-zinc-950 border-b border-white/10">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6 md:gap-10">
             <Link href="/" className="flex items-center">
-              <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-11 w-auto" style={{ filter: "drop-shadow(0px 1px 2px rgba(0,0,0,0.55))" }} />
+              <img src="/wut-logo-green.png" alt="What's Up Tallaght" className="h-11 w-auto" />
             </Link>
             <nav className="hidden md:flex gap-6">
-              <NavLinks />
+              <NavLinks dark />
             </nav>
           </div>
 
@@ -66,19 +67,19 @@ export function Layout({ children }: { children: ReactNode }) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search articles…"
-                  className="w-48 sm:w-64 px-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="w-48 sm:w-64 px-3 py-1.5 text-sm rounded-lg border border-white/20 bg-white/10 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/20"
                 />
-                <Button type="button" variant="ghost" size="icon" onClick={() => setSearchOpen(false)} className="text-muted-foreground">
+                <Button type="button" variant="ghost" size="icon" onClick={() => setSearchOpen(false)} className="text-white/70 hover:text-white hover:bg-white/10">
                   ✕
                 </Button>
               </form>
             ) : (
-              <Button variant="ghost" size="icon" onClick={openSearch} aria-label="Search" data-testid="button-search">
+              <Button variant="ghost" size="icon" onClick={openSearch} aria-label="Search" data-testid="button-search" className="text-white/70 hover:text-white hover:bg-white/10">
                 <Search className="h-5 w-5" />
               </Button>
             )}
             <Link href="/about">
-              <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground rounded-full hidden sm:flex font-semibold shadow-sm" data-testid="button-whatsapp-header">
+              <Button className="bg-[#25d366] hover:bg-[#20bd5a] text-white rounded-full hidden sm:flex font-semibold shadow-sm" data-testid="button-whatsapp-header">
                 <MessageCircle className="w-4 h-4 mr-2" />
                 Send us your story
               </Button>
@@ -86,21 +87,22 @@ export function Layout({ children }: { children: ReactNode }) {
 
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden" data-testid="button-mobile-menu">
+                <Button variant="ghost" size="icon" className="md:hidden text-white/70 hover:text-white hover:bg-white/10" data-testid="button-mobile-menu">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="flex flex-col gap-6">
+                {/* Mobile sheet is white — use Option B logo */}
                 <div className="flex items-center mt-4">
-                  <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-11 w-auto" style={{ filter: "drop-shadow(0px 1px 2px rgba(0,0,0,0.55))" }} />
+                  <img src="/wut-logo-red.png" alt="What's Up Tallaght" className="h-10 w-auto" />
                 </div>
                 <nav className="flex flex-col gap-4 mt-8">
                   <NavLinks />
                 </nav>
                 <div className="mt-auto pb-8">
                   <Link href="/about">
-                    <Button className="w-full bg-secondary hover:bg-secondary/90 text-white rounded-full font-semibold" data-testid="button-whatsapp-mobile">
+                    <Button className="w-full bg-[#25d366] hover:bg-[#20bd5a] text-white rounded-full font-semibold" data-testid="button-whatsapp-mobile">
                       <MessageCircle className="w-4 h-4 mr-2" />
                       Send us your story
                     </Button>
@@ -116,12 +118,13 @@ export function Layout({ children }: { children: ReactNode }) {
         {children}
       </main>
 
+      {/* Light footer — Option B logo */}
       <footer className="border-t bg-card text-card-foreground">
         <div className="container mx-auto px-4 py-12 md:py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2 space-y-4">
               <Link href="/" className="inline-flex items-center">
-                <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-11 w-auto" style={{ filter: "drop-shadow(0px 1px 2px rgba(0,0,0,0.55))" }} />
+                <img src="/wut-logo-red.png" alt="What's Up Tallaght" className="h-10 w-auto" />
               </Link>
               <p className="text-muted-foreground max-w-sm">
                 The hyper-local, AI-powered community news site serving Tallaght, Dublin. Real local faces, real community voices.

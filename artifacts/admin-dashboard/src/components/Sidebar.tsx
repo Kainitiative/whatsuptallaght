@@ -24,7 +24,7 @@ export default function Sidebar() {
   return (
     <aside className="w-56 flex-shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
       <div className="px-4 py-4 border-b border-sidebar-border">
-        <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-9 w-auto" />
+        <img src="/wut-logo-green.png" alt="What's Up Tallaght" className="h-9 w-auto" />
         <p className="text-xs text-sidebar-foreground/40 mt-1.5 pl-0.5">Admin Dashboard</p>
       </div>
 
