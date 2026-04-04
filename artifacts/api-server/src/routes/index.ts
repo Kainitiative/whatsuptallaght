@@ -13,6 +13,7 @@ import webhookRouter from "./webhook";
 import usageRouter from "./usage";
 import storageRouter from "./storage";
 import publicRouter from "./public";
+import eventsRouter from "./events";
 import { adminAuth } from "../lib/admin-auth";
 
 const router: IRouter = Router();
@@ -29,6 +30,7 @@ router.use(rssRouter);
 router.use(statsRouter);
 router.use(webhookRouter);
 router.use(adminRouter); // contains POST /admin/auth — must be unprotected
+router.use(eventsRouter); // GET /public/events is public; admin CRUD protected below
 
 // Protected admin-only routes — require Bearer token
 router.use(adminAuth);

@@ -1091,31 +1091,23 @@ Meta's WhatsApp Business API only allows a business to send **outbound messages*
 
 ---
 
-### Events Calendar & Directory
+### Events Calendar & Directory — COMPLETED
 
-#### Concept
-Event-type submissions (community clean-up, library workshop, GAA match, school fundraiser) are detected by the AI and handled in two ways simultaneously: an article is generated as normal, AND the event is added to a structured Events directory on the public website. Two outputs from one submission.
+#### What was built
+- New `events` table in the DB (`lib/db/src/schema/events.ts`) with full fields: `title`, `eventDate`, `eventTime`, `endDate`, `endTime`, `location`, `organiser`, `description`, `price`, `contactInfo`, `websiteUrl`, `status`, `articleId` (nullable FK).
+- AI pipeline stage 5b (`extractEventDetails`) — runs GPT-4o-mini when tone === "event" to extract all structured fields including resolving relative dates.
+- `maybeCreateEventRecord` helper called at end of both WhatsApp and RSS pipelines.
+- API routes in `artifacts/api-server/src/routes/events.ts`: `GET /public/events` (public, filterable by status/date), `GET /events` (admin, auth required), `PUT /events/:id` (admin), `DELETE /events/:id` (admin).
+- Admin Events page (`artifacts/admin-dashboard/src/pages/Events.tsx`) — list with status filter, full edit modal for all fields, delete with confirmation. "Source article removed" warning when article is deleted.
+- Community website `/events` page (`artifacts/community-website/src/pages/events.tsx`) — upcoming/past toggle, date card with month/day, location/time/price/organiser chips, link to article, WhatsApp CTA at bottom.
+- Events link added to community website header nav, mobile menu, and footer.
+- Events link added to admin sidebar.
 
 #### How the AI detects events
-Stage 4 classification gains a new type: `event`. Signals the AI looks for:
-- Explicit future date or day ("this Saturday", "next Tuesday", "April 12th")
-- Location + time pattern ("at the library at 2pm")
-- Invitation or call-to-participation language ("everyone welcome", "free entry", "all ages")
-- Event vocabulary: "workshop", "clean-up", "fundraiser", "match", "ceremony", "opening"
-
-#### What gets generated
-1. **An article** — written normally through the full pipeline, published under a Community/Events category
-2. **An event record** — stored in a new `events` table with structured fields: `title`, `date`, `time`, `location`, `description`, `articleId` (linked), `submittedBy`, `status` (`upcoming` | `past` | `cancelled`)
-
-#### Events directory on the website
-- A dedicated `/events` page showing upcoming events in calendar/list view
-- Events are sorted by date; past events auto-archive
-- Each event links through to its full article
-- Can be submitted via WhatsApp naturally — "there's a free kids art workshop at Tallaght Library this Saturday at 11am, all welcome" — no form required
-- Admin can add, edit, or cancel events manually from the dashboard
+Stage 4 classification already supports tone `"event"`. When tone === "event", a new parallel extraction step runs specifically to pull structured data: ISO dates (resolves relative dates like "this Saturday"), time, venue, organiser, price, contact, website URL, 1-2 sentence description.
 
 #### Data model — `events` table
-- `id`, `articleId` (FK, nullable — events can exist without an article), `title`, `eventDate`, `eventTime`, `location`, `description`, `status`, `createdAt`
+`id`, `articleId` (FK nullable, onDelete: set null), `title`, `eventDate` (date), `eventTime` (text), `endDate`, `endTime`, `location`, `description`, `organiser`, `contactInfo`, `websiteUrl`, `price`, `status` (upcoming/past/cancelled), `articleDeleted` (bool), `createdAt`, `updatedAt`
 
 ---
 

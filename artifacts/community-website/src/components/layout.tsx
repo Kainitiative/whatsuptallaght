@@ -29,6 +29,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <Link href="/" className="text-sm font-medium hover:text-primary transition-colors data-[active]:text-primary">
         Home
       </Link>
+      <Link href="/events" className="text-sm font-medium hover:text-primary transition-colors">
+        Events
+      </Link>
       <Link href="/contributors" className="text-sm font-medium hover:text-primary transition-colors">
         Contributors
       </Link>
@@ -142,6 +145,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <ul className="space-y-2">
                 <li><Link href="/" className="text-muted-foreground hover:text-primary transition-colors text-sm">Home</Link></li>
                 <li><Link href="/search" className="text-muted-foreground hover:text-primary transition-colors text-sm">Search</Link></li>
+                <li><Link href="/events" className="text-muted-foreground hover:text-primary transition-colors text-sm">Events</Link></li>
                 <li><Link href="/contributors" className="text-muted-foreground hover:text-primary transition-colors text-sm">Contributors</Link></li>
                 <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors text-sm">How it works</Link></li>
               </ul>

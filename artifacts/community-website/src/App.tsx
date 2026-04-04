@@ -13,6 +13,7 @@ import Advertise from "@/pages/advertise";
 import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import SearchPage from "@/pages/search";
+import EventsPage from "@/pages/events";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +37,7 @@ function Router() {
         <Route path="/terms" component={Terms} />
         <Route path="/privacy" component={Privacy} />
         <Route path="/search" component={SearchPage} />
+        <Route path="/events" component={EventsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -282,3 +282,52 @@ export async function getPostCost(id: number) {
 export async function regeneratePostImage(id: number) {
   return request<Post>(`/posts/${id}/regenerate-image`, { method: "POST" });
 }
+
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+
+export interface AdminEvent {
+  id: number;
+  title: string;
+  eventDate: string;
+  eventTime: string | null;
+  endDate: string | null;
+  endTime: string | null;
+  location: string | null;
+  description: string | null;
+  organiser: string | null;
+  contactInfo: string | null;
+  websiteUrl: string | null;
+  price: string | null;
+  status: string;
+  articleId: number | null;
+  articleDeleted: boolean;
+  articleSlug: string | null;
+  articleTitle: string | null;
+  articleStatus: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EventsListResponse {
+  events: AdminEvent[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export async function getEvents(params?: { status?: string; page?: number }): Promise<EventsListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.page) qs.set("page", String(params.page));
+  return request<EventsListResponse>(`/events?${qs.toString()}`);
+}
+
+export async function updateEvent(id: number, data: Partial<AdminEvent>): Promise<AdminEvent> {
+  return request<AdminEvent>(`/events/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function deleteEvent(id: number): Promise<void> {
+  return request<void>(`/events/${id}`, { method: "DELETE" });
+}

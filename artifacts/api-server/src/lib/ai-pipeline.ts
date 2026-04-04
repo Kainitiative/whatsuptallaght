@@ -7,6 +7,7 @@ import {
   goldenExamplesTable,
   rssItemsTable,
   aiUsageLogTable,
+  eventsTable,
 } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSettingValue } from "../routes/settings";
@@ -285,6 +286,109 @@ Respond in JSON:
       completenessScore: 0.3,
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5b — Event detail extraction (GPT-4o-mini, JSON) — runs when tone === "event"
+// ---------------------------------------------------------------------------
+
+interface EventDetails {
+  eventDate: string | null;        // ISO date YYYY-MM-DD
+  eventTime: string | null;        // Human-readable e.g. "7:30 PM"
+  endDate: string | null;          // ISO date YYYY-MM-DD or null
+  endTime: string | null;          // Human-readable e.g. "10:00 PM" or null
+  location: string | null;         // Venue / address
+  organiser: string | null;        // Organisation or person running the event
+  price: string | null;            // "Free", "€5", "Donation welcome", etc.
+  contactInfo: string | null;      // Phone, email, or social media
+  websiteUrl: string | null;       // URL for more info
+  shortDescription: string | null; // 1-2 sentence summary of the event
+}
+
+async function extractEventDetails(openai: OpenAI, combinedText: string, ctx: UsageCtx): Promise<EventDetails | null> {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You are an events editor for a community news platform in Tallaght, Dublin.
+Extract structured event details from the following submission. Today's date is ${today}.
+
+CRITICAL RULES:
+- Extract dates and times EXACTLY as they appear. Do not guess or infer if not mentioned.
+- For relative dates like "this Saturday" or "next Friday", calculate the actual ISO date (YYYY-MM-DD) based on today being ${today}.
+- If the event date cannot be determined, return null for eventDate.
+- Return null for any field that is genuinely not mentioned or cannot be determined.
+
+Respond in JSON:
+{
+  "eventDate": "YYYY-MM-DD or null",
+  "eventTime": "Human-readable start time or null",
+  "endDate": "YYYY-MM-DD or null",
+  "endTime": "Human-readable end time or null",
+  "location": "Venue name and/or address or null",
+  "organiser": "Organisation or person organising the event or null",
+  "price": "Free | €X | Ticket price description or null",
+  "contactInfo": "Phone number, email, or social media handle or null",
+  "websiteUrl": "Full URL for tickets or more info or null",
+  "shortDescription": "1-2 sentence factual description of the event or null"
+}`,
+        },
+        { role: "user", content: combinedText },
+      ],
+    });
+
+    logUsage(ctx, "gpt-4o-mini", "event_extract", response.usage ?? undefined);
+    return JSON.parse(response.choices[0].message.content ?? "{}") as EventDetails;
+  } catch (err) {
+    logger.warn({ err }, "AI pipeline: event extraction failed (non-fatal)");
+    return null;
+  }
+}
+
+async function maybeCreateEventRecord(
+  postId: number,
+  postTitle: string,
+  tone: string,
+  combinedText: string,
+  openai: OpenAI,
+  ctx: UsageCtx,
+  infoEventDate: string | null,
+): Promise<void> {
+  if (tone !== "event") return;
+
+  const details = await extractEventDetails(openai, combinedText, ctx);
+  if (!details) return;
+
+  const eventDate = details.eventDate ?? infoEventDate;
+  if (!eventDate) {
+    logger.warn({ postId }, "AI pipeline: event detected but no date found — skipping event record");
+    return;
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+  const status = eventDate < today ? "past" : "upcoming";
+
+  await db.insert(eventsTable).values({
+    articleId: postId,
+    title: postTitle,
+    eventDate,
+    eventTime: details.eventTime ?? null,
+    endDate: details.endDate ?? null,
+    endTime: details.endTime ?? null,
+    location: details.location ?? null,
+    description: details.shortDescription ?? null,
+    organiser: details.organiser ?? null,
+    contactInfo: details.contactInfo ?? null,
+    websiteUrl: details.websiteUrl ?? null,
+    price: details.price ?? null,
+    status,
+  });
+
+  logger.info({ postId, eventDate, status }, "AI pipeline: event record created");
 }
 
 // ---------------------------------------------------------------------------
@@ -698,6 +802,17 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     .set({ status: "processed", updatedAt: new Date() })
     .where(eq(submissionsTable.id, submissionId));
 
+  // --- Create event record if tone === "event" ---
+  await maybeCreateEventRecord(
+    newPost.id,
+    infoResult.headline,
+    toneResult.tone,
+    combinedText,
+    openai,
+    ctx,
+    infoResult.eventDate,
+  ).catch((err) => logger.warn({ err, postId: newPost.id }, "AI pipeline: event record creation failed (non-fatal)"));
+
   logger.info({ submissionId, postId: newPost.id, status: postStatus }, "AI pipeline: complete");
 
   // --- Notify the submitter ---
@@ -870,6 +985,17 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     .update(rssItemsTable)
     .set({ postId: newPost.id })
     .where(eq(rssItemsTable.id, rssItemId));
+
+  // --- Create event record if tone === "event" ---
+  await maybeCreateEventRecord(
+    newPost.id,
+    infoResult.headline || title,
+    toneResult.tone,
+    combinedText,
+    openai,
+    ctx,
+    infoResult.eventDate,
+  ).catch((err) => logger.warn({ err, postId: newPost.id }, "RSS pipeline: event record creation failed (non-fatal)"));
 
   logger.info(
     { submissionId, postId: newPost.id, status: postStatus, feedName },
