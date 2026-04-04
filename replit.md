@@ -629,7 +629,12 @@ Sponsored content must be clearly labeled — "Sponsored Content", "Business Fea
 
 ---
 
-### Entity Library (organisation & person image store)
+### Entity Library ✅ BUILT
+
+**Backend**: `entities` table (name, aliases[], type, imageUrl, website, description, matchedEntityId on posts). `entity-matcher.ts` module — fast string-based whole-word matching against entity names + all aliases; called in both WhatsApp and RSS pipelines after article is written. Image precedence: submitted photo > entity image > DALL·E > none. API routes at `/admin/entities` (CRUD + search). **5 seed entities pre-loaded**: St Marks GAA Club, Tallaght University Hospital (+ TUH/AMNCH aliases), Tallaght Library, Tallaght Community School, Rua Red Arts Centre.
+**Frontend**: Admin Entity Library page (`/entities`) — list view with entity images/type badges/aliases, inline add/edit form, image upload via presigned URL, alias chip management, type filter, search. Delete with confirmation dialog. Stats bar shows counts by type and image coverage.
+
+### Entity Library (organisation & person image store) — spec
 
 #### Concept
 A database of named entities — local organisations, people, venues, clubs, and recurring figures — each with a stored image (logo, headshot, team crest). When the AI writes an article, it checks whether any known entities are mentioned and automatically uses the matching image as the header image if no photo was submitted with the original message.

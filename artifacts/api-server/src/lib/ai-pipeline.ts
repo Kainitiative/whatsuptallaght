@@ -2,6 +2,7 @@ import OpenAI, { toFile } from "openai";
 import { applyWatermark } from "./watermark";
 import { postToFacebookPage } from "./facebook-poster";
 import { generateAndStoreSocialCaptions, getSocialCaptionsForPost } from "./social-caption-agent";
+import { matchEntityInArticle } from "./entity-matcher";
 import { db } from "@workspace/db";
 import {
   submissionsTable,
@@ -754,11 +755,17 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   // --- Create the post ---
   const postStatus = confidence >= 0.75 ? "published" : "held";
 
+  // --- Stage 7.5: Entity matching ---
+  logger.info({ submissionId }, "AI pipeline: matching entities");
+  const entityMatch = await matchEntityInArticle(articleBody);
+  const entityImagePath = entityMatch?.entityImageUrl ?? null;
+
   // --- Stage 7b: Generate header image (only for articles that will be published) ---
+  // Precedence: submitted photo > entity image > DALL·E generated > none
   // For held articles we save the prompt text only — image is generated when admin publishes.
   let generatedImagePath: string | null = null;
   let generatedImagePrompt: string | null = null;
-  if (!firstImagePath) {
+  if (!firstImagePath && !entityImagePath) {
     // Always build and store the prompt so it's ready when the article is published
     generatedImagePrompt = buildDallePrompt(infoResult.headline, infoResult.keyFacts, toneResult.tone);
     if (postStatus === "published") {
@@ -774,6 +781,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     } else {
       logger.info({ submissionId }, "AI pipeline: skipping image generation — article held for review");
     }
+  } else if (!firstImagePath && entityImagePath) {
+    logger.info({ submissionId, entityName: entityMatch?.entityName }, "AI pipeline: using entity image as header");
   }
 
   const [newPost] = await db
@@ -795,7 +804,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
       primaryCategoryId: matchedCategory?.id ?? null,
       sourceSubmissionId: submissionId,
       publishedAt: postStatus === "published" ? new Date() : null,
-      headerImageUrl: firstImagePath ?? generatedImagePath ?? undefined,
+      matchedEntityId: entityMatch?.entityId ?? null,
+      headerImageUrl: firstImagePath ?? entityImagePath ?? generatedImagePath ?? undefined,
       imagePrompt: generatedImagePrompt ?? undefined,
     })
     .returning();
@@ -955,22 +965,31 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   const confidence = Math.min(1, baseConfidence + infoResult.completenessScore * 0.15);
   const postStatus = confidence >= 0.75 ? "published" : "held";
 
+  // --- Entity matching ---
+  const rssEntityMatch = await matchEntityInArticle(articleBody);
+  const rssEntityImagePath = rssEntityMatch?.entityImageUrl ?? null;
+
   // --- Generate header image (only for articles that will be published) ---
+  // Precedence: entity image > DALL·E generated > none
   // For held articles we save the prompt text only — image is generated when admin publishes.
   let rssImagePath: string | null = null;
   let rssImagePrompt: string | null = buildDallePrompt(infoResult.headline || title, infoResult.keyFacts, toneResult.tone);
-  if (postStatus === "published") {
-    const autoGenerate = await getSettingValue("auto_generate_images");
-    if (autoGenerate === "true") {
-      logger.info({ submissionId }, "RSS pipeline: generating header image (auto-published)");
-      const generated = await generateHeaderImage(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
-      if (generated) {
-        rssImagePath = generated.imageUrl;
-        rssImagePrompt = generated.imagePrompt;
+  if (!rssEntityImagePath) {
+    if (postStatus === "published") {
+      const autoGenerate = await getSettingValue("auto_generate_images");
+      if (autoGenerate === "true") {
+        logger.info({ submissionId }, "RSS pipeline: generating header image (auto-published)");
+        const generated = await generateHeaderImage(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
+        if (generated) {
+          rssImagePath = generated.imageUrl;
+          rssImagePrompt = generated.imagePrompt;
+        }
       }
+    } else {
+      logger.info({ submissionId }, "RSS pipeline: skipping image generation — article held for review");
     }
   } else {
-    logger.info({ submissionId }, "RSS pipeline: skipping image generation — article held for review");
+    logger.info({ submissionId, entityName: rssEntityMatch?.entityName }, "RSS pipeline: using entity image as header");
   }
 
   const slug =
@@ -994,7 +1013,8 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
       primaryCategoryId: matchedCategory?.id ?? null,
       sourceSubmissionId: submissionId,
       publishedAt: postStatus === "published" ? new Date() : null,
-      headerImageUrl: rssImagePath ?? undefined,
+      matchedEntityId: rssEntityMatch?.entityId ?? null,
+      headerImageUrl: rssEntityImagePath ?? rssImagePath ?? undefined,
       imagePrompt: rssImagePrompt ?? undefined,
     })
     .returning();

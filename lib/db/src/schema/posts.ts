@@ -3,6 +3,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { categoriesTable } from "./categories";
 import { submissionsTable } from "./submissions";
+import { entitiesTable } from "./entities";
 
 export const postStatusEnum = pgEnum("post_status", ["draft", "held", "published", "rejected"]);
 
@@ -22,6 +23,7 @@ export const postsTable = pgTable("posts", {
   isFeatured: boolean("is_featured").notNull().default(false),
   starRating: integer("star_rating"),
   imagePrompt: text("image_prompt"),
+  matchedEntityId: integer("matched_entity_id").references(() => entitiesTable.id, { onDelete: "set null" }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -370,3 +370,57 @@ export async function regenerateSocialCaptions(postId: number): Promise<SocialCa
 export async function postToFacebookNow(postId: number): Promise<{ success: boolean; facebookPostId: string }> {
   return request<{ success: boolean; facebookPostId: string }>(`/admin/social/captions/${postId}/post-facebook`, { method: "POST" });
 }
+
+// ---------------------------------------------------------------------------
+// Entity Library
+// ---------------------------------------------------------------------------
+
+export type EntityType = "organisation" | "person" | "venue" | "team" | "event";
+
+export interface Entity {
+  id: number;
+  name: string;
+  aliases: string[];
+  type: EntityType;
+  imageUrl: string | null;
+  website: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEntityInput {
+  name: string;
+  aliases: string[];
+  type: EntityType;
+  imageUrl?: string | null;
+  website?: string | null;
+  description?: string | null;
+}
+
+export async function getEntities(): Promise<Entity[]> {
+  return request<Entity[]>("/admin/entities");
+}
+
+export async function getEntity(id: number): Promise<Entity> {
+  return request<Entity>(`/admin/entities/${id}`);
+}
+
+export async function createEntity(data: CreateEntityInput): Promise<Entity> {
+  return request<Entity>("/admin/entities", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateEntity(id: number, data: Partial<CreateEntityInput>): Promise<Entity> {
+  return request<Entity>(`/admin/entities/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function deleteEntity(id: number): Promise<void> {
+  return request<void>(`/admin/entities/${id}`, { method: "DELETE" });
+}
+
+export async function requestUploadUrl(file: { name: string; size: number; contentType: string }): Promise<{ uploadURL: string; objectPath: string }> {
+  return request<{ uploadURL: string; objectPath: string }>("/storage/uploads/request-url", {
+    method: "POST",
+    body: JSON.stringify(file),
+  });
+}
