@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable, submissionsTable, contributorsTable, aiUsageLogTable } from "@workspace/db/schema";
+import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable, submissionsTable, contributorsTable, aiUsageLogTable, socialCaptionsTable } from "@workspace/db/schema";
 import { eq, and, desc, count, sql, ilike, sum } from "drizzle-orm";
 import { sendTextMessage } from "../lib/whatsapp-client";
 import { getSettingValue } from "./settings";
 import { regeneratePostImage } from "../lib/ai-pipeline";
 import { postToFacebookPage } from "../lib/facebook-poster";
+import { generateAndStoreSocialCaptions, getSocialCaptionsForPost } from "../lib/social-caption-agent";
 
 const router = Router();
 
@@ -257,13 +258,43 @@ router.patch("/posts/:id", async (req, res) => {
       }).catch(() => {});
     }
 
-    // --- Post to Facebook when manually published ---
+    // --- Generate social captions + post to Facebook when manually published ---
     if (status === "published" && currentPost.status !== "published") {
-      postToFacebookPage({
-        title: post.title,
-        slug: post.slug,
-        excerpt: post.excerpt,
-      }).catch(() => {});
+      (async () => {
+        try {
+          // Fetch category name for richer caption context
+          let categoryName: string | null = null;
+          if (post.primaryCategoryId) {
+            const [cat] = await db
+              .select({ name: categoriesTable.name })
+              .from(categoriesTable)
+              .where(eq(categoriesTable.id, post.primaryCategoryId));
+            categoryName = cat?.name ?? null;
+          }
+
+          // Generate and store AI social captions
+          await generateAndStoreSocialCaptions({
+            id: post.id,
+            title: post.title,
+            body: post.body,
+            excerpt: post.excerpt,
+            categoryName,
+          });
+
+          // Use the stored AI caption for Facebook — fall back to excerpt
+          const storedCaptions = await getSocialCaptionsForPost(post.id);
+          const facebookCaption = storedCaptions?.captionFacebook ?? undefined;
+
+          await postToFacebookPage({
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+            overrideMessage: facebookCaption,
+          });
+        } catch {
+          // Non-fatal — never block the response
+        }
+      })();
     }
 
     // --- Notify contributor when manually published ---

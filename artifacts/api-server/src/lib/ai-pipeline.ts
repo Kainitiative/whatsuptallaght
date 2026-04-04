@@ -1,6 +1,7 @@
 import OpenAI, { toFile } from "openai";
 import { applyWatermark } from "./watermark";
 import { postToFacebookPage } from "./facebook-poster";
+import { generateAndStoreSocialCaptions, getSocialCaptionsForPost } from "./social-caption-agent";
 import { db } from "@workspace/db";
 import {
   submissionsTable,
@@ -818,13 +819,25 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
 
   logger.info({ submissionId, postId: newPost.id, status: postStatus }, "AI pipeline: complete");
 
-  // --- Post to Facebook (auto-published WhatsApp submissions) ---
+  // --- Generate social captions + post to Facebook (auto-published WhatsApp) ---
   if (postStatus === "published") {
-    postToFacebookPage({
-      title: newPost.title,
-      slug: newPost.slug,
-      excerpt: newPost.excerpt,
-    }).catch(() => {});
+    (async () => {
+      try {
+        await generateAndStoreSocialCaptions({
+          id: newPost.id,
+          title: newPost.title,
+          body: newPost.body ?? "",
+          excerpt: newPost.excerpt,
+        });
+        const captions = await getSocialCaptionsForPost(newPost.id);
+        await postToFacebookPage({
+          title: newPost.title,
+          slug: newPost.slug,
+          excerpt: newPost.excerpt,
+          overrideMessage: captions?.captionFacebook ?? undefined,
+        });
+      } catch { /* non-fatal */ }
+    })();
   }
 
   // --- Notify the submitter ---
@@ -1009,13 +1022,25 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     infoResult.eventDate,
   ).catch((err) => logger.warn({ err, postId: newPost.id }, "RSS pipeline: event record creation failed (non-fatal)"));
 
-  // --- Post to Facebook (auto-published RSS articles) ---
+  // --- Generate social captions + post to Facebook (auto-published RSS) ---
   if (postStatus === "published") {
-    postToFacebookPage({
-      title: newPost.title,
-      slug: newPost.slug,
-      excerpt: newPost.excerpt,
-    }).catch(() => {});
+    (async () => {
+      try {
+        await generateAndStoreSocialCaptions({
+          id: newPost.id,
+          title: newPost.title,
+          body: newPost.body ?? "",
+          excerpt: newPost.excerpt,
+        });
+        const captions = await getSocialCaptionsForPost(newPost.id);
+        await postToFacebookPage({
+          title: newPost.title,
+          slug: newPost.slug,
+          excerpt: newPost.excerpt,
+          overrideMessage: captions?.captionFacebook ?? undefined,
+        });
+      } catch { /* non-fatal */ }
+    })();
   }
 
   logger.info(

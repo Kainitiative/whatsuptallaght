@@ -769,7 +769,12 @@ The name question should always fire if a name is detected, regardless of anythi
 
 ---
 
-### Social Media Distribution — AI Caption Agent
+### Social Media Distribution — AI Caption Agent ✅ BUILT
+
+**Backend**: `social-caption-agent.ts` — GPT-4o-mini with Social Media Manager persona; generates Facebook, Instagram, X/Twitter captions + hashtags + social score (1–10) + recommended time slot (morning/lunchtime/evening); called automatically on every publish (WhatsApp, RSS, manual admin). Stores in `social_captions` table. Facebook poster uses AI caption via `overrideMessage`. API routes: `GET /admin/social/captions`, `POST /admin/social/captions/:postId/regenerate`, `PUT /admin/social/captions/:id`, `POST /admin/social/captions/:postId/post-facebook`.
+**Frontend**: Admin Social Media page (`/social`) — accordion list of articles with platform tabs (Facebook/Instagram/X), editable caption textarea, copy button, regenerate AI button, "Post to Facebook now" button, social score badge, recommended slot label.
+
+### Social Media Distribution — AI Caption Agent (original spec)
 
 #### The core idea
 The AI that writes articles (factual, careful, no embellishment) is the wrong voice for social media. Social needs scroll-stopping energy — a hook in the first line, a reason to click, a question that pulls people in. A separate AI stage runs after an article is approved, using a completely different role prompt to generate platform-specific social captions.

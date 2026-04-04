@@ -38,6 +38,7 @@ export async function postToFacebookPage(post: {
   title: string;
   slug: string;
   excerpt?: string | null;
+  overrideMessage?: string;
 }): Promise<string | null> {
   try {
     const [pageId, storedToken, siteUrl] = await Promise.all([
@@ -61,9 +62,12 @@ export async function postToFacebookPage(post: {
     const base = (siteUrl ?? "https://whatsuptallaght.ie").replace(/\/$/, "");
     const articleUrl = `${base}/article/${post.slug}`;
 
-    const message = post.excerpt
-      ? `${post.excerpt}\n\n👇 Read the full story on What's Up Tallaght`
-      : `👇 Read the full story on What's Up Tallaght`;
+    // Use AI-generated caption if provided, otherwise fall back to excerpt
+    const message = post.overrideMessage
+      ? `${post.overrideMessage}\n\n🔗 ${articleUrl}`
+      : post.excerpt
+        ? `${post.excerpt}\n\n👇 Read the full story on What's Up Tallaght`
+        : `👇 Read the full story on What's Up Tallaght`;
 
     const response = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
       method: "POST",

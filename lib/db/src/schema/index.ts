@@ -10,3 +10,4 @@ export * from "./distribution";
 export * from "./settings";
 export * from "./usage";
 export * from "./events";
+export * from "./social";

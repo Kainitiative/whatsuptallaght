@@ -14,6 +14,7 @@ import usageRouter from "./usage";
 import storageRouter from "./storage";
 import publicRouter from "./public";
 import eventsRouter from "./events";
+import socialRouter from "./social";
 import { adminAuth } from "../lib/admin-auth";
 
 const router: IRouter = Router();
@@ -36,6 +37,7 @@ router.use(eventsRouter); // GET /public/events is public; admin CRUD protected 
 router.use(adminAuth);
 router.use(settingsRouter);
 router.use(goldenExamplesRouter);
+router.use(socialRouter);
 router.use("/admin/usage", usageRouter);
 
 export default router;

@@ -331,3 +331,42 @@ export async function updateEvent(id: number, data: Partial<AdminEvent>): Promis
 export async function deleteEvent(id: number): Promise<void> {
   return request<void>(`/events/${id}`, { method: "DELETE" });
 }
+
+// ---------------------------------------------------------------------------
+// Social Captions
+// ---------------------------------------------------------------------------
+
+export interface SocialCaption {
+  id: number;
+  postId: number;
+  postTitle: string;
+  postSlug: string;
+  postExcerpt: string | null;
+  postPublishedAt: string | null;
+  captionFacebook: string | null;
+  captionInstagram: string | null;
+  captionTwitter: string | null;
+  hashtags: string | null;
+  socialScore: number | null;
+  recommendedSlot: "morning" | "lunchtime" | "evening" | null;
+  isSocialWorthy: boolean;
+  status: "draft" | "posted" | "skipped";
+  generatedAt: string;
+  updatedAt: string;
+}
+
+export async function getSocialCaptions(): Promise<SocialCaption[]> {
+  return request<SocialCaption[]>("/admin/social/captions");
+}
+
+export async function updateSocialCaption(id: number, data: Partial<Pick<SocialCaption, "captionFacebook" | "captionInstagram" | "captionTwitter" | "hashtags" | "status">>): Promise<SocialCaption> {
+  return request<SocialCaption>(`/admin/social/captions/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function regenerateSocialCaptions(postId: number): Promise<SocialCaption> {
+  return request<SocialCaption>(`/admin/social/captions/${postId}/regenerate`, { method: "POST" });
+}
+
+export async function postToFacebookNow(postId: number): Promise<{ success: boolean; facebookPostId: string }> {
+  return request<{ success: boolean; facebookPostId: string }>(`/admin/social/captions/${postId}/post-facebook`, { method: "POST" });
+}

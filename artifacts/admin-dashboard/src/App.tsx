@@ -12,6 +12,7 @@ import Usage from "@/pages/Usage";
 import RssFeeds from "@/pages/RssFeeds";
 import Categories from "@/pages/Categories";
 import Events from "@/pages/Events";
+import Social from "@/pages/Social";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -36,6 +37,7 @@ function ProtectedLayout() {
           <Route path="/rss" component={RssFeeds} />
           <Route path="/categories" component={Categories} />
           <Route path="/events" component={Events} />
+          <Route path="/social" component={Social} />
           <Route path="/usage" component={Usage} />
           <Route path="/settings" component={Settings} />
           <Route>
