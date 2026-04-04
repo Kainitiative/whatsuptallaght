@@ -50,9 +50,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6 md:gap-10">
             <Link href="/" className="flex items-center">
-              <div className="bg-zinc-900 rounded-lg px-3 py-1.5">
-                <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-8 w-auto" />
-              </div>
+              <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-11 w-auto" style={{ filter: "drop-shadow(0px 1px 2px rgba(0,0,0,0.55))" }} />
             </Link>
             <nav className="hidden md:flex gap-6">
               <NavLinks />
@@ -95,9 +93,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </SheetTrigger>
               <SheetContent side="right" className="flex flex-col gap-6">
                 <div className="flex items-center mt-4">
-                  <div className="bg-zinc-900 rounded-lg px-3 py-1.5">
-                    <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-8 w-auto" />
-                  </div>
+                  <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-11 w-auto" style={{ filter: "drop-shadow(0px 1px 2px rgba(0,0,0,0.55))" }} />
                 </div>
                 <nav className="flex flex-col gap-4 mt-8">
                   <NavLinks />
@@ -125,9 +121,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2 space-y-4">
               <Link href="/" className="inline-flex items-center">
-                <div className="bg-zinc-900 rounded-lg px-3 py-1.5">
-                  <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-8 w-auto" />
-                </div>
+                <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-11 w-auto" style={{ filter: "drop-shadow(0px 1px 2px rgba(0,0,0,0.55))" }} />
               </Link>
               <p className="text-muted-foreground max-w-sm">
                 The hyper-local, AI-powered community news site serving Tallaght, Dublin. Real local faces, real community voices.

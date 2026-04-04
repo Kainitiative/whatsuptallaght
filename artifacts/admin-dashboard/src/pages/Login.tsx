@@ -27,9 +27,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-sidebar">
       <div className="bg-white rounded-2xl shadow-xl p-10 w-full max-w-sm">
         <div className="mb-8">
-          <div className="bg-zinc-900 rounded-lg px-3 py-2 inline-flex">
-            <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-9 w-auto" />
-          </div>
+          <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-11 w-auto" style={{ filter: "drop-shadow(0px 1px 2px rgba(0,0,0,0.55))" }} />
           <p className="text-xs text-muted-foreground mt-2">Admin Dashboard</p>
         </div>
 
