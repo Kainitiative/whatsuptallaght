@@ -51,7 +51,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6 md:gap-10">
             <Link href="/" className="flex items-center">
-              <img src="/wut-logo-green.png" alt="What's Up Tallaght" className="h-11 w-auto" />
+              <img src="/wut-logo-green.png" alt="What's Up Tallaght" className="h-[50px] w-auto" />
             </Link>
             <nav className="hidden md:flex gap-6">
               <NavLinks dark />

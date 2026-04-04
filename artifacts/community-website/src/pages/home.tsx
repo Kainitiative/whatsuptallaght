@@ -33,6 +33,16 @@ export default function Home() {
     }
   });
 
+  // Extra pool used to find the best hero image (WhatsApp photo priority)
+  const { data: heroCandidatesData } = useListPosts({
+    status: "published",
+    limit: 15,
+  }, {
+    query: {
+      queryKey: getListPostsQueryKey({ status: "published", limit: 15 }),
+    }
+  });
+
   const { data: categories } = useListCategories({
     query: {
       queryKey: getListCategoriesQueryKey(),
@@ -71,7 +81,21 @@ export default function Home() {
     return category ? { name: category.name, slug: category.slug, color: category.color } : { name: "News", slug: "news", color: "" };
   };
 
-  const featuredPost = featuredPostsData?.posts?.[0] || postsData?.posts?.[0];
+  // Hero selection: admin-featured → WhatsApp photo → any-image → any post
+  const heroPool = heroCandidatesData?.posts ?? postsData?.posts ?? [];
+  const adminFeatured = featuredPostsData?.posts?.[0];
+  const featuredPost = (() => {
+    if (adminFeatured) return adminFeatured;
+    // Prefer a real community photo (came from WhatsApp and has an image)
+    const whatsappPhoto = heroPool.find(
+      p => (p as any).sourceSubmissionId != null && p.headerImageUrl
+    );
+    if (whatsappPhoto) return whatsappPhoto;
+    // Fall back to any post with an image (DALL·E generated)
+    const anyWithImage = heroPool.find(p => p.headerImageUrl);
+    if (anyWithImage) return anyWithImage;
+    return heroPool[0] ?? null;
+  })();
   const regularPosts = postsData?.posts?.filter(p => p.id !== featuredPost?.id) || [];
   const eventPosts = eventPostsData?.posts || [];
 
