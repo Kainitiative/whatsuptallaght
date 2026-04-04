@@ -47,7 +47,7 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex flex-col w-full bg-background">
       {/* Dark header — Option A logo */}
-      <header className="sticky top-0 z-50 w-full bg-zinc-950 border-b border-white/10">
+      <header className="sticky top-0 z-50 w-full bg-zinc-800 border-b border-white/10">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6 md:gap-10">
             <Link href="/" className="flex items-center">
