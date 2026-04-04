@@ -288,7 +288,7 @@ export async function rematchPostEntity(id: number): Promise<{ matched: boolean;
 }
 
 export async function extractEventFromPost(postId: number): Promise<{ created: boolean; eventDate?: string; reason?: string }> {
-  return request(`/admin/events/extract-from-post/${postId}`, { method: "POST" });
+  return request(`/events/extract-from-post/${postId}`, { method: "POST" });
 }
 
 // ---------------------------------------------------------------------------
