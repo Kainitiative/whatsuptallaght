@@ -216,6 +216,7 @@ async function generateRoundupArticle(
     "- If there is only one event, write warmly about it with full detail, then use the remaining space",
     "  to speak directly to the community — encourage people to submit their events for next week.",
     "- End with the call-to-action paragraph provided — include it exactly as given.",
+    "- Keep the article practical and easy to scan. Focus on what's happening, when, and where. Avoid long introductions or overly descriptive language.",
     "- Length: 200–450 words total.",
     "- Output the article body ONLY — no headline, no byline, no markdown formatting.",
   ].join("\n");
