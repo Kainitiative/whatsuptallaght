@@ -17,6 +17,7 @@ import { CalendarDays, User, AlertCircle, Share2, Facebook, Twitter, Link as Lin
 import { Button } from "@/components/ui/button";
 import { getCategoryBadgeStyle } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { WhatsAppLoopCTA } from "@/components/whatsapp-loop-cta";
 
 export default function Article() {
   const [, params] = useRoute("/article/:slug");
@@ -209,6 +210,11 @@ export default function Article() {
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* WhatsApp Loop CTA */}
+      <div className="container mx-auto px-4 max-w-4xl">
+        <WhatsAppLoopCTA />
       </div>
 
       {/* Related Articles Strip */}
