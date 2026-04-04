@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, type Post, type PostCost } from "@/lib/api";
+import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, rematchPostEntity, type Post, type PostCost } from "@/lib/api";
 import { formatDateShort, statusColour, confidenceColour } from "@/lib/utils";
 import StarRating from "@/components/StarRating";
 import ArticleEditModal from "@/components/ArticleEditModal";
@@ -118,6 +118,23 @@ export default function Articles() {
       showToast("✅ New image generated");
     } catch (err: any) {
       showToast(`❌ ${err.message ?? "Image generation failed"}`);
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function handleRematchEntity(post: Post) {
+    setWorking(post.id);
+    try {
+      const result = await rematchPostEntity(post.id);
+      if (result.matched && result.post) {
+        setPosts((prev) => prev.map((p) => (p.id === post.id ? result.post! : p)));
+        showToast(`✅ Entity image applied — matched "${result.entityName}"`);
+      } else {
+        showToast("No matching entity with an image found in this article");
+      }
+    } catch (err: any) {
+      showToast(`❌ ${err.message ?? "Entity rematch failed"}`);
     } finally {
       setWorking(null);
     }
@@ -262,6 +279,14 @@ export default function Articles() {
                         className="px-3 py-1.5 text-xs bg-purple-50 border border-purple-200 text-purple-800 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors"
                       >
                         🎨 Regenerate Image
+                      </button>
+                      <button
+                        onClick={() => handleRematchEntity(post)}
+                        disabled={working === post.id}
+                        className="px-3 py-1.5 text-xs bg-teal-50 border border-teal-200 text-teal-800 rounded-lg hover:bg-teal-100 disabled:opacity-50 transition-colors"
+                        title="Re-scan the article text for a matching entity and apply its logo as the header image"
+                      >
+                        🏷️ Re-scan Entity Image
                       </button>
                     </div>
                     {costs[post.id] && (

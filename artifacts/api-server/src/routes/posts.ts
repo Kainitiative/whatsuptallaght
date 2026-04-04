@@ -7,6 +7,8 @@ import { getSettingValue } from "./settings";
 import { regeneratePostImage } from "../lib/ai-pipeline";
 import { postToFacebookPage } from "../lib/facebook-poster";
 import { generateAndStoreSocialCaptions, getSocialCaptionsForPost } from "../lib/social-caption-agent";
+import { matchEntityInArticle } from "../lib/entity-matcher";
+import OpenAI from "openai";
 
 const router = Router();
 
@@ -414,6 +416,44 @@ router.post("/posts/:id/regenerate-image", async (req, res) => {
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: "internal_error", message: err.message ?? "Failed to regenerate image" });
+  }
+});
+
+/**
+ * POST /admin/posts/:id/rematch-entity
+ *
+ * Re-runs entity matching + centrality check on the current article body.
+ * If an entity with an image is found, updates the post's headerImageUrl.
+ * Useful after manually correcting a typo in the article (e.g. "Run Red" → "Rua Red").
+ */
+router.post("/posts/:id/rematch-entity", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
+
+  try {
+    const [post] = await db
+      .select({ id: postsTable.id, body: postsTable.body })
+      .from(postsTable)
+      .where(eq(postsTable.id, id));
+
+    if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const match = await matchEntityInArticle(post.body, openai);
+
+    if (!match || !match.entityImageUrl) {
+      return res.status(200).json({ matched: false, message: "No central entity with an image found in this article" });
+    }
+
+    const [updated] = await db
+      .update(postsTable)
+      .set({ headerImageUrl: match.entityImageUrl, updatedAt: new Date() })
+      .where(eq(postsTable.id, id))
+      .returning();
+
+    res.json({ matched: true, entityName: match.entityName, matchedOn: match.matchedOn, post: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: "internal_error", message: err.message ?? "Entity rematch failed" });
   }
 });
 

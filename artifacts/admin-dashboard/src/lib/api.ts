@@ -283,6 +283,10 @@ export async function regeneratePostImage(id: number) {
   return request<Post>(`/posts/${id}/regenerate-image`, { method: "POST" });
 }
 
+export async function rematchPostEntity(id: number): Promise<{ matched: boolean; entityName?: string; matchedOn?: string; post?: Post; message?: string }> {
+  return request(`/posts/${id}/rematch-entity`, { method: "POST" });
+}
+
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
