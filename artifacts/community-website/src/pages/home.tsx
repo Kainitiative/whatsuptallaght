@@ -6,7 +6,7 @@ import { CategoryFilter } from "@/components/category-filter";
 import { WhatsAppSubmit } from "@/components/whatsapp-submit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, AlertCircle } from "lucide-react";
+import { CalendarDays, AlertCircle, ArrowRight } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Home() {
@@ -33,7 +33,6 @@ export default function Home() {
     }
   });
 
-  // Specifically fetching "Events" category posts for the weekend strip
   const { data: categories } = useListCategories({
     query: {
       queryKey: getListCategoriesQueryKey(),
@@ -41,6 +40,19 @@ export default function Home() {
   });
 
   const eventsCategory = categories?.find(c => c.name.toLowerCase().includes("event") || c.name.toLowerCase().includes("what's on"));
+  const weekendGuideCategory = categories?.find(c => c.slug === "weekend-guide");
+
+  const { data: weekendGuideData } = useListPosts({
+    status: "published",
+    categorySlug: "weekend-guide",
+    limit: 1,
+  }, {
+    query: {
+      queryKey: getListPostsQueryKey({ status: "published", categorySlug: "weekend-guide", limit: 1 }),
+    }
+  });
+
+  const weekendGuidePost = weekendGuideData?.posts?.[0];
   
   const { data: eventPostsData } = useListPosts({
     status: "published",
@@ -96,6 +108,63 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* Weekend Guide Feature Block */}
+      {weekendGuidePost && (
+        <section className="w-full bg-gradient-to-br from-green-700 to-green-800 text-white mb-12" data-testid="weekend-guide-feature">
+          <div className="container mx-auto px-4 py-10 md:py-12">
+            <div className="flex flex-col md:flex-row md:items-center gap-8 md:gap-12">
+
+              {/* Left: text content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-4">
+                  <CalendarDays className="w-4 h-4 text-green-300 flex-shrink-0" />
+                  <span className="text-xs font-bold tracking-widest uppercase text-green-300">
+                    Weekend Guide
+                  </span>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold text-white leading-snug mb-3">
+                  {weekendGuidePost.title}
+                </h2>
+                {weekendGuidePost.excerpt && (
+                  <p className="text-green-100 text-sm md:text-base leading-relaxed mb-6 line-clamp-3">
+                    {weekendGuidePost.excerpt}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link href={`/article/${weekendGuidePost.slug}`}>
+                    <Button className="bg-white text-green-800 hover:bg-green-50 font-semibold rounded-full shadow-sm">
+                      Read the full guide
+                      <ArrowRight className="w-4 h-4 ml-1.5" />
+                    </Button>
+                  </Link>
+                  <Link href="/events">
+                    <button className="text-sm text-green-200 hover:text-white underline underline-offset-2 transition-colors">
+                      See all events →
+                    </button>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Right: image or decorative block */}
+              {weekendGuidePost.headerImageUrl ? (
+                <div className="flex-shrink-0 w-full md:w-72 h-44 md:h-48 rounded-2xl overflow-hidden shadow-xl">
+                  <img
+                    src={weekendGuidePost.headerImageUrl}
+                    alt={weekendGuidePost.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="hidden md:flex flex-shrink-0 w-56 h-48 rounded-2xl bg-green-600/40 border border-green-500/30 items-center justify-center">
+                  <CalendarDays className="w-20 h-20 text-green-400/50" />
+                </div>
+              )}
+
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Events Strip */}
       {eventPosts.length > 0 && (
