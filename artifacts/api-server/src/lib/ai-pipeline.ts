@@ -1,5 +1,6 @@
 import OpenAI, { toFile } from "openai";
 import { applyWatermark } from "./watermark";
+import { postToFacebookPage } from "./facebook-poster";
 import { db } from "@workspace/db";
 import {
   submissionsTable,
@@ -817,6 +818,15 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
 
   logger.info({ submissionId, postId: newPost.id, status: postStatus }, "AI pipeline: complete");
 
+  // --- Post to Facebook (auto-published WhatsApp submissions) ---
+  if (postStatus === "published") {
+    postToFacebookPage({
+      title: newPost.title,
+      slug: newPost.slug,
+      excerpt: newPost.excerpt,
+    }).catch(() => {});
+  }
+
   // --- Notify the submitter ---
   if (postStatus === "published") {
     const siteUrl = (await getSettingValue("site_url")) ?? "https://tallaghtcommunity.ie";
@@ -998,6 +1008,15 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     ctx,
     infoResult.eventDate,
   ).catch((err) => logger.warn({ err, postId: newPost.id }, "RSS pipeline: event record creation failed (non-fatal)"));
+
+  // --- Post to Facebook (auto-published RSS articles) ---
+  if (postStatus === "published") {
+    postToFacebookPage({
+      title: newPost.title,
+      slug: newPost.slug,
+      excerpt: newPost.excerpt,
+    }).catch(() => {});
+  }
 
   logger.info(
     { submissionId, postId: newPost.id, status: postStatus, feedName },

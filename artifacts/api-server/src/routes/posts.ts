@@ -5,6 +5,7 @@ import { eq, and, desc, count, sql, ilike, sum } from "drizzle-orm";
 import { sendTextMessage } from "../lib/whatsapp-client";
 import { getSettingValue } from "./settings";
 import { regeneratePostImage } from "../lib/ai-pipeline";
+import { postToFacebookPage } from "../lib/facebook-poster";
 
 const router = Router();
 
@@ -253,6 +254,15 @@ router.patch("/posts/:id", async (req, res) => {
         } catch (err) {
           // Non-fatal — image generation failure should never block publish
         }
+      }).catch(() => {});
+    }
+
+    // --- Post to Facebook when manually published ---
+    if (status === "published" && currentPost.status !== "published") {
+      postToFacebookPage({
+        title: post.title,
+        slug: post.slug,
+        excerpt: post.excerpt,
       }).catch(() => {});
     }
 
