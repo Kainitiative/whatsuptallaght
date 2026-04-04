@@ -238,14 +238,15 @@ When an article has no header image (most WhatsApp submissions and RSS articles)
 - `object-storage` skill already covers the upload pattern
 - Coordinate with the existing `headerImageUrl` field — no schema changes needed beyond `imagePrompt`
 
-#### Logo compositing extension (builds on top of DALL·E generation)
-For RSS feeds from clubs, organisations, or brands with a recognisable logo:
-- Add a `logoUrl` field to `rss_feeds` table — admin pastes in the URL of the feed's logo image once (e.g. `https://www.shamrockrovers.ie/wp-content/uploads/rovers-crest.png`)
-- After DALL·E generates the background scene, download the logo and composite it onto the image using **`sharp`** (Node.js, no extra API cost)
-- Placement: bottom-left or bottom-right corner, ~15% of image width, with a subtle white circle/badge background for visibility
-- For partnership articles (two clubs): composite both logos side by side with a thin divider or "×" between them
-- Logo fetch: download at runtime and cache in Object Storage so it's not re-fetched on every article
-- **Copyright note**: editorial use of club logos for news reporting is standard press practice. Avoid any framing that implies endorsement.
+#### WUT logo watermark ✅ BUILT
+All article images (DALL·E generated **and** WhatsApp submitted) automatically receive the white WUT logo watermarked onto the bottom-left corner before the image is stored in Object Storage. This is the single point of application — `uploadImageBuffer()` in `ai-pipeline.ts` calls `applyWatermark()` before saving.
+
+- **Implementation**: `artifacts/api-server/src/lib/watermark.ts` — uses `sharp` for compositing
+- **Logo file**: `artifacts/api-server/src/assets/wut-logo-white.png` — copied to `dist/` at build time via `build.mjs`
+- **Sizing**: logo is 28% of image width, placed 2.5% from the left and bottom edges
+- **Output**: always saved as JPEG (quality 88) regardless of input format
+- **Fallback**: if compositing fails for any reason, the original buffer is used and a warning is logged
+- **Sharp**: externalized in `build.mjs` (uses prebuilt native binaries)
 
 ---
 

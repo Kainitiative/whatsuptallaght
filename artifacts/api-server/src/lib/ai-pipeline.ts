@@ -1,4 +1,5 @@
 import OpenAI, { toFile } from "openai";
+import { applyWatermark } from "./watermark";
 import { db } from "@workspace/db";
 import {
   submissionsTable,
@@ -29,18 +30,19 @@ async function uploadImageBuffer(buffer: Buffer, mimeType: string): Promise<stri
       logger.warn("Object storage not configured — image will not be saved");
       return null;
     }
-    const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
+
+    // Apply the What's Up Tallaght watermark before storing
+    const watermarked = await applyWatermark(buffer);
+
     const objectId = randomUUID();
-    // Strip any leading slash from PRIVATE_OBJECT_DIR — GCS object names must not start with /
     const cleanDir = privateDir.replace(/^\/+/, "");
-    const gcsPath = `${cleanDir}/whatsapp-images/${objectId}.${ext}`;
+    const gcsPath = `${cleanDir}/whatsapp-images/${objectId}.jpg`;
     const bucket = objectStorageClient.bucket(bucketId);
     const file = bucket.file(gcsPath);
-    await file.save(buffer, { contentType: mimeType, resumable: false });
-    // Serving URL: GET /api/storage/objects/<gcsPath>
+    await file.save(watermarked, { contentType: "image/jpeg", resumable: false });
     return `/api/storage/objects/${gcsPath}`;
   } catch (err) {
-    logger.error({ err }, "Failed to upload WhatsApp image to object storage");
+    logger.error({ err }, "Failed to upload image to object storage");
     return null;
   }
 }
