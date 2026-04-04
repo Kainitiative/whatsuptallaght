@@ -1200,6 +1200,41 @@ The admin dashboard also gets search — searching across submissions (including
 
 ---
 
+### AI Transcription Correction — Domain-Aware Whisper Fix
+
+#### The problem
+Whisper is a general-purpose model. When a voice message mentions Irish football clubs or local proper nouns (e.g. "Bohs", "Rovers", "Jobstown", "Belgard"), Whisper picks the nearest-sounding common English word instead — "Bohs" → "bowels", "Rovers" → "robbers", etc. The AI pipeline then inherits the corrupted text and writes an article with the wrong word.
+
+#### Fix 1 — Whisper prompt priming (free, no extra API call)
+The Whisper API accepts an optional `prompt` field that biases the transcription toward vocabulary you supply. Pass a curated string of Tallaght-specific proper nouns before transcription starts:
+
+```
+"Tallaght, Shamrock Rovers, Bohemians, Bohs, St Patrick's Athletic, Shelbourne, Dundalk, Drogheda United, Peamount United, Tallaght Stadium, League of Ireland, Luas Red Line, SDCC, Jobstown, Belgard, Fettercairn, Killinardan, Old Bawn, Firhouse, Knocklyon, Rathfarnham, Templeogue, Citywest"
+```
+
+Whisper uses this as phonetic context — when it hears something that sounds like one of those words, it will strongly prefer the supplied spelling. No extra API call, no extra cost.
+
+This list should grow over time as new local names appear — sports clubs, community organisations, schools, road names, local politicians.
+
+#### Fix 2 — GPT-4o transcription correction pass (small extra cost per voice message)
+After Stage 2 (Whisper transcription), add a new Stage 2b: a lightweight GPT-4o-mini call that receives the raw transcript and a system prompt:
+
+> "You are a transcription editor for a community news platform in Tallaght, Dublin. The following text was produced by voice-to-text transcription and may contain errors, especially with Irish place names, football clubs, and local proper nouns. Silently correct any obvious transcription errors. Return only the corrected text — do not explain changes."
+
+GPT-4o-mini already knows the League of Ireland, Irish geography, and Dublin place names — it will catch what Whisper missed. Cost: ~$0.0001 per voice message (negligible).
+
+#### Implementation plan
+1. In `ai-pipeline.ts`, find the Whisper API call (Stage 2) and add the `prompt` field with the curated proper noun list.
+2. After the Whisper call, add Stage 2b: a GPT-4o-mini completion that cleans the raw transcript. Use the corrected text for all downstream stages.
+3. Log whether Stage 2b made any changes — useful for monitoring quality over time.
+4. The proper noun list should be stored as a configurable setting (admin can add new terms as they come up).
+
+#### Where to edit
+- `artifacts/api-server/src/lib/ai-pipeline.ts` — Stage 2 (Whisper), add prompt field + Stage 2b correction call.
+- Admin Settings: add a "Local vocabulary" textarea where the admin can maintain the proper noun list (stored in the `settings` table as `whisper_prompt_vocabulary`).
+
+---
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
