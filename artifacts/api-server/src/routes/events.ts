@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eventsTable, postsTable } from "@workspace/db/schema";
+import { eventsTable, postsTable, submissionsTable } from "@workspace/db/schema";
 import { eq, gte, lte, and, asc, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { adminAuth } from "../lib/admin-auth";
@@ -8,7 +8,25 @@ import { adminAuth } from "../lib/admin-auth";
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// Public — list upcoming events (optionally filter by status / date range)
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getWeekendRange(): { saturday: string; sunday: string } {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const daysUntilSat = day === 6 ? 0 : day === 0 ? 6 : 6 - day;
+  const sat = new Date(now);
+  sat.setDate(now.getDate() + daysUntilSat);
+  const sun = new Date(sat);
+  sun.setDate(sat.getDate() + 1);
+  return {
+    saturday: sat.toISOString().split("T")[0],
+    sunday: sun.toISOString().split("T")[0],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Public — list events (filterable by status / weekend / date range)
 // ---------------------------------------------------------------------------
 
 router.get("/public/events", async (req, res) => {
@@ -21,10 +39,14 @@ router.get("/public/events", async (req, res) => {
 
   try {
     const today = new Date().toISOString().split("T")[0];
-
     const conditions = [];
 
-    if (status === "upcoming") {
+    if (status === "weekend") {
+      const { saturday, sunday } = getWeekendRange();
+      conditions.push(gte(eventsTable.eventDate, saturday));
+      conditions.push(lte(eventsTable.eventDate, sunday));
+      conditions.push(eq(eventsTable.status, "upcoming"));
+    } else if (status === "upcoming") {
       conditions.push(gte(eventsTable.eventDate, today));
       conditions.push(eq(eventsTable.status, "upcoming"));
     } else if (status === "past") {
@@ -59,11 +81,12 @@ router.get("/public/events", async (req, res) => {
         status: eventsTable.status,
         articleId: eventsTable.articleId,
         articleSlug: postsTable.slug,
-        articleTitle: postsTable.title,
         articleHeaderImageUrl: postsTable.headerImageUrl,
+        submissionSource: submissionsTable.source,
       })
       .from(eventsTable)
       .leftJoin(postsTable, eq(eventsTable.articleId, postsTable.id))
+      .leftJoin(submissionsTable, eq(postsTable.sourceSubmissionId, submissionsTable.id))
       .where(where)
       .orderBy(status === "past" ? desc(eventsTable.eventDate) : asc(eventsTable.eventDate))
       .limit(limit)
@@ -75,6 +98,7 @@ router.get("/public/events", async (req, res) => {
       page,
       totalPages: Math.ceil(Number(total) / limit),
       status,
+      ...(status === "weekend" ? { weekendRange: getWeekendRange() } : {}),
     });
   } catch (err) {
     res.status(500).json({ error: "internal_error", message: "Failed to fetch events" });
