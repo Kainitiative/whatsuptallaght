@@ -354,6 +354,49 @@ Respond in JSON:
   }
 }
 
+/**
+ * Exported: re-run event extraction on an existing post and insert an event
+ * record if one doesn't already exist. Used by the admin "Extract Event"
+ * button when the pipeline originally missed the event (wrong tone, no date, etc.)
+ */
+export async function extractAndSaveEventForPost(postId: number): Promise<{ created: boolean; eventDate?: string; reason?: string }> {
+  const [post] = await db.select({ id: postsTable.id, title: postsTable.title, body: postsTable.body }).from(postsTable).where(eq(postsTable.id, postId));
+  if (!post) return { created: false, reason: "Post not found" };
+
+  // Check if an event already exists for this post
+  const existing = await db.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.articleId, postId));
+  if (existing.length > 0) return { created: false, reason: "Event already exists for this article" };
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const ctx: UsageCtx = { jobId: 0, submissionId: postId };
+  const details = await extractEventDetails(openai, post.body, ctx);
+  if (!details) return { created: false, reason: "AI could not extract event details" };
+
+  const eventDate = details.eventDate;
+  if (!eventDate) return { created: false, reason: "No event date found in article — add the date to the article first, then try again" };
+
+  const today = new Date().toISOString().split("T")[0];
+  const status = eventDate < today ? "past" : "upcoming";
+
+  await db.insert(eventsTable).values({
+    articleId: postId,
+    title: post.title,
+    eventDate,
+    eventTime: details.eventTime ?? null,
+    endDate: details.endDate ?? null,
+    endTime: details.endTime ?? null,
+    location: details.location ?? null,
+    description: details.shortDescription ?? null,
+    organiser: details.organiser ?? null,
+    contactInfo: details.contactInfo ?? null,
+    websiteUrl: details.websiteUrl ?? null,
+    price: details.price ?? null,
+    status,
+  });
+
+  return { created: true, eventDate };
+}
+
 async function maybeCreateEventRecord(
   postId: number,
   postTitle: string,

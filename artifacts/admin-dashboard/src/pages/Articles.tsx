@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, rematchPostEntity, type Post, type PostCost } from "@/lib/api";
+import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, rematchPostEntity, extractEventFromPost, type Post, type PostCost } from "@/lib/api";
 import { formatDateShort, statusColour, confidenceColour } from "@/lib/utils";
 import StarRating from "@/components/StarRating";
 import ArticleEditModal from "@/components/ArticleEditModal";
@@ -135,6 +135,22 @@ export default function Articles() {
       }
     } catch (err: any) {
       showToast(`❌ ${err.message ?? "Entity rematch failed"}`);
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function handleExtractEvent(post: Post) {
+    setWorking(post.id);
+    try {
+      const result = await extractEventFromPost(post.id);
+      if (result.created) {
+        showToast(`✅ Event created for ${result.eventDate}`);
+      } else {
+        showToast(result.reason ?? "Could not create event");
+      }
+    } catch (err: any) {
+      showToast(`❌ ${err.message ?? "Event extraction failed"}`);
     } finally {
       setWorking(null);
     }
@@ -287,6 +303,14 @@ export default function Articles() {
                         title="Re-scan the article text for a matching entity and apply its logo as the header image"
                       >
                         🏷️ Re-scan Entity Image
+                      </button>
+                      <button
+                        onClick={() => handleExtractEvent(post)}
+                        disabled={working === post.id}
+                        className="px-3 py-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                        title="Re-run AI event extraction and create a calendar event from this article"
+                      >
+                        📅 Extract Event
                       </button>
                     </div>
                     {costs[post.id] && (

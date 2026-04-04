@@ -4,6 +4,7 @@ import { eventsTable, postsTable, submissionsTable } from "@workspace/db/schema"
 import { eq, gte, lte, and, asc, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { adminAuth } from "../lib/admin-auth";
+import { extractAndSaveEventForPost } from "../lib/ai-pipeline";
 
 const router = Router();
 
@@ -195,6 +196,22 @@ router.put("/events/:id", adminAuth, async (req, res) => {
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: "internal_error", message: "Failed to update event" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Admin — extract event from an existing article (when pipeline missed it)
+// ---------------------------------------------------------------------------
+
+router.post("/events/extract-from-post/:postId", adminAuth, async (req, res) => {
+  const postId = parseInt(req.params.postId);
+  if (isNaN(postId)) return res.status(400).json({ error: "validation_error", message: "Invalid post ID" });
+
+  try {
+    const result = await extractAndSaveEventForPost(postId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: "internal_error", message: err.message ?? "Event extraction failed" });
   }
 });
 
