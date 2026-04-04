@@ -755,9 +755,9 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   // --- Create the post ---
   const postStatus = confidence >= 0.75 ? "published" : "held";
 
-  // --- Stage 7.5: Entity matching ---
+  // --- Stage 7.5: Entity matching (with centrality check) ---
   logger.info({ submissionId }, "AI pipeline: matching entities");
-  const entityMatch = await matchEntityInArticle(articleBody);
+  const entityMatch = await matchEntityInArticle(articleBody, openai);
   const entityImagePath = entityMatch?.entityImageUrl ?? null;
 
   // --- Stage 7b: Generate header image (only for articles that will be published) ---
@@ -965,8 +965,8 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   const confidence = Math.min(1, baseConfidence + infoResult.completenessScore * 0.15);
   const postStatus = confidence >= 0.75 ? "published" : "held";
 
-  // --- Entity matching ---
-  const rssEntityMatch = await matchEntityInArticle(articleBody);
+  // --- Entity matching (with centrality check) ---
+  const rssEntityMatch = await matchEntityInArticle(articleBody, openai);
   const rssEntityImagePath = rssEntityMatch?.entityImageUrl ?? null;
 
   // --- Generate header image (only for articles that will be published) ---
