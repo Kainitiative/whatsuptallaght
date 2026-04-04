@@ -266,9 +266,11 @@ async function generateRoundupArticle(
 
   // Build SEO-friendly title and slug
   const dublinNow = getDublinNow();
-  const dateLabel = dublinNow.toLocaleDateString("en-IE", { day: "numeric", month: "long" });
-  const title = `Things to Do in Tallaght This Weekend – ${dateLabel}`;
-  const slug = `things-to-do-tallaght-this-weekend-${dublinNow.getFullYear()}-${String(dublinNow.getMonth() + 1).padStart(2, "0")}-${String(dublinNow.getDate()).padStart(2, "0")}`;
+  const monthName = dublinNow.toLocaleDateString("en-IE", { month: "long" }); // e.g. "April"
+  const day = dublinNow.getDate(); // e.g. 4
+  const year = dublinNow.getFullYear();
+  const title = `Things to Do in Tallaght This Weekend – ${monthName} ${day}, ${year}`;
+  const slug = `things-to-do-in-tallaght-this-weekend-${monthName.toLowerCase()}-${day}`;
 
   return { title, body, slug };
 }
