@@ -49,13 +49,10 @@ export function Layout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-6 md:gap-10">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary text-primary-foreground rounded-md flex items-center justify-center font-bold text-xl leading-none">
-                T
+            <Link href="/" className="flex items-center">
+              <div className="bg-zinc-900 rounded-lg px-3 py-1.5">
+                <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-8 w-auto" />
               </div>
-              <span className="font-bold text-xl tracking-tight text-foreground hidden sm:inline-block">
-                Tallaght <span className="text-primary">Platform</span>
-              </span>
             </Link>
             <nav className="hidden md:flex gap-6">
               <NavLinks />
@@ -97,11 +94,10 @@ export function Layout({ children }: { children: ReactNode }) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="flex flex-col gap-6">
-                <div className="flex items-center gap-2 mt-4">
-                  <div className="w-8 h-8 bg-primary text-primary-foreground rounded-md flex items-center justify-center font-bold text-xl leading-none">
-                    T
+                <div className="flex items-center mt-4">
+                  <div className="bg-zinc-900 rounded-lg px-3 py-1.5">
+                    <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-8 w-auto" />
                   </div>
-                  <span className="font-bold text-xl tracking-tight">Tallaght Platform</span>
                 </div>
                 <nav className="flex flex-col gap-4 mt-8">
                   <NavLinks />
@@ -128,13 +124,10 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="container mx-auto px-4 py-12 md:py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2 space-y-4">
-              <Link href="/" className="flex items-center gap-2 inline-flex">
-                <div className="w-8 h-8 bg-primary text-primary-foreground rounded-md flex items-center justify-center font-bold text-xl leading-none">
-                  T
+              <Link href="/" className="inline-flex items-center">
+                <div className="bg-zinc-900 rounded-lg px-3 py-1.5">
+                  <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-8 w-auto" />
                 </div>
-                <span className="font-bold text-xl tracking-tight">
-                  Tallaght Platform
-                </span>
               </Link>
               <p className="text-muted-foreground max-w-sm">
                 The hyper-local, AI-powered community news site serving Tallaght, Dublin. Real local faces, real community voices.
@@ -160,7 +153,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="border-t mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} Tallaght Community Platform. Made for Tallaght.</p>
+            <p>&copy; {new Date().getFullYear()} What's Up Tallaght. Made for Tallaght.</p>
             <div className="flex items-center gap-4">
               <Link href="/terms" className="hover:text-primary transition-colors">Terms of Use</Link>
               <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>

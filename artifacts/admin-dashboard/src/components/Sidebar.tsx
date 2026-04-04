@@ -23,16 +23,9 @@ export default function Sidebar() {
 
   return (
     <aside className="w-56 flex-shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
-      <div className="px-5 py-5 border-b border-sidebar-border">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <span className="text-white font-bold text-sm">T</span>
-          </div>
-          <div>
-            <p className="font-bold text-sm text-sidebar-foreground leading-tight">Tallaght Admin</p>
-            <p className="text-xs text-sidebar-foreground/50">Community Hub</p>
-          </div>
-        </div>
+      <div className="px-4 py-4 border-b border-sidebar-border">
+        <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-9 w-auto" />
+        <p className="text-xs text-sidebar-foreground/40 mt-1.5 pl-0.5">Admin Dashboard</p>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5">

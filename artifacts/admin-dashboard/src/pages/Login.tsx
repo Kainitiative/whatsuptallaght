@@ -26,14 +26,11 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-sidebar">
       <div className="bg-white rounded-2xl shadow-xl p-10 w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <span className="text-white font-bold text-lg">T</span>
+        <div className="mb-8">
+          <div className="bg-zinc-900 rounded-lg px-3 py-2 inline-flex">
+            <img src="/wut-logo.png" alt="What's Up Tallaght" className="h-9 w-auto" />
           </div>
-          <div>
-            <h1 className="font-bold text-gray-900 leading-tight">Tallaght Admin</h1>
-            <p className="text-xs text-muted-foreground">Community Hub</p>
-          </div>
+          <p className="text-xs text-muted-foreground mt-2">Admin Dashboard</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
