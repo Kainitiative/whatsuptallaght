@@ -26,10 +26,13 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function start() {
-  // Run database migrations before anything else
-  const migrationsFolder = path.join(process.cwd(), "migrations");
-  await migrate(db, { migrationsFolder });
-  logger.info("Database migrations applied");
+  // Run database migrations before anything else (production only)
+  // Development uses drizzle-kit push instead
+  if (process.env.NODE_ENV === "production") {
+    const migrationsFolder = path.join(process.cwd(), "migrations");
+    await migrate(db, { migrationsFolder });
+    logger.info("Database migrations applied");
+  }
 
   if (!isEncryptionKeySet()) {
     logger.warn(
