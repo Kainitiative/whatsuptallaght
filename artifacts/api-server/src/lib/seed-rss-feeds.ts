@@ -39,7 +39,7 @@ const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">
     name: "Transport for Ireland — News",
     // Correct URL confirmed 2026-04: /tfi-alerts/feed/ redirects to 404; /feed/ works
     url: "https://www.transportforireland.ie/feed/",
-    isActive: true,
+    isActive: false,
     checkIntervalMinutes: 20,
   },
   {
@@ -63,7 +63,7 @@ const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">
     name: "The Journal — Ireland News",
     // Replaces RTÉ RSS (broken); thejournal.ie has working RSS and good Tallaght coverage
     url: "https://www.thejournal.ie/feed/",
-    isActive: true,
+    isActive: false,
     checkIntervalMinutes: 30,
   },
   {
@@ -75,7 +75,7 @@ const DEFAULT_FEEDS: Omit<typeof rssFeedsTable.$inferInsert, "id" | "createdAt">
   {
     name: "Dublin Live — Latest News",
     url: "https://www.dublinlive.ie/news/dublin-news/?service=rss",
-    isActive: true,
+    isActive: false,
     checkIntervalMinutes: 30,
   },
 
