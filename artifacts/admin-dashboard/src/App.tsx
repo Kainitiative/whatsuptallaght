@@ -14,6 +14,7 @@ import Categories from "@/pages/Categories";
 import Events from "@/pages/Events";
 import Social from "@/pages/Social";
 import Entities from "@/pages/Entities";
+import ImageAssets from "@/pages/ImageAssets";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -40,6 +41,7 @@ function ProtectedLayout() {
           <Route path="/events" component={Events} />
           <Route path="/social" component={Social} />
           <Route path="/entities" component={Entities} />
+          <Route path="/image-assets" component={ImageAssets} />
           <Route path="/usage" component={Usage} />
           <Route path="/settings" component={Settings} />
           <Route>
