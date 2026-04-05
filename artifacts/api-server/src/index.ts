@@ -7,6 +7,9 @@ import { isEncryptionKeySet } from "./lib/encryption";
 import { startQueueWorker } from "./lib/queue-worker";
 import { startRssScheduler } from "./lib/rss-fetcher";
 import { startWeekendRoundupScheduler } from "./lib/weekend-roundup-scheduler";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { db } from "@workspace/db";
+import path from "path";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +26,14 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function start() {
+  // Run database migrations before anything else (production only)
+  // Development uses drizzle-kit push instead
+  if (process.env.NODE_ENV === "production") {
+    const migrationsFolder = path.join(process.cwd(), "migrations");
+    await migrate(db, { migrationsFolder });
+    logger.info("Database migrations applied");
+  }
+
   if (!isEncryptionKeySet()) {
     logger.warn(
       "SETTINGS_ENCRYPTION_KEY is not set. Settings are encrypted with a development fallback key — NOT safe for production. " +
