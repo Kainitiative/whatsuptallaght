@@ -2,9 +2,9 @@ services:
   app:
     image: ghcr.io/kainitiative/whatsuptallaght:latest
     restart: unless-stopped
-    ports:
-      # Bound to all interfaces so the shared Nginx container can proxy to it
-      - "0.0.0.0:8081:8081"
+    # Use host networking so the container connects to the host's PostgreSQL
+    # as 127.0.0.1, which is always permitted in pg_hba.conf
+    network_mode: host
     env_file:
       - .env.production
     volumes:
