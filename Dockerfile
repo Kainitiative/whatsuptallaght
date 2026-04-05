@@ -17,7 +17,7 @@ COPY artifacts/community-website/package.json artifacts/community-website/
 COPY artifacts/admin-dashboard/package.json artifacts/admin-dashboard/
 
 # Install all dependencies (dev + prod)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copy full source
 COPY . .
