@@ -1,0 +1,95 @@
+Run appleboy/ssh-action@v1.0.3
+/usr/bin/docker run --name aac6c50f728e34dc45f0ab0b316cfdd25f31_1e9fa6 --label 98aac6 --workdir /github/workspace --rm -e "REGISTRY" -e "IMAGE_NAME" -e "INPUT_HOST" -e "INPUT_USERNAME" -e "INPUT_PASSWORD" -e "INPUT_SCRIPT" -e "INPUT_PORT" -e "INPUT_PASSPHRASE" -e "INPUT_SYNC" -e "INPUT_USE_INSECURE_CIPHER" -e "INPUT_CIPHER" -e "INPUT_TIMEOUT" -e "INPUT_COMMAND_TIMEOUT" -e "INPUT_KEY" -e "INPUT_KEY_PATH" -e "INPUT_FINGERPRINT" -e "INPUT_PROXY_HOST" -e "INPUT_PROXY_PORT" -e "INPUT_PROXY_USERNAME" -e "INPUT_PROXY_PASSWORD" -e "INPUT_PROXY_PASSPHRASE" -e "INPUT_PROXY_TIMEOUT" -e "INPUT_PROXY_KEY" -e "INPUT_PROXY_KEY_PATH" -e "INPUT_PROXY_FINGERPRINT" -e "INPUT_PROXY_CIPHER" -e "INPUT_PROXY_USE_INSECURE_CIPHER" -e "INPUT_SCRIPT_STOP" -e "INPUT_ENVS" -e "INPUT_ENVS_FORMAT" -e "INPUT_DEBUG" -e "INPUT_ALLENVS" -e "INPUT_REQUEST_PTY" -e "HOME" -e "GITHUB_JOB" -e "GITHUB_REF" -e "GITHUB_SHA" -e "GITHUB_REPOSITORY" -e "GITHUB_REPOSITORY_OWNER" -e "GITHUB_REPOSITORY_OWNER_ID" -e "GITHUB_RUN_ID" -e "GITHUB_RUN_NUMBER" -e "GITHUB_RETENTION_DAYS" -e "GITHUB_RUN_ATTEMPT" -e "GITHUB_ACTOR_ID" -e "GITHUB_ACTOR" -e "GITHUB_WORKFLOW" -e "GITHUB_HEAD_REF" -e "GITHUB_BASE_REF" -e "GITHUB_EVENT_NAME" -e "GITHUB_SERVER_URL" -e "GITHUB_API_URL" -e "GITHUB_GRAPHQL_URL" -e "GITHUB_REF_NAME" -e "GITHUB_REF_PROTECTED" -e "GITHUB_REF_TYPE" -e "GITHUB_WORKFLOW_REF" -e "GITHUB_WORKFLOW_SHA" -e "GITHUB_REPOSITORY_ID" -e "GITHUB_TRIGGERING_ACTOR" -e "GITHUB_WORKSPACE" -e "GITHUB_ACTION" -e "GITHUB_EVENT_PATH" -e "GITHUB_ACTION_REPOSITORY" -e "GITHUB_ACTION_REF" -e "GITHUB_PATH" -e "GITHUB_ENV" -e "GITHUB_STEP_SUMMARY" -e "GITHUB_STATE" -e "GITHUB_OUTPUT" -e "RUNNER_OS" -e "RUNNER_ARCH" -e "RUNNER_NAME" -e "RUNNER_ENVIRONMENT" -e "RUNNER_TOOL_CACHE" -e "RUNNER_TEMP" -e "RUNNER_WORKSPACE" -e "ACTIONS_RUNTIME_URL" -e "ACTIONS_RUNTIME_TOKEN" -e "ACTIONS_CACHE_URL" -e "ACTIONS_RESULTS_URL" -e "ACTIONS_ORCHESTRATION_ID" -e GITHUB_ACTIONS=true -e CI=true -v "/var/run/docker.sock":"/var/run/docker.sock" -v "/home/runner/work/_temp":"/github/runner_temp" -v "/home/runner/work/_temp/_github_home":"/github/home" -v "/home/runner/work/_temp/_github_workflow":"/github/workflow" -v "/home/runner/work/_temp/_runner_file_commands":"/github/file_commands" -v "/home/runner/work/whatsuptallaght/whatsuptallaght":"/github/workspace" 98aac6:c50f728e34dc45f0ab0b316cfdd25f31
+======CMD======
+cd /opt/whatsuptallaght
+echo "***" | docker login ghcr.io -u Kainitiative --password-stdin
+docker compose pull
+docker compose up -d --remove-orphans
+for i in $(seq 1 12); do
+  sleep 5
+  if curl -sf http://localhost:8081/api/health > /dev/null; then
+    echo "Health check passed"
+    exit 0
+  fi
+  echo "Waiting... ($((i*5))s)"
+done
+echo "Health check failed after 60s"
+docker compose logs --tail=50
+exit 1
+
+======END======
+err: WARNING! Your credentials are stored unencrypted in '/root/.docker/config.json'.
+err: Configure a credential helper to remove this warning. See
+err: https://docs.docker.com/go/credential-store/
+out: Login Succeeded
+err:  Image ghcr.io/kainitiative/whatsuptallaght:latest Pulling 
+err:  dc022680be0e Download complete 0B
+err:  Image ghcr.io/kainitiative/whatsuptallaght:latest Pulled 
+err:  Container whatsuptallaght-app-1 Recreate 
+err:  Container whatsuptallaght-app-1 Recreated 
+err:  Container whatsuptallaght-app-1 Starting 
+err:  Container whatsuptallaght-app-1 Started 
+out: Waiting... (5s)
+out: Waiting... (10s)
+out: Waiting... (15s)
+out: Waiting... (20s)
+out: Waiting... (25s)
+out: Waiting... (30s)
+out: Waiting... (35s)
+out: Waiting... (40s)
+out: Waiting... (45s)
+out: Waiting... (50s)
+out: Waiting... (55s)
+out: Waiting... (60s)
+out: Health check failed after 60s
+out: app-1  | {"level":30,"time":1775427491727,"pid":1,"hostname":"server","msg":"Database migrations applied"}
+out: app-1  | {"level":30,"time":1775427491743,"pid":1,"hostname":"server","msg":"Platform settings seeded"}
+out: app-1  | {"level":30,"time":1775427491757,"pid":1,"hostname":"server","msg":"RSS feeds seeded"}
+out: app-1  | {"level":30,"time":1775427491779,"pid":1,"hostname":"server","msg":"Demo content seeded"}
+out: app-1  | {"level":30,"time":1775427491782,"pid":1,"hostname":"server","port":8081,"msg":"Server listening"}
+out: app-1  | {"level":30,"time":1775427491782,"pid":1,"hostname":"server","msg":"Queue worker started"}
+out: app-1  | {"level":30,"time":1775427491783,"pid":1,"hostname":"server","msg":"RSS scheduler started"}
+out: app-1  | {"level":30,"time":1775427491783,"pid":1,"hostname":"server","msg":"Weekend roundup scheduler started"}
+out: app-1  | {"level":30,"time":1775427491784,"pid":1,"hostname":"server","count":3,"msg":"RSS: processing due feeds"}
+out: app-1  | {"level":30,"time":1775427491784,"pid":1,"hostname":"server","feedId":5,"name":"Transport for Ireland — News","msg":"RSS: fetching feed"}
+out: app-1  | {"level":30,"time":1775427492694,"pid":1,"hostname":"server","feedId":5,"name":"Transport for Ireland — News","newCount":10,"relevantCount":0,"msg":"RSS: feed processed"}
+out: app-1  | {"level":30,"time":1775427492694,"pid":1,"hostname":"server","feedId":8,"name":"The Journal — Ireland News","msg":"RSS: fetching feed"}
+out: app-1  | {"level":30,"time":1775427492832,"pid":1,"hostname":"server","feedId":8,"name":"The Journal — Ireland News","newCount":40,"relevantCount":0,"msg":"RSS: feed processed"}
+out: app-1  | {"level":30,"time":1775427492832,"pid":1,"hostname":"server","feedId":10,"name":"Dublin Live — Latest News","msg":"RSS: fetching feed"}
+out: app-1  | {"level":30,"time":1775427492869,"pid":1,"hostname":"server","submissionId":1,"rssItemId":51,"feedName":"Dublin Live — Latest News","title":"Alleged robbery in Tallaght in early hours of this morning","msg":"RSS: relevant item queued"}
+out: app-1  | {"level":30,"time":1775427492892,"pid":1,"hostname":"server","submissionId":2,"rssItemId":64,"feedName":"Dublin Live — Latest News","title":"M50 breakdown adds to delays on busy motorway - live updates","msg":"RSS: relevant item queued"}
+out: app-1  | {"level":30,"time":1775427492910,"pid":1,"hostname":"server","submissionId":3,"rssItemId":74,"feedName":"Dublin Live — Latest News","title":"Five suspected burglars arrested after garda chase in Rathfarnham","msg":"RSS: relevant item queued"}
+out: app-1  | {"level":30,"time":1775427492912,"pid":1,"hostname":"server","feedId":10,"name":"Dublin Live — Latest News","newCount":25,"relevantCount":3,"msg":"RSS: feed processed"}
+out: app-1  | {"level":30,"time":1775427496266,"pid":1,"hostname":"server","req":{"id":1,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":4,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427496337,"pid":1,"hostname":"server","req":{"id":2,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427496786,"pid":1,"hostname":"server","jobId":1,"jobType":"PROCESS_RSS_SUBMISSION","attempt":1,"msg":"Queue: processing job"}
+out: app-1  | {"level":30,"time":1775427496787,"pid":1,"hostname":"server","submissionId":1,"feedName":"Dublin Live — Latest News","msg":"RSS pipeline: starting"}
+out: app-1  | {"level":30,"time":1775427501276,"pid":1,"hostname":"server","req":{"id":3,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427501438,"pid":1,"hostname":"server","req":{"id":4,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427504836,"pid":1,"hostname":"server","submissionId":1,"msg":"RSS pipeline: skipping image generation — article held for review"}
+out: app-1  | {"level":30,"time":1775427504840,"pid":1,"hostname":"server","submissionId":1,"postId":9,"status":"held","feedName":"Dublin Live — Latest News","msg":"RSS pipeline: complete"}
+out: app-1  | {"level":30,"time":1775427504841,"pid":1,"hostname":"server","jobId":1,"msg":"Queue: job done"}
+out: app-1  | {"level":30,"time":1775427504843,"pid":1,"hostname":"server","jobId":2,"jobType":"PROCESS_RSS_SUBMISSION","attempt":1,"msg":"Queue: processing job"}
+out: app-1  | {"level":30,"time":1775427504843,"pid":1,"hostname":"server","submissionId":2,"feedName":"Dublin Live — Latest News","msg":"RSS pipeline: starting"}
+out: app-1  | {"level":30,"time":1775427506286,"pid":1,"hostname":"server","req":{"id":5,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427506536,"pid":1,"hostname":"server","req":{"id":6,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427511232,"pid":1,"hostname":"server","submissionId":2,"msg":"RSS pipeline: skipping image generation — article held for review"}
+out: app-1  | {"level":30,"time":1775427511236,"pid":1,"hostname":"server","submissionId":2,"postId":10,"status":"held","feedName":"Dublin Live — Latest News","msg":"RSS pipeline: complete"}
+out: app-1  | {"level":30,"time":1775427511237,"pid":1,"hostname":"server","jobId":2,"msg":"Queue: job done"}
+out: app-1  | {"level":30,"time":1775427511238,"pid":1,"hostname":"server","jobId":3,"jobType":"PROCESS_RSS_SUBMISSION","attempt":1,"msg":"Queue: processing job"}
+out: app-1  | {"level":30,"time":1775427511238,"pid":1,"hostname":"server","submissionId":3,"feedName":"Dublin Live — Latest News","msg":"RSS pipeline: starting"}
+out: app-1  | {"level":30,"time":1775427511297,"pid":1,"hostname":"server","req":{"id":7,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427511642,"pid":1,"hostname":"server","req":{"id":8,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427516308,"pid":1,"hostname":"server","req":{"id":9,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427519351,"pid":1,"hostname":"server","submissionId":3,"msg":"RSS pipeline: skipping image generation — article held for review"}
+out: app-1  | {"level":30,"time":1775427519355,"pid":1,"hostname":"server","submissionId":3,"postId":11,"status":"held","feedName":"Dublin Live — Latest News","msg":"RSS pipeline: complete"}
+out: app-1  | {"level":30,"time":1775427519356,"pid":1,"hostname":"server","jobId":3,"msg":"Queue: job done"}
+out: app-1  | {"level":30,"time":1775427521319,"pid":1,"hostname":"server","req":{"id":10,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427526329,"pid":1,"hostname":"server","req":{"id":11,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427531339,"pid":1,"hostname":"server","req":{"id":12,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427536350,"pid":1,"hostname":"server","req":{"id":13,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427541360,"pid":1,"hostname":"server","req":{"id":14,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427541741,"pid":1,"hostname":"server","req":{"id":15,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+out: app-1  | {"level":30,"time":1775427546370,"pid":1,"hostname":"server","req":{"id":16,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":0,"msg":"request completed"}
+2026/04/05 22:19:11 Process exited with status 1
+out: app-1  | {"level":30,"time":1775427551381,"pid":1,"hostname":"server","req":{"id":17,"method":"GET","url":"/api/health"},"res":{"statusCode":401},"responseTime":1,"msg":"request completed"}
