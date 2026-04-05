@@ -432,3 +432,21 @@ export async function requestUploadUrl(file: { name: string; size: number; conte
     body: JSON.stringify(file),
   });
 }
+
+export interface ImageAsset {
+  id: number;
+  imageUrl: string;
+  tone: string;
+  keywords: string[];
+  prompt: string;
+  usageCount: number;
+  createdAt: string;
+}
+
+export async function getImageAssets(): Promise<ImageAsset[]> {
+  return request<ImageAsset[]>("/admin/image-assets");
+}
+
+export async function deleteImageAsset(id: number): Promise<void> {
+  return request<void>(`/admin/image-assets/${id}`, { method: "DELETE" });
+}
