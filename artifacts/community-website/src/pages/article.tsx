@@ -39,7 +39,6 @@ export default function Article() {
 
   const category = categories?.find(c => c.id === post?.primaryCategoryId);
 
-  // Fetch related articles from same category
   const { data: relatedData } = useListPosts({
     status: "published",
     categorySlug: category?.slug,
@@ -108,28 +107,32 @@ export default function Article() {
   const formattedDate = format(publishDate, "MMMM d, yyyy");
   
   const badgeStyle = getCategoryBadgeStyle(category?.name || "News", category?.color);
-  
-  // Use real images if available, fallback otherwise based on ID
+
+  // Header image — purpose-built wide image (generated or entity). Falls back to placeholder by category.
   const fallbackImages = [
     '/images/tallaght-event.png',
     '/images/tallaght-sport.png',
     '/images/tallaght-business.png',
     '/images/tallaght-news.png'
   ];
-  const imageUrl = post.headerImageUrl || fallbackImages[post.id % fallbackImages.length];
+  const headerImageUrl = post.headerImageUrl || fallbackImages[post.id % fallbackImages.length];
+
+  // Body images — WhatsApp-submitted photos placed inline after the article text
+  const bodyImages: string[] = (post as any).bodyImages ?? [];
 
   const relatedPosts = relatedData?.posts?.filter(p => p.id !== post.id).slice(0, 3) || [];
 
   return (
     <article className="w-full pb-20 bg-white">
-      {/* Header Image */}
-      <div className="w-full aspect-[21/9] md:aspect-[24/7] bg-muted relative">
+      {/* Header Image — wide cinematic banner, no stretching */}
+      <div className="w-full overflow-hidden bg-muted relative" style={{ aspectRatio: "21/7" }}>
         <img 
-          src={imageUrl} 
-          alt={post.title} 
-          className="w-full h-full object-cover"
+          src={headerImageUrl} 
+          alt={post.title}
+          className="w-full h-full object-cover object-center"
+          style={{ display: "block" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
         <div className="absolute bottom-0 left-0 w-full p-6 md:p-10">
           <div className="container mx-auto max-w-4xl">
             <Badge className={`${badgeStyle} mb-4 text-sm px-3 py-1 font-semibold border-0 shadow-sm`} variant="outline">
@@ -156,7 +159,7 @@ export default function Article() {
               </div>
             </div>
             
-            <div className="hidden md:block w-px h-10 bg-border"></div>
+            <div className="hidden md:block w-px h-10 bg-border" />
             
             <div className="flex items-center gap-2 text-muted-foreground">
               <CalendarDays className="w-5 h-5" />
@@ -173,7 +176,7 @@ export default function Article() {
         </div>
 
         {/* Content */}
-        <div className="prose prose-lg md:prose-xl max-w-none text-foreground prose-headings:font-bold prose-headings:text-foreground prose-a:text-accent prose-img:rounded-xl">
+        <div className="prose prose-lg md:prose-xl max-w-none text-foreground prose-headings:font-bold prose-headings:text-foreground prose-a:text-accent">
           {post.excerpt && (
             <p className="lead text-xl md:text-2xl text-muted-foreground font-medium mb-8">
               {post.excerpt}
@@ -185,6 +188,27 @@ export default function Article() {
             className="leading-relaxed"
           />
         </div>
+
+        {/* Body Images — WhatsApp-submitted photos displayed below the article text */}
+        {bodyImages.length > 0 && (
+          <div className="mt-10">
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+              Photos from the community
+            </p>
+            <div className={`grid gap-4 ${bodyImages.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
+              {bodyImages.map((src, i) => (
+                <div key={i} className="overflow-hidden rounded-xl border border-border bg-muted">
+                  <img
+                    src={src}
+                    alt={`Community photo ${i + 1}`}
+                    className="w-full h-auto object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Article Footer */}
         <div className="mt-16 pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
