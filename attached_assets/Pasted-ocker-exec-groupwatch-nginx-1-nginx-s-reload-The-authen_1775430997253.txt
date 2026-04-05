@@ -1,0 +1,61 @@
+ocker exec groupwatch-nginx-1 nginx -s reload
+The authenticity of host '185.43.233.219 (185.43.233.219)' can't be established.
+ED25519 key fingerprint is SHA256:TOCwHGgNskUGMN0hF4BGl6pnM0e2q98M5zLQVF4FJEk.
+This key is not known by any other names.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? YES
+Warning: Permanently added '185.43.233.219' (ED25519) to the list of known hosts.
+root@185.43.233.219's password:
+Welcome to Ubuntu 24.04.2 LTS (GNU/Linux 6.8.0-106-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, you can run the 'unminimize' command.
+Last login: Mon Apr  6 00:09:15 2026 from 212.129.74.170
+root@server:~# cat >> /opt/groupwatch/deploy/nginx/nginx.conf << 'EOF'
+
+server {
+    listen 80;
+    server_name whatsuptallaght.ie www.whatsuptallaght.ie;
+
+    location / {
+        proxy_pass         http://172.17.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 15M;
+    }
+}
+EOF
+root@server:~# docker exec groupwatch-nginx-1 nginx -s reload
+2026/04/05 23:10:38 [notice] 167#167: signal process started
+root@server:~# curl http://localhost:8081/api/health
+{"status":"ok"}curl -s http://localhost:8081/api/health8081/api/health
+{"status":"ok"}tail -20 /opt/groupwatch/deploy/nginx/nginx.confginx/nginx.conf
+        proxy_set_header   X-Forwarded-For   $http_cf_connecting_ip;
+        proxy_set_header   X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_read_timeout 120s;
+    }
+}
+
+server {
+    listen 80;
+    server_name whatsuptallaght.ie www.whatsuptallaght.ie;
+
+    location / {
+        proxy_pass         http://172.17.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 15M;
+    }
+}
+root@server:~#
