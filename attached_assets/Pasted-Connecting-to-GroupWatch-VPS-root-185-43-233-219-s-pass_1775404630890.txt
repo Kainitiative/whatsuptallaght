@@ -1,0 +1,83 @@
+Connecting to GroupWatch VPS...
+root@185.43.233.219's password:
+Welcome to Ubuntu 24.04.2 LTS (GNU/Linux 6.8.0-106-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, you can run the 'unminimize' command.
+Last login: Sun Apr  5 11:34:02 2026 from 37.228.201.163
+root@server:~# curl "https://graph.facebook.com/v19.0/977887435417701?fields=access_token&access_token=EAAORKUZADFOMBRGYoyastymRqCZBkbfZCoOASmCIvuZAHaVN2HLbbYLqLVu5WkWZA1qlJpBXg6Q2BgmnSALxPqigBw4hceGtsmsZA2ZC1vP9VzeOnHlPTUIEjBn1mT2O8wuquZC4b2hrqDydMENrZACwwCE0I8RU3byL4TZC9ZA07tAgBmjsxvqqcYarm9hZAtfs5hbjewZDZD"
+{"error":{"message":"(#100) Object does not exist, cannot be loaded due to missing permission or reviewable feature, or does not support this operation. This endpoint requires the 'pages_read_engagement' permission or the 'Page Public Content Access' feature or the 'Page Public Metadata Access' feature. Refer to https:\/\/developers.facebook.com\/docs\/apps\/review\/login-permissions#manage-pages, https:\/\/developers.facebook.com\/docs\/apps\/review\/feature#reference-PAGES_ACCESS and https:\/\/developers.facebook.com\/docs\/apps\/review\/feature#page-public-metadata-access for details.","type":"OAuthException","code":100,"fbtrace_id":"AVkdc7PJpd4sE1XZMBenU-F"}}root@server:~#
+root@server:~# cat > /opt/whatsuptallaght/.env.production << 'EOF'
+NODE_ENV=production
+PORT=8081
+
+SETTINGS_ENCRYPTION_KEY=1cea46ebec0e738403ddcf51bd72824f3c102ccceaa47cba7cba5d7d384d4406
+ADMIN_PASSWORD=Nbbzabz234@
+
+DATABASE_URL=postgresql://wut:wut_prod_2024@172.17.0.1:5432/wut
+
+STORAGE_TYPE=local
+LOCAL_STORAGE_PATH=/data/uploads
+
+OPENAI_API_KEY=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
+
+WHATSAPP_TOKEN=EAAORKUZADFOMBRGYoyastymRqCZBkbfZCoOASmCIvuZAHaVN2HLbbYLqLVu5WkWZA1qlJpBXg6Q2BgmnSALxPqigBw4hceGtsmsZA2ZC1vP9VzeOnHlPTUIEjBn1mT2O8wuquZC4b2hrqDydMENrZACwwCE0I8RU3byL4TZC9ZA07tAgBmjsxvqqcYarm9hZAtfs5hbjewZDZD
+WHATSAPP_PHONE_NUMBER_ID=1025305714005391
+WHATSAPP_VERIFY_TOKEN=wut-webhook-2024
+
+FACEBOOK_PAGE_ID=977887435417701
+FACEBOOK_PAGE_ACCESS_TOKEN=
+
+SITE_URL=https://www.whatsuptallaght.ie
+EOF
+root@server:~# cat /opt/whatsuptallaght/.env.production
+NODE_ENV=production
+PORT=8081
+
+SETTINGS_ENCRYPTION_KEY=1cea46ebec0e738403ddcf51bd72824f3c102ccceaa47cba7cba5d7d384d4406
+ADMIN_PASSWORD=Nbbzabz234@
+
+DATABASE_URL=postgresql://wut:wut_prod_2024@172.17.0.1:5432/wut
+
+STORAGE_TYPE=local
+LOCAL_STORAGE_PATH=/data/uploads
+
+OPENAI_API_KEY=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
+
+WHATSAPP_TOKEN=EAAORKUZADFOMBRGYoyastymRqCZBkbfZCoOASmCIvuZAHaVN2HLbbYLqLVu5WkWZA1qlJpBXg6Q2BgmnSALxPqigBw4hceGtsmsZA2ZC1vP9VzeOnHlPTUIEjBn1mT2O8wuquZC4b2hrqDydMENrZACwwCE0I8RU3byL4TZC9ZA07tAgBmjsxvqqcYarm9hZAtfs5hbjewZDZD
+WHATSAPP_PHONE_NUMBER_ID=1025305714005391
+WHATSAPP_VERIFY_TOKEN=wut-webhook-2024
+
+FACEBOOK_PAGE_ID=977887435417701
+FACEBOOK_PAGE_ACCESS_TOKEN=
+
+SITE_URL=https://www.whatsuptallaght.ie
+root@server:~# cat /etc/nginx/conf.d/default.conf
+cat: /etc/nginx/conf.d/default.conf: No such file or directory
+root@server:~# ls /etc/nginx/conf.d/ && ls /etc/nginx/sites-enabled/ 2>/dev/null && nginx -T 2>/dev/null | grep "configuration file"
+ls: cannot access '/etc/nginx/conf.d/': No such file or directory
+root@server:~# ls /etc/nginx/conf.d/ && ls /etc/nginx/sites-enabled/ 2>/dev/null && nginx -T 2>/dev/null | grep "configuration file"
+ls: cannot access '/etc/nginx/conf.d/': No such file or directory
+root@server:~# docker ps
+CONTAINER ID   IMAGE                                    COMMAND                  CREATED       STATUS                PORTS                      NAMES
+3919c01d760c   ghcr.io/kainitiative/groupwatch:latest   "docker-entrypoint.s…"   5 days ago    Up 5 days (healthy)   127.0.0.1:8080->8080/tcp   groupwatch-app-1
+77da306e42cd   nginx:1.27-alpine                        "/docker-entrypoint.…"   2 weeks ago   Up 7 days             0.0.0.0:80->80/tcp         groupwatch-nginx-1
+root@server:~# docker inspect groupwatch-nginx-1 --format '{{json .Mounts}}' | python3 -m json.tool
+[
+    {
+        "Type": "bind",
+        "Source": "/opt/groupwatch/deploy/nginx/nginx.conf",
+        "Destination": "/etc/nginx/conf.d/default.conf",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+    }
+]
+root@server:~#
+root@server:~#
