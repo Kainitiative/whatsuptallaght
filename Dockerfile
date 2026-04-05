@@ -56,11 +56,11 @@ COPY --from=builder /app/artifacts/admin-dashboard/dist/public  ./static/admin
 RUN mkdir -p /data/uploads
 
 ENV NODE_ENV=production
-ENV PORT=8080
+ENV PORT=8081
 ENV STATIC_DIR=/app/static
 ENV STORAGE_TYPE=local
 ENV LOCAL_STORAGE_PATH=/data/uploads
 
-EXPOSE 8080
+EXPOSE 8081
 
 CMD ["node", "--enable-source-maps", "./dist/index.mjs"]

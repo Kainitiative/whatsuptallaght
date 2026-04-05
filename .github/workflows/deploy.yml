@@ -3,11 +3,11 @@ name: Build & Deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allow manual trigger from GitHub UI
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: kainitiative/whatsuptallaght
 
 jobs:
   build-and-push:
@@ -15,10 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # needed to push to ghcr.io
-
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
+      packages: write
 
     steps:
       - name: Checkout
@@ -65,39 +62,37 @@ jobs:
       - name: Copy docker-compose.yml to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: 185.43.233.219
+          username: root
+          password: ${{ secrets.VPS_SSH_PASS }}
           source: docker-compose.yml
           target: /opt/whatsuptallaght/
 
       - name: Pull new image & restart
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: 185.43.233.219
+          username: root
+          password: ${{ secrets.VPS_SSH_PASS }}
           script: |
             cd /opt/whatsuptallaght
 
-            # Log in to GHCR so we can pull the private image
+            # Log in to GHCR so we can pull the image
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Pull the new image
-            GITHUB_REPOSITORY=${{ github.repository }} docker compose pull
+            # Pull the new image and restart
+            docker compose pull
+            docker compose up -d --remove-orphans
 
-            # Start / restart the app (zero-downtime swap)
-            GITHUB_REPOSITORY=${{ github.repository }} docker compose up -d --remove-orphans
-
-            # Health check — wait up to 60s for the app to respond
+            # Health check — wait up to 60s
             for i in $(seq 1 12); do
               sleep 5
-              if curl -sf http://localhost:8080/api/health > /dev/null; then
-                echo "✅ Health check passed"
+              if curl -sf http://localhost:8081/api/health > /dev/null; then
+                echo "Health check passed"
                 exit 0
               fi
-              echo "Waiting for app... ($((i*5))s)"
+              echo "Waiting... ($((i*5))s)"
             done
-            echo "❌ Health check failed after 60s"
+            echo "Health check failed after 60s"
             docker compose logs --tail=50
             exit 1
