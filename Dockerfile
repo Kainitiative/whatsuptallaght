@@ -48,6 +48,9 @@ RUN npm install --no-save \
 # Copy the bundled API server and its pino worker side-files
 COPY --from=builder /app/artifacts/api-server/dist ./dist
 
+# Copy database migration SQL files (run at startup via drizzle migrator)
+COPY --from=builder /app/lib/db/migrations ./migrations
+
 # Copy Vite-built static sites
 COPY --from=builder /app/artifacts/community-website/dist/public ./static/community
 COPY --from=builder /app/artifacts/admin-dashboard/dist/public  ./static/admin
