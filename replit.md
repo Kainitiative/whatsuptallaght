@@ -1249,3 +1249,90 @@ GPT-4o-mini already knows the League of Ireland, Irish geography, and Dublin pla
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+---
+
+## VPS Deployment (www.whatsuptallaght.ie)
+
+**VPS:** 185.43.233.219 · **Domain:** www.whatsuptallaght.ie
+
+### Architecture
+
+A single Docker container runs the full stack on port 8080. Nginx sits in front (installed natively on the VPS) for SSL termination via Let's Encrypt.
+
+| Request path | Served by |
+|---|---|
+| `/api/*` | Express routes inside the container |
+| `/admin/*` | Admin dashboard (Vite build, served as static by Express) |
+| `/*` | Community website (Vite build, served as static by Express) |
+| Uploaded images | Local disk at `/data/uploads` (Docker volume) |
+
+### Image storage
+
+`STORAGE_TYPE=local` (set in `.env.production`) switches the API server to store uploaded and AI-generated images on the Docker volume `/data/uploads` instead of Replit's GCS sidecar. Images are served at `/api/storage/objects/<path>`. In Replit dev, `STORAGE_TYPE` is unset and GCS is used as before.
+
+### CI / CD pipeline
+
+Push to `main` → GitHub Actions (`.github/workflows/deploy.yml`):
+1. Builds the Docker image (multi-stage: builder compiles Vite apps + esbuild bundle; production stage installs runtime-only native deps)
+2. Pushes image to GHCR (`ghcr.io/<your-repo>/whatsuptallaght:latest`)
+3. SSHs to VPS, copies `docker-compose.yml`, pulls new image, runs `docker compose up -d`
+
+### Required GitHub Actions secrets
+
+| Secret | Value |
+|---|---|
+| `VPS_HOST` | `185.43.233.219` |
+| `VPS_USER` | your SSH user (e.g. `root`) |
+| `VPS_SSH_KEY` | private key matching an authorized key on the VPS |
+
+`GITHUB_TOKEN` is provided automatically by GitHub Actions for GHCR push.
+
+### VPS one-time setup
+
+```bash
+# 1. Install Docker + Compose
+curl -fsSL https://get.docker.com | sh
+apt install docker-compose-plugin nginx certbot python3-certbot-nginx -y
+
+# 2. Create app directory
+mkdir -p /opt/whatsuptallaght
+cd /opt/whatsuptallaght
+
+# 3. Place secrets (copy .env.production.example, fill in real values)
+nano .env.production
+
+# 4. Copy Nginx config from repo, enable it
+cp nginx.conf /etc/nginx/sites-available/whatsuptallaght
+ln -s /etc/nginx/sites-available/whatsuptallaght /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+
+# 5. Obtain SSL cert
+certbot --nginx -d whatsuptallaght.ie -d www.whatsuptallaght.ie
+
+# 6. Log in to GHCR (one-time; token needs read:packages scope)
+echo "<GITHUB_PAT>" | docker login ghcr.io -u <github-username> --password-stdin
+
+# 7. First deploy — CI will handle subsequent deploys automatically
+GITHUB_REPOSITORY=<your-org/repo> docker compose pull
+GITHUB_REPOSITORY=<your-org/repo> docker compose up -d
+```
+
+### Database migrations on VPS
+
+After deploying a schema change, run:
+```bash
+cd /opt/whatsuptallaght
+docker run --rm --env-file .env.production \
+  ghcr.io/<your-org/repo>/whatsuptallaght:latest \
+  node -e "import('./dist/index.mjs').catch(()=>{})"
+```
+Or simpler: add `db push` to the deploy step. The `drizzle-orm` migration is idempotent.
+
+### Key env vars for VPS (see `.env.production.example`)
+
+- `DATABASE_URL` — PostgreSQL connection string
+- `SETTINGS_ENCRYPTION_KEY` — 32-byte hex, generated once, never changed
+- `STORAGE_TYPE=local` and `LOCAL_STORAGE_PATH=/data/uploads`
+- `OPENAI_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`
+- `FACEBOOK_PAGE_ID` + `FACEBOOK_PAGE_ACCESS_TOKEN` (optional)

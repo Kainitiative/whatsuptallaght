@@ -19,6 +19,7 @@ import { downloadMedia } from "./whatsapp-client";
 import { sendTextMessage } from "./whatsapp-client";
 import { logger } from "./logger";
 import { objectStorageClient } from "./objectStorage";
+import { isLocalStorage, localSave } from "./localStorage";
 import { randomUUID } from "crypto";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,16 @@ import { randomUUID } from "crypto";
 
 async function uploadImageBuffer(buffer: Buffer, mimeType: string): Promise<string | null> {
   try {
+    // Apply the What's Up Tallaght watermark before storing
+    const watermarked = await applyWatermark(buffer);
+    const objectId = randomUUID();
+
+    if (isLocalStorage()) {
+      const objectPath = `whatsapp-images/${objectId}.jpg`;
+      await localSave(objectPath, watermarked);
+      return `/api/storage/objects/${objectPath}`;
+    }
+
     const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
     const privateDir = process.env.PRIVATE_OBJECT_DIR;
     if (!bucketId || !privateDir) {
@@ -34,10 +45,6 @@ async function uploadImageBuffer(buffer: Buffer, mimeType: string): Promise<stri
       return null;
     }
 
-    // Apply the What's Up Tallaght watermark before storing
-    const watermarked = await applyWatermark(buffer);
-
-    const objectId = randomUUID();
     const cleanDir = privateDir.replace(/^\/+/, "");
     const gcsPath = `${cleanDir}/whatsapp-images/${objectId}.jpg`;
     const bucket = objectStorageClient.bucket(bucketId);
