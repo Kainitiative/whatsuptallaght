@@ -1,0 +1,81 @@
+un appleboy/ssh-action@v1.0.3
+  with:
+    host: 185.43.233.219
+    username: root
+    password: ***
+    script: cd /opt/whatsuptallaght
+  echo "***" | docker login ghcr.io -u Kainitiative --password-stdin
+  docker compose pull
+  docker compose up -d --remove-orphans
+  for i in $(seq 1 12); do
+    sleep 5
+    if curl -sf http://localhost:8081/api/health > /dev/null; then
+      echo "Health check passed"
+      exit 0
+    fi
+    echo "Waiting... ($((i*5))s)"
+  done
+  echo "Health check failed after 60s"
+  docker compose logs --tail=50
+  exit 1
+  
+    port: 22
+    timeout: 30s
+    command_timeout: 10m
+    proxy_port: 22
+    proxy_timeout: 30s
+  env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: kainitiative/whatsuptallaght
+/usr/bin/docker run --name ed9c98e6400947b794ecbb686ec7faf9ed0b5_f07aa9 --label 5ed9c9 --workdir /github/workspace --rm -e "REGISTRY" -e "IMAGE_NAME" -e "INPUT_HOST" -e "INPUT_USERNAME" -e "INPUT_PASSWORD" -e "INPUT_SCRIPT" -e "INPUT_PORT" -e "INPUT_PASSPHRASE" -e "INPUT_SYNC" -e "INPUT_USE_INSECURE_CIPHER" -e "INPUT_CIPHER" -e "INPUT_TIMEOUT" -e "INPUT_COMMAND_TIMEOUT" -e "INPUT_KEY" -e "INPUT_KEY_PATH" -e "INPUT_FINGERPRINT" -e "INPUT_PROXY_HOST" -e "INPUT_PROXY_PORT" -e "INPUT_PROXY_USERNAME" -e "INPUT_PROXY_PASSWORD" -e "INPUT_PROXY_PASSPHRASE" -e "INPUT_PROXY_TIMEOUT" -e "INPUT_PROXY_KEY" -e "INPUT_PROXY_KEY_PATH" -e "INPUT_PROXY_FINGERPRINT" -e "INPUT_PROXY_CIPHER" -e "INPUT_PROXY_USE_INSECURE_CIPHER" -e "INPUT_SCRIPT_STOP" -e "INPUT_ENVS" -e "INPUT_ENVS_FORMAT" -e "INPUT_DEBUG" -e "INPUT_ALLENVS" -e "INPUT_REQUEST_PTY" -e "HOME" -e "GITHUB_JOB" -e "GITHUB_REF" -e "GITHUB_SHA" -e "GITHUB_REPOSITORY" -e "GITHUB_REPOSITORY_OWNER" -e "GITHUB_REPOSITORY_OWNER_ID" -e "GITHUB_RUN_ID" -e "GITHUB_RUN_NUMBER" -e "GITHUB_RETENTION_DAYS" -e "GITHUB_RUN_ATTEMPT" -e "GITHUB_ACTOR_ID" -e "GITHUB_ACTOR" -e "GITHUB_WORKFLOW" -e "GITHUB_HEAD_REF" -e "GITHUB_BASE_REF" -e "GITHUB_EVENT_NAME" -e "GITHUB_SERVER_URL" -e "GITHUB_API_URL" -e "GITHUB_GRAPHQL_URL" -e "GITHUB_REF_NAME" -e "GITHUB_REF_PROTECTED" -e "GITHUB_REF_TYPE" -e "GITHUB_WORKFLOW_REF" -e "GITHUB_WORKFLOW_SHA" -e "GITHUB_REPOSITORY_ID" -e "GITHUB_TRIGGERING_ACTOR" -e "GITHUB_WORKSPACE" -e "GITHUB_ACTION" -e "GITHUB_EVENT_PATH" -e "GITHUB_ACTION_REPOSITORY" -e "GITHUB_ACTION_REF" -e "GITHUB_PATH" -e "GITHUB_ENV" -e "GITHUB_STEP_SUMMARY" -e "GITHUB_STATE" -e "GITHUB_OUTPUT" -e "RUNNER_OS" -e "RUNNER_ARCH" -e "RUNNER_NAME" -e "RUNNER_ENVIRONMENT" -e "RUNNER_TOOL_CACHE" -e "RUNNER_TEMP" -e "RUNNER_WORKSPACE" -e "ACTIONS_RUNTIME_URL" -e "ACTIONS_RUNTIME_TOKEN" -e "ACTIONS_CACHE_URL" -e "ACTIONS_RESULTS_URL" -e "ACTIONS_ORCHESTRATION_ID" -e GITHUB_ACTIONS=true -e CI=true -v "/var/run/docker.sock":"/var/run/docker.sock" -v "/home/runner/work/_temp":"/github/runner_temp" -v "/home/runner/work/_temp/_github_home":"/github/home" -v "/home/runner/work/_temp/_github_workflow":"/github/workflow" -v "/home/runner/work/_temp/_runner_file_commands":"/github/file_commands" -v "/home/runner/work/whatsuptallaght/whatsuptallaght":"/github/workspace" 5ed9c9:8e6400947b794ecbb686ec7faf9ed0b5
+======CMD======
+cd /opt/whatsuptallaght
+echo "***" | docker login ghcr.io -u Kainitiative --password-stdin
+docker compose pull
+docker compose up -d --remove-orphans
+for i in $(seq 1 12); do
+  sleep 5
+  if curl -sf http://localhost:8081/api/health > /dev/null; then
+    echo "Health check passed"
+    exit 0
+  fi
+  echo "Waiting... ($((i*5))s)"
+done
+echo "Health check failed after 60s"
+docker compose logs --tail=50
+exit 1
+
+======END======
+err: WARNING! Your credentials are stored unencrypted in '/root/.docker/config.json'.
+err: Configure a credential helper to remove this warning. See
+err: https://docs.docker.com/go/credential-store/
+out: Login Succeeded
+err:  Image ghcr.io/kainitiative/whatsuptallaght:latest Pulling 
+err:  Image ghcr.io/kainitiative/whatsuptallaght:latest Pulled 
+err:  Container whatsuptallaght-app-1 Starting 
+err:  Container whatsuptallaght-app-1 Started 
+out: Waiting... (5s)
+out: Waiting... (10s)
+out: Waiting... (15s)
+out: Waiting... (20s)
+out: Waiting... (25s)
+out: Waiting... (30s)
+out: Waiting... (35s)
+out: Waiting... (40s)
+out: Waiting... (45s)
+out: Waiting... (50s)
+out: Waiting... (55s)
+out: Waiting... (60s)
+out: Health check failed after 60s
+out: app-1  | {"level":50,"time":1775426633023,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426633787,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426634686,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426635762,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426637221,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426639567,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426643427,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426650447,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426663899,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+out: app-1  | {"level":50,"time":1775426690119,"pid":1,"hostname":"4e94521b68b7","err":{"type":"Error","message":"Can't find meta/_journal.json file","stack":"Error: Can't find meta/_journal.json file\n    at readMigrationFiles (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/migrator.ts:29:9)\n    at migrate (/node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.18.0_pg@8.20.0/node_modules/src/node-postgres/migrator.ts:9:21)\n    at start (/app/src/index.ts:33:11)\n    at <anonymous> (/app/src/index.ts:66:1)\n    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:665:26)\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)"},"msg":"Failed to start server"}
+2026/04/05 22:05:27 Process exited with status 1
+0s
