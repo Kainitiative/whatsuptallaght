@@ -1,0 +1,1432 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Tallaght Community Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: settings
+    description: Platform configuration and integration settings
+  - name: posts
+    description: Published articles and content
+  - name: categories
+    description: Content categories
+  - name: submissions
+    description: Raw incoming content submissions
+  - name: contributors
+    description: Community contributors
+  - name: admin
+    description: Admin user management
+  - name: rss
+    description: RSS feed management
+  - name: stats
+    description: Platform statistics
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Posts ────────────────────────────────────────────────────────────────────
+
+  /posts:
+    get:
+      operationId: listPosts
+      tags: [posts]
+      summary: List posts
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/PostStatus"
+        - name: categorySlug
+          in: query
+          schema:
+            type: string
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostListResponse"
+    post:
+      operationId: createPost
+      tags: [posts]
+      summary: Create a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts/summary:
+    get:
+      operationId: getPostsSummary
+      tags: [stats]
+      summary: Posts summary stats
+      description: Count of posts by status and category, plus recent activity
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostsSummary"
+
+  /posts/{id}:
+    get:
+      operationId: getPost
+      tags: [posts]
+      summary: Get a post by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Post found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updatePost
+      tags: [posts]
+      summary: Update a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePostRequest"
+      responses:
+        "200":
+          description: Post updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deletePost
+      tags: [posts]
+      summary: Delete a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /posts/slug/{slug}:
+    get:
+      operationId: getPostBySlug
+      tags: [posts]
+      summary: Get a post by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Categories ───────────────────────────────────────────────────────────────
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      tags: [categories]
+      summary: Create a category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /categories/{slug}:
+    get:
+      operationId: getCategory
+      tags: [categories]
+      summary: Get a category by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Category found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Submissions ──────────────────────────────────────────────────────────────
+
+  /submissions:
+    post:
+      operationId: createSubmission
+      tags: [submissions]
+      summary: Create a submission
+      description: Internal endpoint used by the WhatsApp and RSS ingestion pipelines
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubmissionRequest"
+      responses:
+        "201":
+          description: Submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: listSubmissions
+      tags: [submissions]
+      summary: List submissions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/SubmissionStatus"
+        - name: source
+          in: query
+          schema:
+            $ref: "#/components/schemas/SubmissionSource"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of submissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionListResponse"
+
+  /submissions/{id}:
+    get:
+      operationId: getSubmission
+      tags: [submissions]
+      summary: Get a submission by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Submission found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateSubmission
+      tags: [submissions]
+      summary: Update submission status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubmissionRequest"
+      responses:
+        "200":
+          description: Submission updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Contributors ─────────────────────────────────────────────────────────────
+
+  /contributors:
+    get:
+      operationId: listContributors
+      tags: [contributors]
+      summary: List contributors
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of contributors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContributorListResponse"
+
+  /contributors/{id}:
+    get:
+      operationId: getContributor
+      tags: [contributors]
+      summary: Get a contributor by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contributor found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contributor"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateContributor
+      tags: [contributors]
+      summary: Update a contributor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContributorRequest"
+      responses:
+        "200":
+          description: Contributor updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contributor"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Admin ────────────────────────────────────────────────────────────────────
+
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      summary: List admin users
+      responses:
+        "200":
+          description: List of admin users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+
+  /admin/invitations:
+    post:
+      operationId: createAdminInvitation
+      tags: [admin]
+      summary: Create an admin invite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvitationRequest"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminInvitation"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Login with an invite token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+        "401":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── RSS ──────────────────────────────────────────────────────────────────────
+
+  /rss/feeds:
+    get:
+      operationId: listRssFeeds
+      tags: [rss]
+      summary: List RSS feeds
+      responses:
+        "200":
+          description: List of RSS feeds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RssFeed"
+    post:
+      operationId: createRssFeed
+      tags: [rss]
+      summary: Add an RSS feed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRssFeedRequest"
+      responses:
+        "201":
+          description: Feed created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RssFeed"
+
+  # ── Settings ─────────────────────────────────────────────────────────────────
+
+  /admin/settings:
+    get:
+      operationId: listSettings
+      tags: [settings]
+      summary: List all platform settings
+      description: Returns all setting definitions. Secret values are masked. Non-secret values are returned in plain text.
+      responses:
+        "200":
+          description: List of settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlatformSetting"
+
+  /admin/settings/status:
+    get:
+      operationId: getSettingsStatus
+      tags: [settings]
+      summary: Setup completion status
+      description: Returns a per-category breakdown of how many required settings are configured, and whether the encryption key is set.
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsStatus"
+
+  /admin/settings/{key}:
+    put:
+      operationId: updateSetting
+      tags: [settings]
+      summary: Set a setting value
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingRequest"
+      responses:
+        "200":
+          description: Setting updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingUpdateResponse"
+        "404":
+          description: Setting key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: clearSetting
+      tags: [settings]
+      summary: Clear a setting value
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Setting cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingUpdateResponse"
+        "404":
+          description: Setting key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Stats ────────────────────────────────────────────────────────────────────
+
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      tags: [stats]
+      summary: Platform summary statistics
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummary"
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+components:
+  schemas:
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+
+    # ── Enums ──────────────────────────────────────────────────────────────────
+
+    PostStatus:
+      type: string
+      enum: [draft, held, published, rejected]
+
+    SubmissionStatus:
+      type: string
+      enum: [pending, processing, processed, rejected, failed]
+
+    SubmissionSource:
+      type: string
+      enum: [whatsapp, rss]
+
+    Platform:
+      type: string
+      enum: [facebook, instagram]
+
+    DistributionStatus:
+      type: string
+      enum: [pending, succeeded, failed]
+
+    # ── Category ───────────────────────────────────────────────────────────────
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        color:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - slug
+        - color
+        - createdAt
+
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        color:
+          type: string
+      required:
+        - name
+        - slug
+
+    # ── Post ───────────────────────────────────────────────────────────────────
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        body:
+          type: string
+        excerpt:
+          type: string
+          nullable: true
+        headerImageUrl:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/PostStatus"
+        confidenceScore:
+          type: number
+          nullable: true
+        wordCount:
+          type: integer
+          nullable: true
+        primaryCategoryId:
+          type: integer
+          nullable: true
+        sourceSubmissionId:
+          type: integer
+          nullable: true
+        isSponsored:
+          type: boolean
+        isFeatured:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - slug
+        - body
+        - status
+        - isSponsored
+        - isFeatured
+        - createdAt
+        - updatedAt
+
+    CreatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        body:
+          type: string
+        excerpt:
+          type: string
+        headerImageUrl:
+          type: string
+        status:
+          $ref: "#/components/schemas/PostStatus"
+        confidenceScore:
+          type: number
+        wordCount:
+          type: integer
+        primaryCategoryId:
+          type: integer
+        sourceSubmissionId:
+          type: integer
+        isSponsored:
+          type: boolean
+        isFeatured:
+          type: boolean
+        categoryIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - title
+        - slug
+        - body
+
+    UpdatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        excerpt:
+          type: string
+        headerImageUrl:
+          type: string
+        status:
+          $ref: "#/components/schemas/PostStatus"
+        confidenceScore:
+          type: number
+        primaryCategoryId:
+          type: integer
+        isSponsored:
+          type: boolean
+        isFeatured:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+
+    PostListResponse:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - posts
+        - pagination
+
+    PostsSummary:
+      type: object
+      properties:
+        totalPublished:
+          type: integer
+        totalDraft:
+          type: integer
+        totalHeld:
+          type: integer
+        todayPublished:
+          type: integer
+        byCategory:
+          type: array
+          items:
+            type: object
+            properties:
+              categoryId:
+                type: integer
+              categoryName:
+                type: string
+              count:
+                type: integer
+            required:
+              - categoryId
+              - categoryName
+              - count
+      required:
+        - totalPublished
+        - totalDraft
+        - totalHeld
+        - todayPublished
+        - byCategory
+
+    # ── Submission ─────────────────────────────────────────────────────────────
+
+    Submission:
+      type: object
+      properties:
+        id:
+          type: integer
+        contributorId:
+          type: integer
+          nullable: true
+        source:
+          $ref: "#/components/schemas/SubmissionSource"
+        rawText:
+          type: string
+          nullable: true
+        mediaUrls:
+          type: array
+          items:
+            type: string
+          nullable: true
+        voiceTranscript:
+          type: string
+          nullable: true
+        rssItemId:
+          type: integer
+          nullable: true
+        status:
+          $ref: "#/components/schemas/SubmissionStatus"
+        rejectionReason:
+          type: string
+          nullable: true
+        safetyCheckPassed:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - source
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateSubmissionRequest:
+      type: object
+      properties:
+        contributorId:
+          type: integer
+        source:
+          $ref: "#/components/schemas/SubmissionSource"
+        rawText:
+          type: string
+        mediaUrls:
+          type: array
+          items:
+            type: string
+        voiceTranscript:
+          type: string
+        rssItemId:
+          type: integer
+      required:
+        - source
+
+    UpdateSubmissionRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/SubmissionStatus"
+        rejectionReason:
+          type: string
+
+    SubmissionListResponse:
+      type: object
+      properties:
+        submissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Submission"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - submissions
+        - pagination
+
+    # ── Contributor ────────────────────────────────────────────────────────────
+
+    Contributor:
+      type: object
+      properties:
+        id:
+          type: integer
+        phoneHash:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        area:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        profileImageUrl:
+          type: string
+          nullable: true
+        submissionCount:
+          type: integer
+        publishedCount:
+          type: integer
+        isVerified:
+          type: boolean
+        isBanned:
+          type: boolean
+        firstSeenAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - phoneHash
+        - submissionCount
+        - publishedCount
+        - isVerified
+        - isBanned
+        - firstSeenAt
+        - updatedAt
+
+    UpdateContributorRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        area:
+          type: string
+        bio:
+          type: string
+        profileImageUrl:
+          type: string
+        isVerified:
+          type: boolean
+        isBanned:
+          type: boolean
+
+    ContributorListResponse:
+      type: object
+      properties:
+        contributors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contributor"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - contributors
+        - pagination
+
+    # ── Admin ──────────────────────────────────────────────────────────────────
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - email
+        - name
+        - createdAt
+
+    AdminInvitation:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        usedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - token
+        - expiresAt
+        - createdAt
+
+    CreateInvitationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+      required:
+        - email
+
+    AdminLoginRequest:
+      type: object
+      properties:
+        token:
+          type: string
+      required:
+        - token
+
+    AdminLoginResponse:
+      type: object
+      properties:
+        adminUser:
+          $ref: "#/components/schemas/AdminUser"
+        sessionToken:
+          type: string
+      required:
+        - adminUser
+        - sessionToken
+
+    # ── RSS ────────────────────────────────────────────────────────────────────
+
+    RssFeed:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        url:
+          type: string
+        isActive:
+          type: boolean
+        checkIntervalMinutes:
+          type: integer
+        lastFetchedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - url
+        - isActive
+        - checkIntervalMinutes
+        - createdAt
+
+    CreateRssFeedRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        checkIntervalMinutes:
+          type: integer
+      required:
+        - name
+        - url
+
+    # ── Stats ──────────────────────────────────────────────────────────────────
+
+    StatsSummary:
+      type: object
+      properties:
+        posts:
+          type: object
+          properties:
+            total:
+              type: integer
+            published:
+              type: integer
+            draft:
+              type: integer
+            held:
+              type: integer
+            todayPublished:
+              type: integer
+          required:
+            - total
+            - published
+            - draft
+            - held
+            - todayPublished
+        submissions:
+          type: object
+          properties:
+            total:
+              type: integer
+            pending:
+              type: integer
+            processed:
+              type: integer
+            rejected:
+              type: integer
+          required:
+            - total
+            - pending
+            - processed
+            - rejected
+        contributors:
+          type: object
+          properties:
+            total:
+              type: integer
+            active:
+              type: integer
+          required:
+            - total
+            - active
+        queue:
+          type: object
+          properties:
+            pending:
+              type: integer
+            failed:
+              type: integer
+          required:
+            - pending
+            - failed
+      required:
+        - posts
+        - submissions
+        - contributors
+        - queue
+
+    # ── Distribution ───────────────────────────────────────────────────────────
+
+    DistributionLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        platform:
+          $ref: "#/components/schemas/Platform"
+        status:
+          $ref: "#/components/schemas/DistributionStatus"
+        platformPostId:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        attemptedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - postId
+        - platform
+        - status
+        - attemptedAt
+
+    # ── Settings ───────────────────────────────────────────────────────────────
+
+    PlatformSetting:
+      type: object
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        helpUrl:
+          type: string
+          nullable: true
+        category:
+          type: string
+        isSecret:
+          type: boolean
+        isRequired:
+          type: boolean
+        isConfigured:
+          type: boolean
+        displayOrder:
+          type: integer
+        value:
+          type: string
+          nullable: true
+          description: Plain text for non-secret settings, masked (••••••••) for secrets that are configured, null if not configured.
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - key
+        - label
+        - description
+        - category
+        - isSecret
+        - isRequired
+        - isConfigured
+        - displayOrder
+
+    UpdateSettingRequest:
+      type: object
+      properties:
+        value:
+          type: string
+      required:
+        - value
+
+    SettingUpdateResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        isConfigured:
+          type: boolean
+        isSecret:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - key
+        - label
+        - isConfigured
+        - isSecret
+
+    SettingsCategoryStatus:
+      type: object
+      properties:
+        total:
+          type: integer
+        configured:
+          type: integer
+        complete:
+          type: boolean
+      required:
+        - total
+        - configured
+        - complete
+
+    SettingsStatus:
+      type: object
+      properties:
+        encryptionKeySet:
+          type: boolean
+        allComplete:
+          type: boolean
+        categories:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SettingsCategoryStatus"
+      required:
+        - encryptionKeySet
+        - allComplete
+        - categories
