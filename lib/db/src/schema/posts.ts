@@ -23,6 +23,7 @@ export const postsTable = pgTable("posts", {
   isFeatured: boolean("is_featured").notNull().default(false),
   starRating: integer("star_rating"),
   imagePrompt: text("image_prompt"),
+  bodyImages: text("body_images").array().default([]),
   matchedEntityId: integer("matched_entity_id").references(() => entitiesTable.id, { onDelete: "set null" }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

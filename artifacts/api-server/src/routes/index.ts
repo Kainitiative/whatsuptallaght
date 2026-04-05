@@ -13,6 +13,7 @@ import webhookRouter from "./webhook";
 import usageRouter from "./usage";
 import storageRouter from "./storage";
 import publicRouter from "./public";
+import imageAssetsRouter from "./image-assets";
 import eventsRouter from "./events";
 import socialRouter from "./social";
 import entitiesRouter from "./entities";
@@ -36,6 +37,7 @@ router.use(eventsRouter); // GET /public/events is public; admin CRUD protected 
 
 // Protected admin-only routes — require Bearer token
 router.use(adminAuth);
+router.use(imageAssetsRouter);
 router.use(settingsRouter);
 router.use(goldenExamplesRouter);
 router.use(socialRouter);

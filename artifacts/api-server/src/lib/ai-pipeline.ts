@@ -12,6 +12,7 @@ import {
   rssItemsTable,
   aiUsageLogTable,
   eventsTable,
+  headerImageAssetsTable,
 } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getSettingValue } from "../routes/settings";
@@ -487,7 +488,7 @@ async function generateHeaderImage(
       model: "dall-e-3",
       prompt,
       n: 1,
-      size: "1024x1024",
+      size: "1792x1024",
       quality: "standard",
       response_format: "url",
     });
@@ -518,6 +519,60 @@ async function generateHeaderImage(
     logger.error({ err, submissionId: ctx.submissionId }, "AI pipeline: DALL·E generation failed (non-fatal)");
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Asset library — find a reusable header image or generate + store a new one
+// ---------------------------------------------------------------------------
+
+const MAX_ASSET_REUSE = 5; // max articles that can share the same header image
+
+async function findOrCreateHeaderAsset(
+  openai: OpenAI,
+  headline: string,
+  keyFacts: string[],
+  tone: string,
+  ctx: UsageCtx,
+): Promise<{ imageUrl: string; imagePrompt: string } | null> {
+  // Search existing assets with matching tone
+  const candidates = await db
+    .select()
+    .from(headerImageAssetsTable)
+    .where(eq(headerImageAssetsTable.tone, tone));
+
+  // Find one with keyword overlap and under the reuse cap
+  const keywords = keyFacts.map((k) => k.toLowerCase());
+  const match = candidates.find((asset) => {
+    if (asset.usageCount >= MAX_ASSET_REUSE) return false;
+    const assetKws = (asset.keywords ?? []).map((k: string) => k.toLowerCase());
+    return keywords.some((k) => assetKws.some((ak) => ak.includes(k) || k.includes(ak)));
+  });
+
+  if (match) {
+    await db
+      .update(headerImageAssetsTable)
+      .set({ usageCount: match.usageCount + 1 })
+      .where(eq(headerImageAssetsTable.id, match.id));
+    logger.info({ submissionId: ctx.submissionId, assetId: match.id }, "AI pipeline: reusing header image from library");
+    return { imageUrl: match.imageUrl, imagePrompt: match.prompt };
+  }
+
+  // No reusable asset — generate a new one and save to library
+  const generated = await generateHeaderImage(openai, headline, keyFacts, tone, ctx);
+  if (!generated) return null;
+
+  await db
+    .insert(headerImageAssetsTable)
+    .values({
+      imageUrl: generated.imageUrl,
+      tone,
+      keywords: keyFacts.slice(0, 6),
+      prompt: generated.imagePrompt,
+      usageCount: 1,
+    })
+    .catch((err) => logger.warn({ err }, "AI pipeline: failed to save header image to library (non-fatal)"));
+
+  return generated;
 }
 
 // ---------------------------------------------------------------------------
@@ -679,7 +734,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   const mediaUrls = submission.mediaUrls ?? [];
   const transcripts: string[] = [];
   const imageDescriptions: string[] = [];
-  let firstImagePath: string | null = null; // saved to GCS for use as article header
+  // All submitted images go into the article body — header is always DALL·E generated
+  const bodyImagePaths: string[] = [];
 
   for (const mediaId of mediaUrls) {
     try {
@@ -701,9 +757,9 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
           uploadImageBuffer(buffer, mimeType),
         ]);
         imageDescriptions.push(description);
-        if (!firstImagePath && storedPath) {
-          firstImagePath = storedPath;
-          logger.info({ submissionId, storedPath }, "AI pipeline: image uploaded to storage");
+        if (storedPath) {
+          bodyImagePaths.push(storedPath);
+          logger.info({ submissionId, storedPath }, "AI pipeline: image stored as body image");
         }
       }
     } catch (err) {
@@ -810,28 +866,28 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   const entityMatch = await matchEntityInArticle(articleBody, openai);
   const entityImagePath = entityMatch?.entityImageUrl ?? null;
 
-  // --- Stage 7b: Generate header image (only for articles that will be published) ---
-  // Precedence: submitted photo > entity image > DALL·E generated > none
-  // For held articles we save the prompt text only — image is generated when admin publishes.
-  let generatedImagePath: string | null = null;
-  let generatedImagePrompt: string | null = null;
-  if (!firstImagePath && !entityImagePath) {
-    // Always build and store the prompt so it's ready when the article is published
-    generatedImagePrompt = buildDallePrompt(infoResult.headline, infoResult.keyFacts, toneResult.tone);
+  // --- Stage 7b: Generate header image ---
+  // Header is always a purpose-built wide image (entity image or DALL·E from asset library).
+  // Submitted WhatsApp photos go into bodyImages — displayed inline in the article body.
+  // For held articles we save the prompt text only — image is sourced from the library when admin publishes.
+  let headerImagePath: string | null = entityImagePath ?? null;
+  let headerImagePrompt: string | null = null;
+  if (!entityImagePath) {
+    headerImagePrompt = buildDallePrompt(infoResult.headline, infoResult.keyFacts, toneResult.tone);
     if (postStatus === "published") {
       const autoGenerate = await getSettingValue("auto_generate_images");
       if (autoGenerate === "true") {
-        logger.info({ submissionId }, "AI pipeline: generating header image (auto-published)");
-        const generated = await generateHeaderImage(openai, infoResult.headline, infoResult.keyFacts, toneResult.tone, ctx);
-        if (generated) {
-          generatedImagePath = generated.imageUrl;
-          generatedImagePrompt = generated.imagePrompt;
+        logger.info({ submissionId }, "AI pipeline: sourcing header image from asset library");
+        const asset = await findOrCreateHeaderAsset(openai, infoResult.headline, infoResult.keyFacts, toneResult.tone, ctx);
+        if (asset) {
+          headerImagePath = asset.imageUrl;
+          headerImagePrompt = asset.imagePrompt;
         }
       }
     } else {
-      logger.info({ submissionId }, "AI pipeline: skipping image generation — article held for review");
+      logger.info({ submissionId }, "AI pipeline: skipping header image — article held for review");
     }
-  } else if (!firstImagePath && entityImagePath) {
+  } else {
     logger.info({ submissionId, entityName: entityMatch?.entityName }, "AI pipeline: using entity image as header");
   }
 
@@ -855,8 +911,9 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
       sourceSubmissionId: submissionId,
       publishedAt: postStatus === "published" ? new Date() : null,
       matchedEntityId: entityMatch?.entityId ?? null,
-      headerImageUrl: firstImagePath ?? entityImagePath ?? generatedImagePath ?? undefined,
-      imagePrompt: generatedImagePrompt ?? undefined,
+      headerImageUrl: headerImagePath ?? undefined,
+      imagePrompt: headerImagePrompt ?? undefined,
+      bodyImages: bodyImagePaths,
     })
     .returning();
 
@@ -1020,19 +1077,19 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   const rssEntityImagePath = rssEntityMatch?.entityImageUrl ?? null;
 
   // --- Generate header image (only for articles that will be published) ---
-  // Precedence: entity image > DALL·E generated > none
-  // For held articles we save the prompt text only — image is generated when admin publishes.
-  let rssImagePath: string | null = null;
+  // Precedence: entity image > DALL·E asset library > none
+  // For held articles we save the prompt text only — image is sourced from library when admin publishes.
+  let rssImagePath: string | null = rssEntityImagePath ?? null;
   let rssImagePrompt: string | null = buildDallePrompt(infoResult.headline || title, infoResult.keyFacts, toneResult.tone);
   if (!rssEntityImagePath) {
     if (postStatus === "published") {
       const autoGenerate = await getSettingValue("auto_generate_images");
       if (autoGenerate === "true") {
-        logger.info({ submissionId }, "RSS pipeline: generating header image (auto-published)");
-        const generated = await generateHeaderImage(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
-        if (generated) {
-          rssImagePath = generated.imageUrl;
-          rssImagePrompt = generated.imagePrompt;
+        logger.info({ submissionId }, "RSS pipeline: sourcing header image from asset library");
+        const asset = await findOrCreateHeaderAsset(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
+        if (asset) {
+          rssImagePath = asset.imageUrl;
+          rssImagePrompt = asset.imagePrompt;
         }
       }
     } else {
