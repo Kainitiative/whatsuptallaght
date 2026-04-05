@@ -54,7 +54,7 @@ if (process.env.NODE_ENV === "production") {
   const communityDir = path.join(staticDir, "community");
   app.use(express.static(communityDir, { index: "index.html" }));
   // SPA fallback for client-side routing (exclude /api/* to avoid masking 404s)
-  app.get("(.*)", (req, res, next) => {
+  app.use((req, res, next) => {
     if (req.path.startsWith("/api/")) return next();
     res.sendFile(path.join(communityDir, "index.html"));
   });

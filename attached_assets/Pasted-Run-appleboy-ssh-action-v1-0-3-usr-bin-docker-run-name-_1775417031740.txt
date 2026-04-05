@@ -1,0 +1,109 @@
+Run appleboy/ssh-action@v1.0.3
+/usr/bin/docker run --name d8de17386cd4b5cbbc594e38e204dc9_082aa3 --label 051268 --workdir /github/workspace --rm -e "REGISTRY" -e "IMAGE_NAME" -e "INPUT_HOST" -e "INPUT_USERNAME" -e "INPUT_PASSWORD" -e "INPUT_SCRIPT" -e "INPUT_PORT" -e "INPUT_PASSPHRASE" -e "INPUT_SYNC" -e "INPUT_USE_INSECURE_CIPHER" -e "INPUT_CIPHER" -e "INPUT_TIMEOUT" -e "INPUT_COMMAND_TIMEOUT" -e "INPUT_KEY" -e "INPUT_KEY_PATH" -e "INPUT_FINGERPRINT" -e "INPUT_PROXY_HOST" -e "INPUT_PROXY_PORT" -e "INPUT_PROXY_USERNAME" -e "INPUT_PROXY_PASSWORD" -e "INPUT_PROXY_PASSPHRASE" -e "INPUT_PROXY_TIMEOUT" -e "INPUT_PROXY_KEY" -e "INPUT_PROXY_KEY_PATH" -e "INPUT_PROXY_FINGERPRINT" -e "INPUT_PROXY_CIPHER" -e "INPUT_PROXY_USE_INSECURE_CIPHER" -e "INPUT_SCRIPT_STOP" -e "INPUT_ENVS" -e "INPUT_ENVS_FORMAT" -e "INPUT_DEBUG" -e "INPUT_ALLENVS" -e "INPUT_REQUEST_PTY" -e "HOME" -e "GITHUB_JOB" -e "GITHUB_REF" -e "GITHUB_SHA" -e "GITHUB_REPOSITORY" -e "GITHUB_REPOSITORY_OWNER" -e "GITHUB_REPOSITORY_OWNER_ID" -e "GITHUB_RUN_ID" -e "GITHUB_RUN_NUMBER" -e "GITHUB_RETENTION_DAYS" -e "GITHUB_RUN_ATTEMPT" -e "GITHUB_ACTOR_ID" -e "GITHUB_ACTOR" -e "GITHUB_WORKFLOW" -e "GITHUB_HEAD_REF" -e "GITHUB_BASE_REF" -e "GITHUB_EVENT_NAME" -e "GITHUB_SERVER_URL" -e "GITHUB_API_URL" -e "GITHUB_GRAPHQL_URL" -e "GITHUB_REF_NAME" -e "GITHUB_REF_PROTECTED" -e "GITHUB_REF_TYPE" -e "GITHUB_WORKFLOW_REF" -e "GITHUB_WORKFLOW_SHA" -e "GITHUB_REPOSITORY_ID" -e "GITHUB_TRIGGERING_ACTOR" -e "GITHUB_WORKSPACE" -e "GITHUB_ACTION" -e "GITHUB_EVENT_PATH" -e "GITHUB_ACTION_REPOSITORY" -e "GITHUB_ACTION_REF" -e "GITHUB_PATH" -e "GITHUB_ENV" -e "GITHUB_STEP_SUMMARY" -e "GITHUB_STATE" -e "GITHUB_OUTPUT" -e "RUNNER_OS" -e "RUNNER_ARCH" -e "RUNNER_NAME" -e "RUNNER_ENVIRONMENT" -e "RUNNER_TOOL_CACHE" -e "RUNNER_TEMP" -e "RUNNER_WORKSPACE" -e "ACTIONS_RUNTIME_URL" -e "ACTIONS_RUNTIME_TOKEN" -e "ACTIONS_CACHE_URL" -e "ACTIONS_RESULTS_URL" -e "ACTIONS_ORCHESTRATION_ID" -e GITHUB_ACTIONS=true -e CI=true -v "/var/run/docker.sock":"/var/run/docker.sock" -v "/home/runner/work/_temp":"/github/runner_temp" -v "/home/runner/work/_temp/_github_home":"/github/home" -v "/home/runner/work/_temp/_github_workflow":"/github/workflow" -v "/home/runner/work/_temp/_runner_file_commands":"/github/file_commands" -v "/home/runner/work/whatsuptallaght/whatsuptallaght":"/github/workspace" 051268:3d8de17386cd4b5cbbc594e38e204dc9
+======CMD======
+cd /opt/whatsuptallaght
+echo "***" | docker login ghcr.io -u Kainitiative --password-stdin
+docker compose pull
+docker compose up -d --remove-orphans
+for i in $(seq 1 12); do
+  sleep 5
+  if curl -sf http://localhost:8081/api/health > /dev/null; then
+    echo "Health check passed"
+    exit 0
+  fi
+  echo "Waiting... ($((i*5))s)"
+done
+echo "Health check failed after 60s"
+docker compose logs --tail=50
+exit 1
+
+======END======
+err: WARNING! Your credentials are stored unencrypted in '/root/.docker/config.json'.
+out: Login Succeeded
+err: Configure a credential helper to remove this warning. See
+err: https://docs.docker.com/go/credential-store/
+err:  Image ghcr.io/kainitiative/whatsuptallaght:latest Pulling 
+err:  ca9664af0b86 Pulling fs layer 0B
+err:  e6e30663e96e Pulling fs layer 0B
+err:  f178183cb62a Pulling fs layer 0B
+err:  08e4f13091c9 Pulling fs layer 0B
+err:  9c2e663f61fb Download complete 0B
+err:  e6e30663e96e Downloading 1.049MB
+err:  f178183cb62a Download complete 0B
+err:  ca9664af0b86 Download complete 0B
+err:  e6e30663e96e Download complete 0B
+err:  08e4f13091c9 Downloading 8.678MB
+err:  e6e30663e96e Pull complete 0B
+err:  08e4f13091c9 Download complete 0B
+err:  f178183cb62a Pull complete 0B
+err:  ca9664af0b86 Pull complete 0B
+err:  08e4f13091c9 Pull complete 0B
+err:  Image ghcr.io/kainitiative/whatsuptallaght:latest Pulled 
+err:  Container whatsuptallaght-app-1 Recreate 
+err:  Container whatsuptallaght-app-1 Recreated 
+err:  Container whatsuptallaght-app-1 Starting 
+err:  Container whatsuptallaght-app-1 Started 
+out: Waiting... (5s)
+out: Waiting... (10s)
+out: Waiting... (15s)
+out: Waiting... (20s)
+out: Waiting... (25s)
+out: Waiting... (30s)
+out: Waiting... (35s)
+out: Waiting... (40s)
+out: Waiting... (45s)
+out: Waiting... (50s)
+out: Waiting... (55s)
+out: Waiting... (60s)
+out: Health check failed after 60s
+out: app-1  |     at pathToRegexp (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:480:54)
+out: app-1  |     at Object.match (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:438:28)
+out: app-1  |     at matcher (/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+out: app-1  |     at new Layer (/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+out: app-1  |     at Function.route (/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+out: app-1  |     at Function.route (/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+out: app-1  |     at Function.app2.<computed> (/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22)
+out: app-1  |     at <anonymous> (/app/src/app.ts:57:7) {
+out: app-1  |   originalPath: '(.*)'
+out: app-1  | }
+out: app-1  | 
+out: app-1  | Node.js v22.22.2
+out: app-1  | /node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225
+out: app-1  |       throw new PathError(`Missing parameter name at index ${index}`, str);
+out: app-1  |             ^
+out: app-1  | 
+out: app-1  | PathError [TypeError]: Missing parameter name at index 3: (.*); visit https://git.new/pathToRegexpError for info
+out: app-1  |     at name (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225:13)
+out: app-1  |     at parse (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:242:62)
+out: app-1  |     at pathToRegexp (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:480:54)
+out: app-1  |     at Object.match (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:438:28)
+out: app-1  |     at matcher (/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+out: app-1  |     at new Layer (/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+out: app-1  |     at Function.route (/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+out: app-1  |     at Function.route (/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+out: app-1  |     at Function.app2.<computed> (/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22)
+out: app-1  |     at <anonymous> (/app/src/app.ts:57:7) {
+out: app-1  |   originalPath: '(.*)'
+out: app-1  | }
+out: app-1  | 
+out: app-1  | Node.js v22.22.2
+out: app-1  | /node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225
+out: app-1  |       throw new PathError(`Missing parameter name at index ${index}`, str);
+out: app-1  |             ^
+out: app-1  | 
+out: app-1  | PathError [TypeError]: Missing parameter name at index 3: (.*); visit https://git.new/pathToRegexpError for info
+out: app-1  |     at name (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:225:13)
+out: app-1  |     at parse (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:242:62)
+out: app-1  |     at pathToRegexp (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:480:54)
+out: app-1  |     at Object.match (/node_modules/.pnpm/path-to-regexp@8.3.0/node_modules/path-to-regexp/src/index.ts:438:28)
+out: app-1  |     at matcher (/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:86:23)
+out: app-1  |     at new Layer (/node_modules/.pnpm/router@2.2.0/node_modules/router/lib/layer.js:93:62)
+out: app-1  |     at Function.route (/node_modules/.pnpm/router@2.2.0/node_modules/router/index.js:428:17)
+out: app-1  |     at Function.route (/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:257:22)
+out: app-1  |     at Function.app2.<computed> (/node_modules/.pnpm/express@5.2.1/node_modules/express/lib/application.js:478:22)
+out: app-1  |     at <anonymous> (/app/src/app.ts:57:7) {
+out: app-1  |   originalPath: '(.*)'
+out: app-1  | }
+out: app-1  | 
+out: app-1  | Node.js v22.22.2
+2026/04/05 19:23:34 Process exited with status 1
