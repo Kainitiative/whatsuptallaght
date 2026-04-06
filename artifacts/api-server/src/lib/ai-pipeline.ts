@@ -662,7 +662,7 @@ async function generateHeaderImage(
 // Asset library — find a reusable header image or generate + store a new one
 // ---------------------------------------------------------------------------
 
-const MAX_ASSET_REUSE = 5; // max articles that can share the same header image
+const MAX_ASSET_REUSE = 50; // max articles that can share the same header image (cost saving)
 
 async function findOrCreateHeaderAsset(
   openai: OpenAI,
