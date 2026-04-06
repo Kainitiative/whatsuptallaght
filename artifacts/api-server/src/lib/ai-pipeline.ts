@@ -762,6 +762,72 @@ async function writeArticle(
 }
 
 // ---------------------------------------------------------------------------
+// Stage 7b — Fact-check (GPT-4o-mini)
+// Compares the written article against the original submission.
+// Returns PASS or FAIL with specific issues. A FAIL forces the article to
+// "held" for editor review — it is never auto-published.
+// ---------------------------------------------------------------------------
+
+interface FactCheckResult {
+  result: "PASS" | "FAIL";
+  issues: string[];
+}
+
+async function factCheckArticle(
+  openai: OpenAI,
+  submission: string,
+  article: string,
+  ctx: UsageCtx,
+): Promise<FactCheckResult> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: `You are a fact-checker for a community news platform.
+
+Your job is to compare a written article against the original submission it was based on.
+
+Look for ANY detail in the article that is NOT explicitly present in the submission:
+- Invented names, places, organisations, or events
+- Numbers or statistics not in the submission
+- Quotes that were not in the submission
+- Claimed motivations, opinions, or emotions not stated
+- Added context about what an organisation "is known for" or "typically does"
+- Any specific detail the submission does not directly support
+
+Respond in JSON:
+{
+  "result": "PASS" or "FAIL",
+  "issues": ["List each fabricated or unsupported detail found. Empty array if PASS."]
+}
+
+Return PASS only if every factual claim in the article is directly supported by the submission.
+Connecting phrases and rewordings of stated facts are acceptable — only flag genuinely new information.`,
+        },
+        {
+          role: "user",
+          content: `ORIGINAL SUBMISSION:\n${submission}\n\n---\n\nWRITTEN ARTICLE:\n${article}`,
+        },
+      ],
+    });
+
+    logUsage(ctx, "gpt-4o-mini", "fact_check", response.usage ?? undefined);
+    const raw = JSON.parse(response.choices[0].message.content ?? "{}");
+    return {
+      result: raw.result === "PASS" ? "PASS" : "FAIL",
+      issues: Array.isArray(raw.issues) ? raw.issues : [],
+    };
+  } catch (err) {
+    logger.warn({ err, submissionId: ctx.submissionId }, "AI pipeline: fact-check failed (non-fatal) — defaulting to PASS");
+    return { result: "PASS", issues: [] };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main pipeline entry point
 // ---------------------------------------------------------------------------
 
@@ -926,6 +992,15 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   logger.info({ submissionId }, "AI pipeline: writing article");
   const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx);
 
+  // --- Stage 7b: Fact-check ---
+  logger.info({ submissionId }, "AI pipeline: fact-checking article");
+  const factCheck = await factCheckArticle(openai, combinedText, articleBody, ctx);
+  if (factCheck.result === "FAIL") {
+    logger.warn({ submissionId, issues: factCheck.issues }, "AI pipeline: fact-check FAILED — article will be held for review");
+  } else {
+    logger.info({ submissionId }, "AI pipeline: fact-check PASSED");
+  }
+
   // --- Stage 8: Confidence score and routing ---
   const confidence =
     (infoResult.completenessScore * 0.5 +
@@ -954,7 +1029,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   }
 
   // --- Create the post ---
-  const postStatus = confidence >= 0.75 ? "published" : "held";
+  // Fact-check FAIL forces "held" — editor must review before the article can go live
+  const postStatus = (confidence >= 0.75 && factCheck.result === "PASS") ? "published" : "held";
 
   // --- Stage 7.5: Entity matching (with centrality check) ---
   logger.info({ submissionId }, "AI pipeline: matching entities");
@@ -1163,11 +1239,18 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   logUsage(ctx, "gpt-4o-mini", "rss_rewrite", rssArticleResponse.usage ?? undefined);
   const articleBody = rssArticleResponse.choices[0].message.content?.trim() ?? content;
 
+  // --- Fact-check ---
+  const rssfactCheck = await factCheckArticle(openai, combinedText, articleBody, ctx);
+  if (rssfactCheck.result === "FAIL") {
+    logger.warn({ submissionId, issues: rssfactCheck.issues }, "RSS pipeline: fact-check FAILED — article will be held for review");
+  }
+
   // --- Confidence and routing ---
   // Official sources get auto-published; news/general sources are held for review
+  // Fact-check FAIL forces "held" regardless of confidence
   const baseConfidence = trustLevel === "official" ? 0.85 : trustLevel === "news" ? 0.6 : 0.5;
   const confidence = Math.min(1, baseConfidence + infoResult.completenessScore * 0.15);
-  const postStatus = confidence >= 0.75 ? "published" : "held";
+  const postStatus = (confidence >= 0.75 && rssfactCheck.result === "PASS") ? "published" : "held";
 
   // --- Entity matching (with centrality check) ---
   const rssEntityMatch = await matchEntityInArticle(articleBody, openai);
