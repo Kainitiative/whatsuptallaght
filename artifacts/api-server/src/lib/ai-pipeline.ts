@@ -259,6 +259,30 @@ interface ExtractedInfo {
   sentiment: "positive" | "negative" | "neutral";
   wordCount: number;
   completenessScore: number;
+  // Explicit completeness criteria — scored in code, not by AI guess
+  hasLocation: boolean;
+  hasDateTime: boolean;
+  hasClearSubject: boolean;
+  hasActionableInfo: boolean;
+}
+
+/**
+ * Compute completeness score from four explicit criteria (0.25 each).
+ * Each criterion is a boolean flag returned by the AI — scored here in code
+ * so the result is deterministic and auditable, not a single AI-guessed number.
+ */
+function computeCompletenessScore(flags: {
+  hasLocation: boolean;
+  hasDateTime: boolean;
+  hasClearSubject: boolean;
+  hasActionableInfo: boolean;
+}): number {
+  return (
+    (flags.hasLocation ? 0.25 : 0) +
+    (flags.hasDateTime ? 0.25 : 0) +
+    (flags.hasClearSubject ? 0.25 : 0) +
+    (flags.hasActionableInfo ? 0.25 : 0)
+  );
 }
 
 async function extractInfo(openai: OpenAI, combinedText: string, ctx: UsageCtx): Promise<ExtractedInfo> {
@@ -278,7 +302,10 @@ Respond in JSON:
   "keyFacts": ["Array of up to 5 key facts from the submission"],
   "sentiment": "positive | negative | neutral",
   "wordCount": number,
-  "completenessScore": number (0–1, how complete and publishable is this information)
+  "hasLocation": boolean (true if the submission mentions a specific place, venue, or area),
+  "hasDateTime": boolean (true if a date or time is mentioned, even approximately),
+  "hasClearSubject": boolean (true if it is clear who or what the story is about),
+  "hasActionableInfo": boolean (true if the submission contains something useful to the reader — an event to attend, a warning to act on, a result, a notice, etc.)
 }`,
       },
       { role: "user", content: combinedText },
@@ -287,7 +314,18 @@ Respond in JSON:
 
   logUsage(ctx, "gpt-4o-mini", "info_extract", response.usage ?? undefined);
   try {
-    return JSON.parse(response.choices[0].message.content ?? "{}") as ExtractedInfo;
+    const raw = JSON.parse(response.choices[0].message.content ?? "{}");
+    const flags = {
+      hasLocation:      Boolean(raw.hasLocation),
+      hasDateTime:      Boolean(raw.hasDateTime),
+      hasClearSubject:  Boolean(raw.hasClearSubject),
+      hasActionableInfo: Boolean(raw.hasActionableInfo),
+    };
+    return {
+      ...raw,
+      ...flags,
+      completenessScore: computeCompletenessScore(flags),
+    } as ExtractedInfo;
   } catch {
     return {
       headline: "Community Update",
@@ -296,7 +334,11 @@ Respond in JSON:
       keyFacts: [],
       sentiment: "neutral",
       wordCount: combinedText.split(" ").length,
-      completenessScore: 0.3,
+      hasLocation: false,
+      hasDateTime: false,
+      hasClearSubject: false,
+      hasActionableInfo: false,
+      completenessScore: 0,
     };
   }
 }
