@@ -375,7 +375,9 @@ export async function extractAndSaveEventForPost(postId: number): Promise<{ crea
   const existing = await db.select({ id: eventsTable.id }).from(eventsTable).where(eq(eventsTable.articleId, postId));
   if (existing.length > 0) return { created: false, reason: "Event already exists for this article" };
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const apiKey = (await getSettingValue("openai_api_key")) ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) return { created: false, reason: "OpenAI API key is not configured" };
+  const openai = new OpenAI({ apiKey });
   const ctx: UsageCtx = { jobId: 0, submissionId: postId };
   const details = await extractEventDetails(openai, post.body, ctx);
   if (!details) return { created: false, reason: "AI could not extract event details" };
