@@ -177,7 +177,7 @@ export default function Settings() {
       <div className="mt-8 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
         <p className="text-sm font-medium text-amber-900 mb-1">Admin password</p>
         <p className="text-xs text-amber-800">
-          Set the <code className="bg-amber-100 px-1 rounded">ADMIN_PASSWORD</code> environment variable in Replit Secrets to change the login password.
+          Set the <code className="bg-amber-100 px-1 rounded">ADMIN_PASSWORD</code> environment variable on the server to change the login password.
           Default is <code className="bg-amber-100 px-1 rounded">tallaght-admin</code>.
         </p>
       </div>
