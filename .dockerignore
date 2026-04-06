@@ -1,0 +1,5 @@
+*.md
+**/*.md
+.local/
+.git/
+node_modules/
