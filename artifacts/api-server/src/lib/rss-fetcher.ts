@@ -27,11 +27,12 @@ const DATE_SIGNALS = [
   /\bcoming\s+(soon|up|this)\b/i,
   /\bfrom\s+\d{1,2}[:.]\d{2}\b/i,
   /\bdoors\s+open\b/i,
+  /\btaking\s+place\b/i,
 ];
 
 const EVENT_SIGNALS = [
-  /\b(event|events|festival|gig|concert|show|exhibition|market|fair|launch|opening|sale|workshop|class|competition|ceremony|performance|screening|celebration|party|seminar|webinar)\b/i,
-  /\b(fun\s+day|open\s+day|pop[- ]up|come\s+along|join\s+us|don't\s+miss|book\s+now|get\s+your\s+tickets|limited\s+spaces|free\s+entry|on\s+the\s+night|taking\s+place|happening)\b/i,
+  /\b(event|events|festival|gig|concert|show|exhibition|market|fair|launch|opening|sale|workshop|class|competition|ceremony|performance|screening|celebration|party|seminar|webinar|live)\b/i,
+  /\b(kids?\s+event|fun\s+day|open\s+day|pop[- ]up|come\s+along|join\s+us|don't\s+miss|book\s+now|get\s+your\s+tickets|limited\s+spaces|free\s+entry|on\s+the\s+night|happening)\b/i,
 ];
 
 function isEventContent(title: string, content: string): boolean {
