@@ -1,0 +1,115 @@
+Connecting to GroupWatch VPS...
+root@185.43.233.219's password:
+Welcome to Ubuntu 24.04.2 LTS (GNU/Linux 6.8.0-106-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, you can run the 'unminimize' command.
+Last login: Mon Apr  6 00:10:13 2026 from 185.43.233.219
+root@server:~# ssh root@185.43.233.219
+cat /opt/groupwatch/deploy/nginx/nginx.conf
+root@185.43.233.219's password:
+Welcome to Ubuntu 24.04.2 LTS (GNU/Linux 6.8.0-106-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+This system has been minimized by removing packages and content that are
+not required on a system that users do not log into.
+
+To restore this content, you can run the 'unminimize' command.
+Last login: Mon Apr  6 10:17:13 2026 from 212.129.74.170
+root@server:~# cat /opt/groupwatch/deploy/nginx/nginx.conf
+server {
+    listen 80;
+    server_name groupwatchplatform.com www.groupwatchplatform.com;
+
+    # Upload size limit (10 MB for photo uploads)
+    client_max_body_size 10M;
+
+    # Gzip
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # Security headers (Cloudflare passes these through to the browser)
+    add_header X-Frame-Options        SAMEORIGIN                          always;
+    add_header X-Content-Type-Options nosniff                             always;
+    add_header Referrer-Policy        strict-origin-when-cross-origin     always;
+
+    # Restore real visitor IP from Cloudflare
+    real_ip_header    CF-Connecting-IP;
+
+    location / {
+        proxy_pass         http://app:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        "upgrade";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $http_cf_connecting_ip;
+        proxy_set_header   X-Forwarded-For   $http_cf_connecting_ip;
+        # Forward Cloudflare's proto header — "https" when through Cloudflare,
+        # empty when connecting directly. Express uses this to set Secure cookies.
+        proxy_set_header   X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_read_timeout 60s;
+    }
+}
+
+server {
+    listen 80;
+    server_name whatsuptallaght.ie www.whatsuptallaght.ie;
+
+    client_max_body_size 15M;
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    add_header X-Frame-Options        SAMEORIGIN                      always;
+    add_header X-Content-Type-Options nosniff                         always;
+    add_header Referrer-Policy        strict-origin-when-cross-origin always;
+
+    real_ip_header CF-Connecting-IP;
+
+    location / {
+        proxy_pass         http://172.17.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $http_cf_connecting_ip;
+        proxy_set_header   X-Forwarded-For   $http_cf_connecting_ip;
+        proxy_set_header   X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_read_timeout 120s;
+    }
+}
+
+root@server:~# docker exec groupwatch-nginx-1 cat /var/log/nginx/access.log | tail -20
+^C
+root@server:~# curl -s -H "Host: whatsuptallaght.ie" http://localhost/ | head -10
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>GroupWatch Platform</title>
+    <meta name="description" content="GroupWatch gives community groups a simple, offline-ready app to report incidents, build evidence, and take action." />
+    <meta name="google-site-verification" content="VXVilOw1vVbi-kz0YlT6KW8DvlHu0d9aVoGll_o2Vr4" />
+
+    <!-- Open Graph / Facebook -->
+root@server:~# curl -s http://172.17.0.1:8081/ | head -10
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Tallaght Community — Local News & Stories</title>
+    <meta name="description" content="Local news, events, and stories from Tallaght, Dublin. Submitted by the community, for the community." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tallaght Community" />
+    <meta property="og:title" content="Tallaght Community — Local News & Stories" />
+root@server:~#
