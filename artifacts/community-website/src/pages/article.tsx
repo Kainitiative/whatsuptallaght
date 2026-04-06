@@ -124,16 +124,27 @@ export default function Article() {
 
   return (
     <article className="w-full pb-20 bg-white">
-      {/* Header Image — wide cinematic banner, no stretching */}
-      <div className="w-full overflow-hidden bg-muted relative" style={{ aspectRatio: "21/7" }}>
+      {/* Header Image — wide cinematic banner.
+           Blurred backdrop fills the 21:7 frame for any image shape (square logos,
+           portrait crests, landscape photos) without cropping or stretching. */}
+      <div className="w-full overflow-hidden bg-black relative" style={{ aspectRatio: "21/7" }}>
+        {/* Blurred fill layer — scaled up so no gaps at edges */}
+        <img
+          src={headerImageUrl}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl brightness-50 pointer-events-none select-none"
+          style={{ display: "block" }}
+        />
+        {/* Main image — contained so logos/crests aren't cropped */}
         <img 
           src={headerImageUrl} 
           alt={post.title}
-          className="w-full h-full object-cover object-center"
+          className="relative w-full h-full object-contain object-center z-10"
           style={{ display: "block" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
-        <div className="absolute bottom-0 left-0 w-full p-6 md:p-10">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent z-20" />
+        <div className="absolute bottom-0 left-0 w-full p-6 md:p-10 z-30">
           <div className="container mx-auto max-w-4xl">
             <Badge className={`${badgeStyle} mb-4 text-sm px-3 py-1 font-semibold border-0 shadow-sm`} variant="outline">
               {category?.name || "News"}
