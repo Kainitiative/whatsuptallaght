@@ -58,7 +58,7 @@ export default function Login() {
         <p className="mt-6 text-xs text-muted-foreground text-center">
           Default password: <code className="bg-gray-100 px-1 py-0.5 rounded">tallaght-admin</code>
           <br />
-          Set <code className="bg-gray-100 px-1 py-0.5 rounded">ADMIN_PASSWORD</code> in Replit Secrets to change it.
+          Set <code className="bg-gray-100 px-1 py-0.5 rounded">ADMIN_PASSWORD</code> on the server to change it.
         </p>
       </div>
     </div>
