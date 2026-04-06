@@ -457,15 +457,20 @@ async function maybeCreateEventRecord(
   openai: OpenAI,
   ctx: UsageCtx,
   infoEventDate: string | null,
+  hasDateTime = false,
 ): Promise<void> {
-  if (tone !== "event") return;
+  // Run if classified as event, OR if any other tone but the submission contains a date/time.
+  // This catches "community" articles that are actually about events (e.g. "Community Fair this Saturday").
+  const isEventTone = tone === "event";
+  const mightBeEvent = hasDateTime && infoEventDate !== null;
+  if (!isEventTone && !mightBeEvent) return;
 
   const details = await extractEventDetails(openai, combinedText, ctx);
   if (!details) return;
 
   const eventDate = details.eventDate ?? infoEventDate;
   if (!eventDate) {
-    logger.warn({ postId }, "AI pipeline: event detected but no date found — skipping event record");
+    logger.info({ postId, tone }, "AI pipeline: submission has a date but no event date could be extracted — skipping event record");
     return;
   }
 
@@ -1115,7 +1120,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     .set({ status: "processed", updatedAt: new Date() })
     .where(eq(submissionsTable.id, submissionId));
 
-  // --- Create event record if tone === "event" ---
+  // --- Create event record (tone === "event" OR any tone with a date mentioned) ---
   await maybeCreateEventRecord(
     newPost.id,
     infoResult.headline,
@@ -1124,6 +1129,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     openai,
     ctx,
     infoResult.eventDate,
+    infoResult.hasDateTime,
   ).catch((err) => logger.warn({ err, postId: newPost.id }, "AI pipeline: event record creation failed (non-fatal)"));
 
   logger.info({ submissionId, postId: newPost.id, status: postStatus }, "AI pipeline: complete");
@@ -1348,6 +1354,7 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     openai,
     ctx,
     infoResult.eventDate,
+    infoResult.hasDateTime,
   ).catch((err) => logger.warn({ err, postId: newPost.id }, "RSS pipeline: event record creation failed (non-fatal)"));
 
   // --- Generate social captions + post to Facebook (auto-published RSS) ---
