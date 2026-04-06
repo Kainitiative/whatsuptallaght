@@ -58,11 +58,18 @@ export function ArticleCard({
     return (
       <Link href={`/article/${post.slug}`}>
         <Card className="overflow-hidden border-0 shadow-md hover-elevate transition-all duration-300 group cursor-pointer bg-card h-full flex flex-col md:flex-row" data-testid={`card-post-featured-${post.id}`}>
-          <div className="w-full md:w-2/3 h-64 md:h-auto relative overflow-hidden bg-muted">
+          <div className="w-full md:w-2/3 h-64 md:h-80 relative overflow-hidden bg-black">
+            {/* Blurred backdrop so square logos/crests don't push the card height */}
+            <img
+              src={imageUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl brightness-50 pointer-events-none select-none"
+            />
             <img 
               src={imageUrl} 
               alt={post.title} 
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              className="relative w-full h-full object-contain transition-transform duration-700 group-hover:scale-105 z-10"
             />
             <div className="absolute top-4 left-4 z-10">
               <Badge className={`${badgeStyle} shadow-sm border-0 font-medium px-3 py-1 text-xs`} variant="outline">
