@@ -292,6 +292,8 @@ router.patch("/posts/:id", async (req, res) => {
             slug: post.slug,
             excerpt: post.excerpt,
             overrideMessage: facebookCaption,
+            headerImageUrl: post.headerImageUrl,
+            bodyImages: post.bodyImages,
           });
         } catch {
           // Non-fatal — never block the response
