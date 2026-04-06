@@ -1,8 +1,39 @@
 import { Button } from "@/components/ui/button";
-import { MessageCircle, CheckCircle2, Users, Newspaper, ShieldCheck } from "lucide-react";
+import { MessageCircle, CheckCircle2, ShieldCheck, Newspaper } from "lucide-react";
 import { CategoryFilter } from "@/components/category-filter";
+import { useQuery } from "@tanstack/react-query";
+
+interface PublicConfig {
+  whatsappNumber: string | null;
+  platformName: string;
+  platformUrl: string | null;
+}
+
+function toWaNumber(displayNumber: string): string {
+  const digits = displayNumber.replace(/\D/g, "");
+  if (digits.startsWith("00")) return digits.slice(2);
+  if (digits.startsWith("0") && digits.length <= 11) return "353" + digits.slice(1);
+  return digits;
+}
+
+async function fetchPublicConfig(): Promise<PublicConfig> {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const res = await fetch(`${base}/api/public/config`);
+  if (!res.ok) throw new Error("Failed to fetch config");
+  return res.json();
+}
 
 export default function About() {
+  const { data: config } = useQuery<PublicConfig>({
+    queryKey: ["public-config"],
+    queryFn: fetchPublicConfig,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const displayNumber = config?.whatsappNumber ?? null;
+  const waNumber = displayNumber ? toWaNumber(displayNumber) : null;
+  const waUrl = waNumber ? `https://wa.me/${waNumber}` : null;
+
   return (
     <div className="w-full flex flex-col bg-background pb-20">
       <CategoryFilter />
@@ -18,12 +49,19 @@ export default function About() {
             Tallaght Platform is a new kind of local news. No journalists, no paywalls. Just local people sharing what's happening right now in our neighbourhoods.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a href="https://wa.me/353871234567" target="_blank" rel="noreferrer">
-              <Button size="lg" className="bg-secondary hover:bg-secondary/90 text-white rounded-full font-bold h-14 px-8 text-lg w-full sm:w-auto shadow-md hover-elevate">
+            {waUrl ? (
+              <a href={waUrl} target="_blank" rel="noreferrer">
+                <Button size="lg" className="bg-secondary hover:bg-secondary/90 text-white rounded-full font-bold h-14 px-8 text-lg w-full sm:w-auto shadow-md hover-elevate">
+                  <MessageCircle className="w-5 h-5 mr-3" />
+                  Submit via WhatsApp
+                </Button>
+              </a>
+            ) : (
+              <Button size="lg" disabled className="rounded-full font-bold h-14 px-8 text-lg w-full sm:w-auto">
                 <MessageCircle className="w-5 h-5 mr-3" />
                 Submit via WhatsApp
               </Button>
-            </a>
+            )}
           </div>
         </div>
       </section>
@@ -34,7 +72,6 @@ export default function About() {
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-foreground">How it works</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-            {/* Connecting line for desktop */}
             <div className="hidden md:block absolute top-12 left-1/6 right-1/6 h-0.5 bg-border z-0"></div>
             
             <div className="relative z-10 flex flex-col items-center text-center bg-background">
@@ -43,7 +80,8 @@ export default function About() {
               </div>
               <h3 className="text-2xl font-bold mb-4">1. Send a message</h3>
               <p className="text-muted-foreground text-lg">
-                See something happening? Got an event? Send a quick WhatsApp message with a photo or voice note to <span className="font-bold text-foreground">087 123 4567</span>.
+                See something happening? Got an event? Send a quick WhatsApp message with a photo or voice note
+                {displayNumber ? <> to <span className="font-bold text-foreground">{displayNumber}</span>.</> : "."}
               </p>
             </div>
             
@@ -117,13 +155,19 @@ export default function About() {
                 Add our number to your contacts and send us a message on WhatsApp. We accept photos, videos, text, and voice notes.
               </p>
               <div className="bg-muted p-4 rounded-xl w-full mb-8 font-mono text-2xl font-bold tracking-widest text-foreground">
-                087 123 4567
+                {displayNumber ?? "—"}
               </div>
-              <a href="https://wa.me/353871234567" target="_blank" rel="noreferrer" className="w-full">
-                <Button size="lg" className="w-full bg-[#25D366] hover:bg-[#20B954] text-white rounded-full font-bold h-14 text-lg shadow-sm hover-elevate">
+              {waUrl ? (
+                <a href={waUrl} target="_blank" rel="noreferrer" className="w-full">
+                  <Button size="lg" className="w-full bg-[#25D366] hover:bg-[#20B954] text-white rounded-full font-bold h-14 text-lg shadow-sm hover-elevate">
+                    Open WhatsApp
+                  </Button>
+                </a>
+              ) : (
+                <Button size="lg" disabled className="w-full rounded-full font-bold h-14 text-lg">
                   Open WhatsApp
                 </Button>
-              </a>
+              )}
             </div>
           </div>
         </div>
