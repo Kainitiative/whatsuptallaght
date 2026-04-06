@@ -29,3 +29,9 @@ id = "OESh0ppvIhUNpwjyEN8Vv"
 uri = "file://PLATFORM_OVERVIEW.md"
 type = "text"
 title = "Tallaght Community Platform — Full Overview (updated)"
+
+[[outputs]]
+id = "YnpkShE_UuGVLrb-t8hFw"
+uri = "file://WUT-Platform-Overview.md"
+type = "text"
+title = "What's Up Tallaght — Platform Overview"
