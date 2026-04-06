@@ -314,7 +314,7 @@ router.patch("/posts/:id", async (req, res) => {
             .where(eq(contributorsTable.id, submission.contributorId));
 
           if (contributor?.phoneNumber) {
-            const siteUrl = (await getSettingValue("site_url")) ?? "https://tallaghtcommunity.ie";
+            const siteUrl = (await getSettingValue("platform_url")) ?? "https://whatsuptallaght.ie";
             const articleUrl = `${siteUrl}/article/${post.slug}`;
             await sendTextMessage(
               contributor.phoneNumber,
