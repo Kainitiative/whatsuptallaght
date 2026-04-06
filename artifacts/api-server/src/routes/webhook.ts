@@ -230,7 +230,7 @@ async function handleIncomingMessage(
     }
 
     // --- New contributor or pending — hold submission and request consent ---
-    const siteUrl = (await getSettingValue("site_url")) ?? "https://tallaghtcommunity.ie";
+    const siteUrl = (await getSettingValue("platform_url")) ?? "https://whatsuptallaght.ie";
 
     const mediaIds: string[] = [];
     if (message.image?.id) mediaIds.push(message.image.id);

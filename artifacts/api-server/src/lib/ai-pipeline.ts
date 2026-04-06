@@ -959,7 +959,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
 
   // --- Notify the submitter ---
   if (postStatus === "published") {
-    const siteUrl = (await getSettingValue("site_url")) ?? "https://tallaghtcommunity.ie";
+    const siteUrl = (await getSettingValue("platform_url")) ?? "https://whatsuptallaght.ie";
     const articleUrl = `${siteUrl}/article/${newPost.slug}`;
     await sendTextMessage(
       phoneNumber,
