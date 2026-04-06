@@ -634,11 +634,25 @@ async function writeArticle(
           .join("\n\n")
       : "";
 
+  const toneGuide: Record<string, string> = {
+    community: "Tone: neutral and helpful. Informative without being dramatic. Friendly but factual.",
+    event:     "Tone: informative. Clearly communicate what's happening, when, where, and who it's for. No hype.",
+    sport:     "Tone: controlled energy. Enthusiastic but grounded — reflect the result or activity without over-celebrating or over-dramatising.",
+    warning:   "Tone: clear and urgent. Lead with the essential information. Short sentences. No softening language.",
+    memorial:  "Tone: respectful and minimal. Dignified, simple, no filler. Let the facts speak — avoid flowery or emotional language.",
+    news:      "Tone: neutral and factual. Report what happened. No editorial opinion.",
+    business:  "Tone: professional but accessible. Factual, concise, community-focused.",
+    other:     "Tone: neutral, clear, and factual.",
+  };
+  const toneInstruction = toneGuide[tone.tone] ?? toneGuide.other;
+
   const systemPrompt = [
     "You are an editor for Tallaght Community, a local news platform for Tallaght, Dublin, Ireland.",
     "Your job is to rewrite community submissions into clean, readable news articles.",
     "",
     "VOICE: Tallaght Community writes like a local person sharing real updates — clear, simple, and grounded. It should feel like something you'd read on Facebook or hear from a neighbour.",
+    "",
+    `TONE FOR THIS ARTICLE: ${toneInstruction}`,
     "",
     "STRICT RULES — follow these exactly:",
     "",
