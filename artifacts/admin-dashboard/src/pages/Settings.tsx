@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getSettings, updateSetting, clearSetting, type Setting } from "@/lib/api";
+import { getSettings, updateSetting, clearSetting, checkFacebookStatus, type Setting, type FacebookStatus } from "@/lib/api";
 
 const CATEGORY_LABELS: Record<string, string> = {
   openai: "OpenAI",
@@ -15,6 +15,8 @@ export default function Settings() {
   const [value, setValue] = useState("");
   const [working, setWorking] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [fbTest, setFbTest] = useState<FacebookStatus | null>(null);
+  const [fbTesting, setFbTesting] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -44,6 +46,19 @@ export default function Settings() {
       showToast(`✅ ${updated.label ?? key} saved`);
     } finally {
       setWorking(null);
+    }
+  }
+
+  async function handleTestFacebook() {
+    setFbTesting(true);
+    setFbTest(null);
+    try {
+      const result = await checkFacebookStatus();
+      setFbTest(result);
+    } catch {
+      setFbTest({ ok: false, reason: "check_failed" });
+    } finally {
+      setFbTesting(false);
     }
   }
 
@@ -115,6 +130,15 @@ export default function Settings() {
                         {setting.isConfigured ? (
                           <>
                             <span className="text-xs text-green-600 font-medium">✅ Configured</span>
+                            {setting.key === "facebook_page_access_token" && (
+                              <button
+                                onClick={handleTestFacebook}
+                                disabled={fbTesting}
+                                className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                              >
+                                {fbTesting ? "Testing…" : "Test"}
+                              </button>
+                            )}
                             <button
                               onClick={() => { setEditing(setting.key); setValue(""); }}
                               className="text-xs text-primary hover:underline"
@@ -164,6 +188,34 @@ export default function Settings() {
                         >
                           Cancel
                         </button>
+                      </div>
+                    )}
+
+                    {/* Facebook token test result */}
+                    {setting.key === "facebook_page_access_token" && fbTest && (
+                      <div className={`mt-3 px-3 py-2.5 rounded-lg text-xs border ${fbTest.ok ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                        {fbTest.ok ? (
+                          <>
+                            <p className="font-semibold">✅ Connected successfully</p>
+                            {fbTest.tokenIdentity && (
+                              <p className="mt-0.5">Page: <strong>{fbTest.tokenIdentity.name}</strong> (ID: {fbTest.tokenIdentity.id})</p>
+                            )}
+                            {fbTest.permissions && (
+                              <p className="mt-0.5">Permissions: {fbTest.permissions.join(", ")}</p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-semibold">❌ Connection failed</p>
+                            <p className="mt-0.5">
+                              {fbTest.graphError
+                                ? `${fbTest.graphError.message} (code ${fbTest.graphError.code})`
+                                : fbTest.reason === "not_configured"
+                                  ? "Page ID or token not set."
+                                  : "Token is invalid or has been revoked. Paste a fresh token above."}
+                            </p>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
