@@ -38,6 +38,10 @@ async function resolvePageToken(pageId: string, storedToken: string): Promise<st
  * Fire-and-forget safe — all errors are caught and logged, never thrown.
  * Returns the Facebook post ID on success, null otherwise.
  */
+export type FacebookPostResult =
+  | { postId: string; errorDetail?: never }
+  | { postId: null; errorDetail: string };
+
 export async function postToFacebookPage(post: {
   title: string;
   slug: string;
@@ -45,7 +49,7 @@ export async function postToFacebookPage(post: {
   overrideMessage?: string;
   headerImageUrl?: string | null;
   bodyImages?: string[] | null;
-}): Promise<string | null> {
+}): Promise<FacebookPostResult> {
   try {
     const [pageId, storedToken, platformUrl] = await Promise.all([
       getSettingValue("facebook_page_id"),
@@ -55,13 +59,13 @@ export async function postToFacebookPage(post: {
 
     if (!pageId || !storedToken) {
       logger.info("Facebook posting skipped — page ID or token not configured");
-      return null;
+      return { postId: null, errorDetail: "Facebook page ID or access token not configured in Settings." };
     }
 
     const pageToken = await resolvePageToken(pageId, storedToken);
     if (!pageToken) {
       logger.warn({ pageId }, "Facebook posting skipped — could not resolve Page token");
-      return null;
+      return { postId: null, errorDetail: "Could not resolve a Page Access Token from the stored token." };
     }
 
     const base = (platformUrl ?? "https://whatsuptallaght.ie").replace(/\/$/, "");
@@ -98,12 +102,12 @@ export async function postToFacebookPage(post: {
         }),
       });
 
-      const photoResult = await photoRes.json() as { id?: string; post_id?: string; error?: { message: string; code: number; fbtrace_id?: string } };
+      const photoResult = await photoRes.json() as { id?: string; post_id?: string; error?: { message: string; code: number; type?: string; fbtrace_id?: string } };
 
       if (photoRes.ok && !photoResult.error) {
         const fbId = photoResult.post_id ?? photoResult.id ?? null;
         logger.info({ facebookPostId: fbId, slug: post.slug, imageUrl }, "Article posted to Facebook (photo post)");
-        return fbId;
+        return { postId: fbId! };
       }
 
       logger.warn(
@@ -123,20 +127,22 @@ export async function postToFacebookPage(post: {
       }),
     });
 
-    const feedResult = await feedRes.json() as { id?: string; error?: { message: string; code: number; fbtrace_id?: string } };
+    const feedResult = await feedRes.json() as { id?: string; error?: { message: string; code: number; type?: string; fbtrace_id?: string } };
 
     if (!feedRes.ok || feedResult.error) {
-      logger.warn(
-        { facebookError: feedResult.error, status: feedRes.status, slug: post.slug },
-        "Facebook link post failed"
-      );
-      return null;
+      const fbErr = feedResult.error;
+      const detail = fbErr
+        ? `Facebook API error (code ${fbErr.code}): ${fbErr.message}`
+        : `Facebook returned HTTP ${feedRes.status}`;
+      logger.warn({ facebookError: fbErr, status: feedRes.status, slug: post.slug }, "Facebook link post failed");
+      return { postId: null, errorDetail: detail };
     }
 
     logger.info({ facebookPostId: feedResult.id, slug: post.slug }, "Article posted to Facebook (link post)");
-    return feedResult.id ?? null;
+    return { postId: feedResult.id ?? null };
   } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
     logger.warn({ err }, "Facebook posting: unexpected error (non-fatal)");
-    return null;
+    return { postId: null, errorDetail: `Unexpected error: ${detail}` };
   }
 }
