@@ -453,6 +453,31 @@ async function maybeCreateEventRecord(
 // Stage 6b — Header image generation (DALL·E 3, optional)
 // ---------------------------------------------------------------------------
 
+// Generic words that are useless for image topic matching
+const IMAGE_STOP_WORDS = new Set([
+  "community","local","tallaght","dublin","ireland","member","members",
+  "resident","residents","area","news","update","updates","latest","new",
+  "this","that","from","with","for","and","the","has","have","been",
+  "their","which","about","after","amid","also","says","shares","shared",
+  "sharing","first","last","week","month","year","day","today","tonight",
+  "people","person","told","said","report","reported","annual","other",
+  "more","some","many","most","very","well","good","great","best","next",
+  "over","into","onto","upon","will","would","could","should","does","made",
+  "make","take","gets","gets","gives","came","come","goes","gone","went",
+]);
+
+/**
+ * Extract specific topic keywords from a headline for image asset matching.
+ * Filters out generic stop words so only meaningful subject words remain.
+ */
+function extractTopicKeywords(headline: string): string[] {
+  return headline
+    .toLowerCase()
+    .split(/\W+/)
+    .filter(w => w.length >= 4 && !IMAGE_STOP_WORDS.has(w))
+    .slice(0, 8);
+}
+
 function buildDallePrompt(headline: string, keyFacts: string[], tone: string): string {
   const facts = keyFacts.slice(0, 3).filter(Boolean).join(", ");
   const styleByTone: Record<string, string> = {
@@ -536,18 +561,27 @@ async function findOrCreateHeaderAsset(
   tone: string,
   ctx: UsageCtx,
 ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
+  // Extract specific topic keywords from the headline (e.g. "fishing", "erne", "angling")
+  // NOT from keyFacts sentences which contain generic words like "community" that cause false matches
+  const topicKeywords = extractTopicKeywords(headline);
+
   // Search existing assets with matching tone
   const candidates = await db
     .select()
     .from(headerImageAssetsTable)
     .where(eq(headerImageAssetsTable.tone, tone));
 
-  // Find one with keyword overlap and under the reuse cap
-  const keywords = keyFacts.map((k) => k.toLowerCase());
+  // Only reuse if there are specific topic keywords AND at least 2 of them overlap with the asset's keywords.
+  // This prevents a "fishing" article from reusing a "shopping street" image just because both
+  // have the generic word "community" in their keyFacts.
   const match = candidates.find((asset) => {
     if (asset.usageCount >= MAX_ASSET_REUSE) return false;
+    if (topicKeywords.length === 0) return false; // no specific topic — always generate fresh
     const assetKws = (asset.keywords ?? []).map((k: string) => k.toLowerCase());
-    return keywords.some((k) => assetKws.some((ak) => ak.includes(k) || k.includes(ak)));
+    const overlapCount = topicKeywords.filter((k) =>
+      assetKws.some((ak) => ak === k || ak.includes(k) || k.includes(ak)),
+    ).length;
+    return overlapCount >= 2; // require at least 2 specific matching words
   });
 
   if (match) {
@@ -555,7 +589,7 @@ async function findOrCreateHeaderAsset(
       .update(headerImageAssetsTable)
       .set({ usageCount: match.usageCount + 1 })
       .where(eq(headerImageAssetsTable.id, match.id));
-    logger.info({ submissionId: ctx.submissionId, assetId: match.id }, "AI pipeline: reusing header image from library");
+    logger.info({ submissionId: ctx.submissionId, assetId: match.id, topicKeywords }, "AI pipeline: reusing header image from library");
     return { imageUrl: match.imageUrl, imagePrompt: match.prompt };
   }
 
@@ -563,12 +597,13 @@ async function findOrCreateHeaderAsset(
   const generated = await generateHeaderImage(openai, headline, keyFacts, tone, ctx);
   if (!generated) return null;
 
+  // Store specific topic keywords (not full keyFacts sentences) so future matching is precise
   await db
     .insert(headerImageAssetsTable)
     .values({
       imageUrl: generated.imageUrl,
       tone,
-      keywords: keyFacts.slice(0, 6),
+      keywords: topicKeywords.length > 0 ? topicKeywords : keyFacts.slice(0, 6),
       prompt: generated.imagePrompt,
       usageCount: 1,
     })
