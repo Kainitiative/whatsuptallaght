@@ -528,21 +528,27 @@ function extractTopicKeywords(headline: string): string[] {
 function buildDallePrompt(headline: string, keyFacts: string[], tone: string, entityContext?: string | null): string {
   const facts = keyFacts.slice(0, 3).filter(Boolean).join(", ");
 
-  // Photorealistic camera/lighting specs per tone
+  // Photorealistic camera/lighting specs per tone.
+  // Deliberately avoid scene types that produce signs/banners (stadium hoardings, scoreboards,
+  // protest placards) — DALL-E renders text on these as garbled nonsense.
   const styleByTone: Record<string, string> = {
-    news:      "photorealistic editorial press photograph, 35mm lens, f/4 aperture, overcast natural daylight, documentary style, candid moment",
-    event:     "photorealistic event photograph, wide-angle lens, vibrant natural light, authentic crowd atmosphere, professional press photography",
-    sport:     "photorealistic sports action photograph, telephoto lens, fast shutter speed, shallow depth of field, outdoor pitch or stadium, dynamic composition",
-    community: "photorealistic community documentary photograph, 50mm lens, warm natural light, genuine authentic moment, neighbourhood setting",
-    business:  "photorealistic commercial photograph, professional natural lighting, 35mm lens, clean composition, local business environment",
-    warning:   "photorealistic documentary photograph, overcast sky, desaturated colour grading, journalistic style, reportage photography",
-    memorial:  "photorealistic respectful photograph, soft diffused natural light, 50mm lens, quiet dignified scene, muted tones",
-    other:     "photorealistic news photograph, 50mm lens, natural lighting, editorial documentary style",
+    news:      "photorealistic editorial press photograph, 35mm lens, f/4 aperture, overcast natural daylight, documentary style, candid moment — focus on people and environment, no constructed signage in frame",
+    event:     "photorealistic event photograph, wide-angle lens, vibrant natural light, authentic crowd atmosphere, professional press photography — capture faces and movement, no banners or signs in foreground",
+    sport:     "photorealistic sports action photograph, telephoto lens, fast shutter speed, shallow depth of field, players on open grass pitch, dynamic composition — tight crop on athletic action, no hoardings or advertising boards visible",
+    community: "photorealistic community documentary photograph, 50mm lens, warm natural light, genuine authentic moment, neighbourhood setting — architecture and people, no close-up signage",
+    business:  "photorealistic commercial photograph, professional natural lighting, 35mm lens, clean composition, local business environment — exterior or interior without visible signage or text on surfaces",
+    warning:   "photorealistic documentary photograph, overcast sky, desaturated colour grading, journalistic style, reportage photography — environmental wide shot, no text-bearing objects in focus",
+    memorial:  "photorealistic respectful photograph, soft diffused natural light, 50mm lens, quiet dignified scene, muted tones — flowers, candles, gathering people, no written text elements",
+    other:     "photorealistic news photograph, 50mm lens, natural lighting, editorial documentary style — clean scene without signs or text",
   };
   const style = styleByTone[tone] ?? styleByTone.other;
-  const factsClause = facts ? ` Scene relates to: ${facts}.` : "";
-  const entityClause = entityContext ? ` Visual context: ${entityContext}` : "";
-  return `${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland. No text overlays, no watermarks, no readable signs, no identifiable real faces. Shot on professional camera, high resolution, sharp focus.`;
+  const factsClause = facts ? ` Scene context: ${facts}.` : "";
+  const entityClause = entityContext ? ` Visual detail: ${entityContext}` : "";
+
+  // The no-text rule is stated three different ways and placed FIRST so DALL-E weights it heavily.
+  const noText = "CRITICAL RULES — strictly no text, writing, letters, words, numbers, legible signs, banners, placards, scoreboards, advertising hoardings, or logos anywhere in the image. If any text would naturally appear (shirt numbers excepted), replace it with abstract pattern or blur it out of focus.";
+
+  return `${noText} ${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland. No watermarks. No identifiable real faces. Shot on professional camera, high resolution, sharp focus, cinematic depth.`;
 }
 
 /**
@@ -563,17 +569,19 @@ async function researchEntityContext(
       messages: [
         {
           role: "system",
-          content: `You are a visual research assistant for a news image generator.
+          content: `You are a visual research assistant for a news image generator powered by DALL-E 3.
 
 Given a headline and facts, identify any specific real-world entities (sports clubs, organisations, venues, events, Irish landmarks).
-For each recognised entity, provide brief VISUAL details to help generate an accurate image:
-- Sports clubs: kit colours, home kit style (e.g. "red and white vertical stripes")
-- Venues: appearance, surface type, capacity feel
-- Organisations: brand colours, typical visual setting
+For each recognised entity, provide brief VISUAL details to help generate an accurate photorealistic image:
+- Sports clubs: kit colours and style only (e.g. "hooped green and white jerseys, dark shorts")
+- Venues: surface type, rough size/feel, architecture style — NO named stands or signage
+- Organisations: brand colour palette, typical physical setting without branded signage
 
-Rules:
-- Only include details you are CONFIDENT are accurate from your training data.
-- Do NOT invent or guess. If you are not sure, say nothing about that entity.
+CRITICAL CONSTRAINTS for DALL-E compatibility:
+- Never suggest scenes that would contain text, signs, banners, hoardings, scoreboards, or logos
+- Focus on colours, materials, textures, and body language — not readable identifiers
+- Describe WHAT things look like, not what they say
+- Only include details you are CONFIDENT are accurate. Do not invent or guess.
 - Return 1–2 sentences of visual detail only. No explanations.
 - If no specific real-world entities are identifiable, return an empty string.`,
         },
