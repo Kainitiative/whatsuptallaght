@@ -99,17 +99,18 @@ export interface RssFeed {
   checkIntervalMinutes: number;
   lastFetchedAt: string | null;
   createdAt: string;
+  filterMode: string | null;
 }
 
 export async function getRssFeeds() {
   return request<RssFeed[]>("/rss/feeds");
 }
 
-export async function createRssFeed(data: { name: string; url: string; checkIntervalMinutes?: number }) {
+export async function createRssFeed(data: { name: string; url: string; checkIntervalMinutes?: number; filterMode?: string | null }) {
   return request<RssFeed>("/rss/feeds", { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function updateRssFeed(id: number, data: Partial<Pick<RssFeed, "name" | "url" | "isActive" | "checkIntervalMinutes">>) {
+export async function updateRssFeed(id: number, data: Partial<Pick<RssFeed, "name" | "url" | "isActive" | "checkIntervalMinutes" | "filterMode">>) {
   return request<RssFeed>(`/rss/feeds/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
