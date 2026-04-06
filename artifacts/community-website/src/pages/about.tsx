@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { MessageCircle, CheckCircle2, ShieldCheck, Newspaper } from "lucide-react";
 import { CategoryFilter } from "@/components/category-filter";
 import { useQuery } from "@tanstack/react-query";
+import { QRCodeSVG } from "qrcode.react";
 
 interface PublicConfig {
   whatsappNumber: string | null;
@@ -147,19 +148,30 @@ export default function About() {
             </div>
             
             <div className="bg-card p-8 md:p-10 rounded-2xl shadow-sm border border-border flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-[#25D366]/10 text-[#25D366] rounded-full flex items-center justify-center mb-6">
-                <MessageCircle className="w-10 h-10" />
-              </div>
-              <h3 className="text-2xl font-bold mb-4">Ready to share?</h3>
-              <p className="text-muted-foreground mb-8 text-lg">
-                Add our number to your contacts and send us a message on WhatsApp. We accept photos, videos, text, and voice notes.
+              <h3 className="text-2xl font-bold mb-3">Ready to share?</h3>
+              <p className="text-muted-foreground mb-6 text-base">
+                Scan the QR code or tap the button below. We accept photos, videos, text, and voice notes.
               </p>
-              <div className="bg-muted p-4 rounded-xl w-full mb-8 font-mono text-2xl font-bold tracking-widest text-foreground">
+
+              {/* QR Code */}
+              <div className="bg-white rounded-2xl p-4 shadow-md mb-4">
+                {waUrl ? (
+                  <QRCodeSVG value={waUrl} size={160} marginSize={1} fgColor="#128C7E" />
+                ) : (
+                  <div className="w-40 h-40 bg-muted rounded-xl flex items-center justify-center">
+                    <MessageCircle className="w-10 h-10 text-muted-foreground/40" />
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-muted p-3 rounded-xl w-full mb-6 font-mono text-xl font-bold tracking-widest text-foreground">
                 {displayNumber ?? "—"}
               </div>
+
               {waUrl ? (
                 <a href={waUrl} target="_blank" rel="noreferrer" className="w-full">
                   <Button size="lg" className="w-full bg-[#25D366] hover:bg-[#20B954] text-white rounded-full font-bold h-14 text-lg shadow-sm hover-elevate">
+                    <MessageCircle className="w-5 h-5 mr-2" />
                     Open WhatsApp
                   </Button>
                 </a>
