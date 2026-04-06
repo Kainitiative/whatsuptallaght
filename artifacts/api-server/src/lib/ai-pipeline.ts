@@ -989,6 +989,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
           slug: newPost.slug,
           excerpt: newPost.excerpt,
           overrideMessage: captions?.captionFacebook ?? undefined,
+          headerImageUrl: newPost.headerImageUrl,
+          bodyImages: newPost.bodyImages,
         });
       } catch { /* non-fatal */ }
     })();
@@ -1202,6 +1204,8 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
           slug: newPost.slug,
           excerpt: newPost.excerpt,
           overrideMessage: captions?.captionFacebook ?? undefined,
+          headerImageUrl: newPost.headerImageUrl,
+          bodyImages: newPost.bodyImages,
         });
       } catch { /* non-fatal */ }
     })();
