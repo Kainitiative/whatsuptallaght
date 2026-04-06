@@ -177,7 +177,13 @@ router.post("/admin/social/captions/:postId/post-facebook", async (req, res) => 
 
   try {
     const [post] = await db
-      .select({ title: postsTable.title, slug: postsTable.slug, excerpt: postsTable.excerpt })
+      .select({
+        title: postsTable.title,
+        slug: postsTable.slug,
+        excerpt: postsTable.excerpt,
+        headerImageUrl: postsTable.headerImageUrl,
+        bodyImages: postsTable.bodyImages,
+      })
       .from(postsTable)
       .where(eq(postsTable.id, postId))
       .limit(1);
@@ -190,15 +196,20 @@ router.post("/admin/social/captions/:postId/post-facebook", async (req, res) => 
       .where(eq(socialCaptionsTable.postId, postId))
       .limit(1);
 
-    const facebookPostId = await postToFacebookPage({
+    const result = await postToFacebookPage({
       title: post.title,
       slug: post.slug,
       excerpt: post.excerpt,
       overrideMessage: captions?.captionFacebook ?? undefined,
+      headerImageUrl: post.headerImageUrl,
+      bodyImages: post.bodyImages,
     });
 
-    if (!facebookPostId) {
-      return res.status(500).json({ error: "post_failed", message: "Facebook posting failed — check server logs" });
+    if (!result.postId) {
+      return res.status(500).json({
+        error: "post_failed",
+        message: result.errorDetail ?? "Facebook posting failed — check server logs",
+      });
     }
 
     // Mark as posted
@@ -209,7 +220,7 @@ router.post("/admin/social/captions/:postId/post-facebook", async (req, res) => 
         .where(eq(socialCaptionsTable.postId, postId));
     }
 
-    res.json({ success: true, facebookPostId });
+    res.json({ success: true, facebookPostId: result.postId });
   } catch (err) {
     res.status(500).json({ error: "internal_error", message: "Failed to post to Facebook" });
   }
