@@ -111,11 +111,18 @@ export function ArticleCard({
   return (
     <Link href={`/article/${post.slug}`}>
       <Card className="overflow-hidden border border-card-border shadow-sm hover-elevate transition-all duration-300 group cursor-pointer bg-card h-full flex flex-col" data-testid={`card-post-${post.id}`}>
-        <div className="w-full aspect-[4/3] relative overflow-hidden bg-muted">
+        <div className="w-full aspect-[4/3] relative overflow-hidden bg-black">
+          {/* Blurred fill — ensures no dark gaps for square logos or portrait crests */}
+          <img
+            src={imageUrl}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl brightness-50 pointer-events-none select-none"
+          />
           <img 
             src={imageUrl} 
             alt={post.title} 
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            className="relative w-full h-full object-contain transition-transform duration-700 group-hover:scale-105 z-10"
           />
           <div className="absolute top-3 left-3 z-10">
             <Badge className={`${badgeStyle} shadow-sm border-0 font-medium`} variant="outline">
