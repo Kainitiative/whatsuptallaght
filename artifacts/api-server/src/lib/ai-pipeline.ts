@@ -525,21 +525,70 @@ function extractTopicKeywords(headline: string): string[] {
     .slice(0, 8);
 }
 
-function buildDallePrompt(headline: string, keyFacts: string[], tone: string): string {
+function buildDallePrompt(headline: string, keyFacts: string[], tone: string, entityContext?: string | null): string {
   const facts = keyFacts.slice(0, 3).filter(Boolean).join(", ");
+
+  // Photorealistic camera/lighting specs per tone
   const styleByTone: Record<string, string> = {
-    news: "editorial documentary photography, realistic, candid community scene",
-    event: "community event photography, bright and welcoming atmosphere, people gathered",
-    sport: "sports action photography, outdoor pitch, athletic movement",
-    community: "community documentary photography, warm neighbourhood feel",
-    business: "local business photography, storefront or interior, professional",
-    warning: "documentary photography, Tallaght street scene, overcast mood",
-    memorial: "respectful and dignified photography, flowers, quiet public space",
-    other: "photorealistic community news photography, Irish urban setting",
+    news:      "photorealistic editorial press photograph, 35mm lens, f/4 aperture, overcast natural daylight, documentary style, candid moment",
+    event:     "photorealistic event photograph, wide-angle lens, vibrant natural light, authentic crowd atmosphere, professional press photography",
+    sport:     "photorealistic sports action photograph, telephoto lens, fast shutter speed, shallow depth of field, outdoor pitch or stadium, dynamic composition",
+    community: "photorealistic community documentary photograph, 50mm lens, warm natural light, genuine authentic moment, neighbourhood setting",
+    business:  "photorealistic commercial photograph, professional natural lighting, 35mm lens, clean composition, local business environment",
+    warning:   "photorealistic documentary photograph, overcast sky, desaturated colour grading, journalistic style, reportage photography",
+    memorial:  "photorealistic respectful photograph, soft diffused natural light, 50mm lens, quiet dignified scene, muted tones",
+    other:     "photorealistic news photograph, 50mm lens, natural lighting, editorial documentary style",
   };
   const style = styleByTone[tone] ?? styleByTone.other;
   const factsClause = facts ? ` Scene relates to: ${facts}.` : "";
-  return `${style}. Subject: ${headline}.${factsClause} Set in Tallaght or Dublin, Ireland. No text overlays, no watermarks, no readable signs, no identifiable faces. High-quality editorial photography, natural lighting.`;
+  const entityClause = entityContext ? ` Visual context: ${entityContext}` : "";
+  return `${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland. No text overlays, no watermarks, no readable signs, no identifiable real faces. Shot on professional camera, high resolution, sharp focus.`;
+}
+
+/**
+ * Looks up visual context for real-world entities mentioned in the headline/facts
+ * using GPT's knowledge — team colours, venue details, brand identity etc.
+ * Returns a short descriptive string to enrich the DALL-E prompt, or null if nothing useful found.
+ */
+async function researchEntityContext(
+  openai: OpenAI,
+  headline: string,
+  keyFacts: string[],
+): Promise<string | null> {
+  try {
+    const text = `${headline}. ${keyFacts.slice(0, 4).join(". ")}`;
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: `You are a visual research assistant for a news image generator.
+
+Given a headline and facts, identify any specific real-world entities (sports clubs, organisations, venues, events, Irish landmarks).
+For each recognised entity, provide brief VISUAL details to help generate an accurate image:
+- Sports clubs: kit colours, home kit style (e.g. "red and white vertical stripes")
+- Venues: appearance, surface type, capacity feel
+- Organisations: brand colours, typical visual setting
+
+Rules:
+- Only include details you are CONFIDENT are accurate from your training data.
+- Do NOT invent or guess. If you are not sure, say nothing about that entity.
+- Return 1–2 sentences of visual detail only. No explanations.
+- If no specific real-world entities are identifiable, return an empty string.`,
+        },
+        {
+          role: "user",
+          content: text,
+        },
+      ],
+    });
+
+    const result = response.choices[0].message.content?.trim() ?? "";
+    return result.length > 10 ? result : null;
+  } catch {
+    return null;
+  }
 }
 
 async function downloadBuffer(url: string): Promise<Buffer> {
@@ -557,13 +606,19 @@ async function generateHeaderImage(
   ctx: UsageCtx,
 ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
   try {
-    const prompt = buildDallePrompt(headline, keyFacts, tone);
+    // Research real-world entity context (team colours, venue details etc.) to enrich the prompt
+    const entityContext = await researchEntityContext(openai, headline, keyFacts);
+    if (entityContext) {
+      logger.info({ submissionId: ctx.submissionId, entityContext }, "AI pipeline: entity context found for image");
+    }
+
+    const prompt = buildDallePrompt(headline, keyFacts, tone, entityContext);
     const response = await openai.images.generate({
       model: "dall-e-3",
       prompt,
       n: 1,
       size: "1792x1024",
-      quality: "standard",
+      quality: "hd",
       response_format: "url",
     });
 
