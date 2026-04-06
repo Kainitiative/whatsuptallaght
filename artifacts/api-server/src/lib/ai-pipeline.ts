@@ -665,6 +665,7 @@ async function writeArticle(
   tone: ToneResult,
   goldenExamples: { inputText: string; outputText: string }[],
   ctx: UsageCtx,
+  minimalMode = false,
 ): Promise<string> {
   const examplesBlock =
     goldenExamples.length > 0
@@ -705,6 +706,12 @@ async function writeArticle(
     "   - You may use simple connecting language to make the article read naturally, but do not introduce new facts.",
     "   - If any detail in the submission is uncertain (e.g. 'I think', 'not sure'), reflect that uncertainty in the article. Do not present it as a confirmed fact.",
     "",
+    "1b. NAMED PERSONS — reproduce exactly as given. This is a legal requirement.",
+    "   - If the submission says 'John from Tallaght', write exactly 'John from Tallaght'. Do NOT add a surname, role, title, or any other detail.",
+    "   - Do NOT guess, infer, or expand any name. 'Mary' stays 'Mary'. 'Dave from Jobstown' stays 'Dave from Jobstown'.",
+    "   - Never write 'John Smith', 'local resident John', 'coach John', or any variation not in the submission.",
+    "   - If the full name is given in the submission, use the full name. If only a first name is given, use only the first name.",
+    "",
     "2. LENGTH — write to the natural length of the content, guided by the submission type:",
     "   - Notice (community, warning, memorial): 80–120 words. Keep it tight.",
     "   - Event: 120–200 words. Cover what, where, when, and who.",
@@ -712,6 +719,17 @@ async function writeArticle(
     "   - If the submission is short, write a short article. Never pad to hit a minimum.",
     "   - Never exceed the upper limit for the type. Do not add background context to fill space.",
     "",
+    ...(minimalMode
+      ? [
+          "⚠️ MINIMAL MODE — this submission is thin. Apply these stricter rules:",
+          "   - Write a SHORT NOTICE only: 1–3 sentences maximum. No paragraphs, no structure.",
+          "   - State only what is explicitly in the submission. Nothing else.",
+          "   - Do not attempt to pad, explain, or add context.",
+          "   - Do not write a full news article. A notice is enough.",
+          "   - If you cannot write 1 honest sentence from the submission, write nothing.",
+          "",
+        ]
+      : []),
     "3. Write in third person, plain language. No clickbait, no superlatives.",
     "   - Do not add emotional interpretation or commentary unless it is explicitly stated in the submission.",
     "   - Avoid phrases like 'distressing situation', 'highlighted', 'ensuring', or similar formal wording.",
@@ -989,8 +1007,11 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     .limit(3);
 
   // --- Stage 7: Write article ---
-  logger.info({ submissionId }, "AI pipeline: writing article");
-  const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx);
+  // Minimal mode activates when submission is thin (not all 4 completeness criteria met)
+  // to prevent padding and hallucination on weak input
+  const minimalMode = infoResult.completenessScore <= 0.75;
+  logger.info({ submissionId, minimalMode }, "AI pipeline: writing article");
+  const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode);
 
   // --- Stage 7b: Fact-check ---
   logger.info({ submissionId }, "AI pipeline: fact-checking article");
