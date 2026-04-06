@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getSocialCaptions, updateSocialCaption, regenerateSocialCaptions, postToFacebookNow, type SocialCaption } from "@/lib/api";
+import { getSocialCaptions, updateSocialCaption, regenerateSocialCaptions, postToFacebookNow, checkFacebookStatus, type SocialCaption, type FacebookStatus } from "@/lib/api";
 
 const SLOT_LABELS: Record<string, string> = {
   morning: "☀️ Morning (7–9am)",
@@ -26,6 +26,7 @@ export default function Social() {
   const [regenerating, setRegenerating] = useState<Record<number, boolean>>({});
   const [posting, setPosting] = useState<Record<number, boolean>>({});
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [fbStatus, setFbStatus] = useState<FacebookStatus | null>(null);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
@@ -45,6 +46,11 @@ export default function Social() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Check Facebook connection health on every page load
+  useEffect(() => {
+    checkFacebookStatus().then(setFbStatus).catch(() => setFbStatus({ ok: false, reason: "check_failed" }));
+  }, []);
 
   function getPlatform(captionId: number): Platform {
     return activePlatform[captionId] ?? "facebook";
@@ -125,6 +131,35 @@ export default function Social() {
           toast.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
         }`}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* Facebook connection status banner */}
+      {fbStatus && !fbStatus.ok && (
+        <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm flex items-start gap-3">
+          <span className="text-red-500 text-lg leading-none mt-0.5">⚠️</span>
+          <div className="flex-1">
+            <p className="font-semibold text-red-800">Facebook connection problem</p>
+            <p className="text-red-700 mt-0.5">
+              {fbStatus.graphError
+                ? `${fbStatus.graphError.message} (code ${fbStatus.graphError.code})`
+                : fbStatus.reason === "not_configured"
+                  ? "Facebook Page ID or Access Token not configured."
+                  : "Token appears invalid or has been revoked."}
+            </p>
+            <a href="/settings" className="text-red-600 font-medium underline mt-1 inline-block text-xs">
+              Go to Settings to update the token →
+            </a>
+          </div>
+        </div>
+      )}
+      {fbStatus?.ok && (
+        <div className="mb-5 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+            Facebook connected
+            {fbStatus.tokenIdentity?.name && ` — ${fbStatus.tokenIdentity.name}`}
+          </span>
         </div>
       )}
 

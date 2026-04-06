@@ -379,6 +379,20 @@ export async function postToFacebookNow(postId: number): Promise<{ success: bool
   return request<{ success: boolean; facebookPostId: string }>(`/admin/social/captions/${postId}/post-facebook`, { method: "POST" });
 }
 
+export interface FacebookStatus {
+  ok: boolean;
+  reason?: string;
+  pageIdStored?: string;
+  tokenIdentity?: { id: string; name: string; category?: string } | null;
+  isPageToken?: boolean;
+  permissions?: string[];
+  graphError?: { message: string; code: number } | null;
+}
+
+export async function checkFacebookStatus(): Promise<FacebookStatus> {
+  return request<FacebookStatus>("/admin/facebook/test");
+}
+
 // ---------------------------------------------------------------------------
 // Entity Library
 // ---------------------------------------------------------------------------
