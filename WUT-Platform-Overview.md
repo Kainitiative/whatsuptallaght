@@ -269,4 +269,152 @@ The platform runs in Docker on the VPS. To deploy new code:
 
 ---
 
+## Monetisation Plan
+
+The platform is built to run at near-zero cost (~€3–5/month in AI fees) which means even modest revenue makes it profitable from day one. Below are the revenue streams, roughly in order of ease to implement.
+
+---
+
+### 1. Sponsored Articles — Core Revenue Stream
+
+Local businesses pay to have their announcement published as a clearly labelled sponsored article. It goes through the same AI pipeline, gets the same header image, gets shared to Facebook — it just carries a "Sponsored" label.
+
+**Pricing idea:** €50–€150 per article depending on length and category.
+
+**Who buys this:** The Square, local restaurants, estate agents, gyms, solicitors, dentists, car dealerships — anyone opening, running an event, or promoting a sale.
+
+**Already built:** The `isSponsored` flag exists in the database and the article type. It just needs a submission form and a payment step in front of it.
+
+---
+
+### 2. Display Advertising — Passive Income
+
+Standard banner ads placed on the website. Once the audience is established, local businesses pay a flat monthly fee for a banner on the homepage, sidebar, or article pages.
+
+**Pricing idea:** €100–€300/month for homepage placement, €50–€100/month for run-of-site.
+
+**Who buys this:** Tallaght-area businesses that want consistent visibility — solicitors, financial advisors, car dealerships, takeaways, pharmacies.
+
+**Alternatively:** Google AdSense or a similar automated ad network can fill unsold space passively — low revenue per click but zero effort.
+
+---
+
+### 3. Event Promotion — High Intent Buyers
+
+Event organisers pay to have their event pinned at the top of the Events page or featured in the "Happening This Weekend" strip on the homepage.
+
+**Pricing idea:** €30–€75 to be featured on the homepage this weekend. €20/week to stay pinned on the Events page.
+
+**Who buys this:** Civic Theatre, The Square, local sports clubs, charity events, market organisers, kids' activity providers.
+
+**Why it works:** The person paying already has an event — they have a direct reason to want more eyes on it. It's low friction to sell.
+
+---
+
+### 4. Business Directory Listings
+
+A simple paid directory of local businesses with a profile page, photo, opening hours, phone number, and a link. Businesses submit via WhatsApp the same way community members do — the AI writes the profile.
+
+**Pricing idea:** €99/year for a basic listing, €199/year for a featured listing with priority placement.
+
+**Who buys this:** Tradespeople (plumbers, electricians, painters), beauty salons, takeaways, childcare, tutors — anyone who relies on local word of mouth.
+
+---
+
+### 5. WhatsApp Broadcast Sponsorship
+
+A weekly "What's On in Tallaght This Week" message sent to opted-in WhatsApp subscribers. One sponsored slot per broadcast — the sponsor's event or business mention appears in the message.
+
+**Pricing idea:** €75–€150 per sponsored slot in the broadcast.
+
+**Why it works:** WhatsApp broadcasts have extremely high open rates compared to email. This is a genuinely valuable slot.
+
+---
+
+### 6. Community Grant Funding
+
+WUT is a public good — it provides a free, factual local news service to a community that is otherwise underserved by local media. This qualifies for:
+
+- **South Dublin County Council Community Grants** — SDCC funds local media and community projects
+- **Press Council of Ireland / Local Ireland** — supports local news
+- **Broadcasting Authority of Ireland (BAI)** — community media funding
+- **Local area partnerships** (Tallaght Partnership, Jobstown, Fettercairn) — often fund digital community projects
+
+**Realistic expectation:** €2,000–€10,000/year in grant funding for a project that can demonstrate community reach and impact. Google Analytics data, WhatsApp submission volume, and social media engagement all serve as evidence.
+
+---
+
+### 7. Contributor Tip Jar / Community Support
+
+A simple "Support WUT" button on the site linked to a Stripe or PayPal page. No subscription, no pressure — just an option for people who value the platform to throw in €5 or €10.
+
+**Realistic expectation:** €50–€200/month from a loyal community once the audience is established.
+
+---
+
+## Monetisation Suggestions
+
+These are ideas that would be straightforward to build given how the platform works today.
+
+---
+
+### Suggestion A — "Promote Your Event" Self-Service Page
+
+A page on the public site where any business or organiser can fill in their event details, pay online (Stripe), and have it automatically:
+
+1. Written into an article by the AI
+2. Published with a "Promoted Event" label
+3. Pinned to the top of the Events page for the duration
+4. Shared to the Facebook Page
+
+No human intervention needed. Revenue while you sleep. This is the highest-ROI thing to build next.
+
+---
+
+### Suggestion B — "Advertise With Us" Rate Card Page
+
+The Advertise page already exists in the navigation. Right now it's likely a contact form. Replace it with a proper rate card — clear prices, clear placement options, a simple contact or booking form. Businesses will not enquire unless they know the price. Transparency converts.
+
+---
+
+### Suggestion C — Local Business of the Month
+
+One sponsored slot per month — a business gets a feature article, a pinned homepage card, and a Facebook post. Pitched as a package rather than individual line items.
+
+**Pricing idea:** €250–€400/month for the full package.
+
+**Why it works:** Businesses like clear, simple packages. "Feature article + homepage card + Facebook post" is easy to understand and easy to sell.
+
+---
+
+### Suggestion D — Sponsored Category
+
+A business sponsors an entire category for a month. For example, a gym sponsors the Sport category — their logo appears on every sport article card and the category page.
+
+**Pricing idea:** €200–€500/month per category depending on volume.
+
+---
+
+### Suggestion E — School and Club Newsletters
+
+Local schools and sports clubs send their updates to the WUT WhatsApp number and the AI writes them up as articles. A basic version is free. A premium version (guaranteed same-day publication, priority placement, Facebook share) could be a small paid subscription for the club or school.
+
+**Pricing idea:** €20–€50/month per organisation.
+
+---
+
+### Revenue Projections (Conservative)
+
+| Stream | Monthly estimate |
+|---|---|
+| 2 sponsored articles | €200 |
+| 1 homepage banner ad | €150 |
+| 2 promoted events | €100 |
+| Grant funding (annualised) | €250 |
+| **Total** | **~€700/month** |
+
+At that level, costs are covered many times over and the platform becomes self-sustaining. Scaling to 5–6 sponsored articles/month and 3–4 event promotions pushes monthly revenue past €1,000 without any major effort.
+
+---
+
 *Document generated April 2026. Platform version: live at whatsuptallaght.ie.*
