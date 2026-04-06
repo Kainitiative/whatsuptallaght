@@ -10,6 +10,8 @@ export const rssFeedsTable = pgTable("rss_feeds", {
   checkIntervalMinutes: integer("check_interval_minutes").notNull().default(60),
   lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // "events_only" = skip items that don't describe a real upcoming event with a date
+  filterMode: text("filter_mode"),
 });
 
 export const rssItemsTable = pgTable("rss_items", {

@@ -9,6 +9,7 @@
 const ALWAYS_RELEVANT_URL_FRAGMENTS = [
   "sdcc.ie",           // South Dublin County Council — every item is about South Dublin
   "shamrockrovers.ie", // Shamrock Rovers FC — home ground is Tallaght Stadium
+  "thesquare.ie",      // The Square Shopping Centre — located in Tallaght town centre
 ];
 
 // Geographic and local keywords — any hit = relevant

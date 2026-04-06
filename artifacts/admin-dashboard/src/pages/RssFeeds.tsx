@@ -41,10 +41,13 @@ export default function RssFeeds() {
   const [newUrl, setNewUrl] = useState("");
   const [newInterval, setNewInterval] = useState(60);
 
+  const [newFilterMode, setNewFilterMode] = useState<string>("");
+
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editUrl, setEditUrl] = useState("");
   const [editInterval, setEditInterval] = useState(60);
+  const [editFilterMode, setEditFilterMode] = useState<string>("");
 
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
@@ -67,8 +70,8 @@ export default function RssFeeds() {
     if (!newName.trim() || !newUrl.trim()) return;
     setWorking("new");
     try {
-      await createRssFeed({ name: newName.trim(), url: newUrl.trim(), checkIntervalMinutes: newInterval });
-      setNewName(""); setNewUrl(""); setNewInterval(60); setShowAdd(false);
+      await createRssFeed({ name: newName.trim(), url: newUrl.trim(), checkIntervalMinutes: newInterval, filterMode: newFilterMode || null });
+      setNewName(""); setNewUrl(""); setNewInterval(60); setNewFilterMode(""); setShowAdd(false);
       showToast("Feed added");
       load();
     } catch (err: any) {
@@ -83,6 +86,7 @@ export default function RssFeeds() {
     setEditName(feed.name);
     setEditUrl(feed.url);
     setEditInterval(feed.checkIntervalMinutes);
+    setEditFilterMode(feed.filterMode ?? "");
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -90,7 +94,7 @@ export default function RssFeeds() {
     if (!editId || !editName.trim() || !editUrl.trim()) return;
     setWorking(editId);
     try {
-      await updateRssFeed(editId, { name: editName.trim(), url: editUrl.trim(), checkIntervalMinutes: editInterval });
+      await updateRssFeed(editId, { name: editName.trim(), url: editUrl.trim(), checkIntervalMinutes: editInterval, filterMode: editFilterMode || null });
       setEditId(null);
       showToast("Feed updated");
       load();
@@ -151,34 +155,38 @@ export default function RssFeeds() {
       {showAdd && (
         <form onSubmit={handleAdd} className="mb-8 bg-muted/40 border border-border rounded-xl p-5">
           <h2 className="text-sm font-semibold text-foreground mb-4">New RSS Feed</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <input
               className={inputClass}
-              placeholder="Feed name (e.g. Dublin Live)"
+              placeholder="Feed name (e.g. The Square Tallaght)"
               value={newName}
               onChange={e => setNewName(e.target.value)}
               required
             />
             <input
-              className={`${inputClass} md:col-span-1`}
+              className={inputClass}
               placeholder="RSS URL"
               value={newUrl}
               onChange={e => setNewUrl(e.target.value)}
               type="url"
               required
             />
-            <div className="flex gap-2">
-              <select className={selectClass} value={newInterval} onChange={e => setNewInterval(Number(e.target.value))}>
-                {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
-              </select>
-              <button
-                type="submit"
-                disabled={working === "new"}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
-              >
-                {working === "new" ? "Adding…" : "Add"}
-              </button>
-            </div>
+          </div>
+          <div className="flex gap-2">
+            <select className={selectClass} value={newInterval} onChange={e => setNewInterval(Number(e.target.value))}>
+              {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
+            </select>
+            <select className={selectClass} value={newFilterMode} onChange={e => setNewFilterMode(e.target.value)} title="Content filter">
+              <option value="">All content</option>
+              <option value="events_only">Events only (requires date + event)</option>
+            </select>
+            <button
+              type="submit"
+              disabled={working === "new"}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              {working === "new" ? "Adding…" : "Add"}
+            </button>
           </div>
         </form>
       )}
@@ -199,21 +207,25 @@ export default function RssFeeds() {
           {feeds.map(feed => (
             <div key={feed.id} className={`border border-border rounded-xl bg-card transition-all ${!feed.isActive ? "opacity-60" : ""}`}>
               {editId === feed.id ? (
-                <form onSubmit={handleEdit} className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <form onSubmit={handleEdit} className="p-4 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input className={inputClass} value={editName} onChange={e => setEditName(e.target.value)} required />
                     <input className={inputClass} value={editUrl} onChange={e => setEditUrl(e.target.value)} type="url" required />
-                    <div className="flex gap-2">
-                      <select className={selectClass} value={editInterval} onChange={e => setEditInterval(Number(e.target.value))}>
-                        {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
-                      </select>
-                      <button type="submit" disabled={working === feed.id} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
-                        {working === feed.id ? "…" : "Save"}
-                      </button>
-                      <button type="button" onClick={() => setEditId(null)} className="px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted">
-                        Cancel
-                      </button>
-                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <select className={selectClass} value={editInterval} onChange={e => setEditInterval(Number(e.target.value))}>
+                      {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
+                    </select>
+                    <select className={selectClass} value={editFilterMode} onChange={e => setEditFilterMode(e.target.value)}>
+                      <option value="">All content</option>
+                      <option value="events_only">Events only (requires date + event)</option>
+                    </select>
+                    <button type="submit" disabled={working === feed.id} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                      {working === feed.id ? "…" : "Save"}
+                    </button>
+                    <button type="button" onClick={() => setEditId(null)} className="px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted">
+                      Cancel
+                    </button>
                   </div>
                 </form>
               ) : (
@@ -231,6 +243,7 @@ export default function RssFeeds() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm text-foreground">{feed.name}</span>
                       {!feed.isActive && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Paused</span>}
+                      {feed.filterMode === "events_only" && <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Events only</span>}
                     </div>
                     <a
                       href={feed.url}
