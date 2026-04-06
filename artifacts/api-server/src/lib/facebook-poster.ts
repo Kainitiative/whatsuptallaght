@@ -6,42 +6,114 @@ const GRAPH_API_BASE = "https://graph.facebook.com/v20.0";
 /**
  * Derives a Page Access Token from the stored token.
  * Works whether the stored token is a User token or already a Page token.
- * A Page token is required to post to /{pageId}/feed.
  */
-async function resolvePageToken(pageId: string, storedToken: string): Promise<string | null> {
-  const res = await fetch(
-    `${GRAPH_API_BASE}/${pageId}?fields=access_token&access_token=${storedToken}`
-  );
-  const data = await res.json() as { access_token?: string; id?: string; error?: { message: string; code: number } };
-
-  if (data.access_token) {
-    logger.debug({ pageId }, "Resolved Page Access Token from User token");
-    return data.access_token;
+async function resolvePageToken(pageId: string, storedToken: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `${GRAPH_API_BASE}/${pageId}?fields=access_token&access_token=${storedToken}`
+    );
+    const data = await res.json() as { access_token?: string; error?: { message: string; code: number } };
+    if (data.access_token) {
+      logger.debug({ pageId }, "Resolved Page Access Token from User token");
+      return data.access_token;
+    }
+  } catch {
+    // ignore, fall through
   }
-
-  logger.debug(
-    { pageId, graphError: data.error },
-    "Could not derive Page token — using stored token directly"
-  );
+  logger.debug({ pageId }, "Using stored token directly as Page token");
   return storedToken;
 }
+
+/**
+ * Downloads an image and returns it as a Buffer plus its MIME type.
+ * Tries up to two candidate URLs — the full absolute URL first, then the relative path
+ * via the platform base URL.
+ */
+async function downloadImage(imageUrl: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  try {
+    const res = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) {
+      logger.warn({ imageUrl, status: res.status }, "Image download failed");
+      return null;
+    }
+    const contentType = res.headers.get("content-type") ?? "image/jpeg";
+    const mimeType = contentType.split(";")[0].trim();
+    const buffer = Buffer.from(await res.arrayBuffer());
+    logger.debug({ imageUrl, bytes: buffer.length, mimeType }, "Image downloaded for Facebook upload");
+    return { buffer, mimeType };
+  } catch (err) {
+    logger.warn({ imageUrl, err }, "Image download threw");
+    return null;
+  }
+}
+
+/**
+ * Uploads an image binary to Facebook as an unpublished photo and returns its photo ID.
+ * Uploading binary data is far more reliable than passing a URL for Facebook to fetch.
+ */
+async function uploadImageToFacebook(
+  pageId: string,
+  pageToken: string,
+  buffer: Buffer,
+  mimeType: string
+): Promise<string | null> {
+  const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
+  const form = new FormData();
+  form.append("source", new Blob([buffer], { type: mimeType }), `article.${ext}`);
+  form.append("published", "false"); // upload only, not a post yet
+  form.append("access_token", pageToken);
+
+  const res = await fetch(`${GRAPH_API_BASE}/${pageId}/photos`, {
+    method: "POST",
+    body: form,
+  });
+  const data = await res.json() as { id?: string; error?: { message: string; code: number } };
+
+  if (res.ok && data.id && !data.error) {
+    logger.debug({ photoId: data.id }, "Image uploaded to Facebook (unpublished)");
+    return data.id;
+  }
+  logger.warn({ facebookError: data.error, status: res.status }, "Facebook image upload failed");
+  return null;
+}
+
+/**
+ * Tells Facebook to re-scrape an article URL so its OG cache is refreshed.
+ * Best-effort — errors are logged but not thrown.
+ */
+async function triggerOgRescrape(articleUrl: string, pageToken: string): Promise<void> {
+  try {
+    const res = await fetch(
+      `${GRAPH_API_BASE}/?id=${encodeURIComponent(articleUrl)}&scrape=true&access_token=${pageToken}`,
+      { method: "POST" }
+    );
+    const data = await res.json() as { og_object?: { id: string }; error?: unknown };
+    if (data.og_object) {
+      logger.info({ articleUrl }, "Facebook OG cache refreshed");
+    } else {
+      logger.debug({ articleUrl, data }, "Facebook OG rescrape returned unexpected response");
+    }
+  } catch (err) {
+    logger.debug({ articleUrl, err }, "Facebook OG rescrape failed (non-fatal)");
+  }
+}
+
+export type FacebookPostResult =
+  | { postId: string; errorDetail?: never }
+  | { postId: null; errorDetail: string };
 
 /**
  * Posts a published article to the configured Facebook Page.
  *
  * Strategy:
- *  - If we have an article image (submitted WhatsApp photo preferred, AI header fallback),
- *    post it via /{pageId}/photos so the correct image always appears regardless of
- *    OG meta scraping.  The article URL is embedded prominently in the caption.
- *  - If no image is available, fall back to a plain link-share post via /{pageId}/feed.
- *
- * Fire-and-forget safe — all errors are caught and logged, never thrown.
- * Returns the Facebook post ID on success, null otherwise.
+ *  1. Download the article image locally (avoids Facebook remote-fetch issues with
+ *     internal storage URLs).
+ *  2. Upload as unpublished photo, then publish it as a page post via /{pageId}/feed
+ *     with `attached_media` — this ensures the correct image always appears.
+ *  3. If image handling fails, fall back to a plain link post via /{pageId}/feed.
+ *  4. After every successful post, trigger an OG rescrape so future link shares show
+ *     the right image.
  */
-export type FacebookPostResult =
-  | { postId: string; errorDetail?: never }
-  | { postId: null; errorDetail: string };
-
 export async function postToFacebookPage(post: {
   title: string;
   slug: string;
@@ -58,30 +130,22 @@ export async function postToFacebookPage(post: {
     ]);
 
     if (!pageId || !storedToken) {
-      logger.info("Facebook posting skipped — page ID or token not configured");
       return { postId: null, errorDetail: "Facebook page ID or access token not configured in Settings." };
     }
 
     const pageToken = await resolvePageToken(pageId, storedToken);
-    if (!pageToken) {
-      logger.warn({ pageId }, "Facebook posting skipped — could not resolve Page token");
-      return { postId: null, errorDetail: "Could not resolve a Page Access Token from the stored token." };
-    }
-
     const base = (platformUrl ?? "https://whatsuptallaght.ie").replace(/\/$/, "");
     const articleUrl = `${base}/article/${post.slug}`;
 
-    // Build caption — use AI-generated Facebook caption when available
+    // Build caption
     const captionBody = post.overrideMessage
       ? post.overrideMessage
       : post.excerpt
         ? post.excerpt
         : post.title;
+    const message = `${captionBody}\n\n🔗 Read the full story: ${articleUrl}`;
 
-    const caption = `${captionBody}\n\n🔗 Read the full story: ${articleUrl}`;
-
-    // --- Pick the best image to post ---
-    // Prefer the submitted WhatsApp photo (authentic), then the AI-generated header.
+    // Resolve the image URL — prefer WhatsApp submitted photo, then AI header
     const bodyImgs: string[] = Array.isArray(post.bodyImages) ? (post.bodyImages as string[]) : [];
     const rawImagePath = bodyImgs[0] ?? post.headerImageUrl ?? null;
     const imageUrl = rawImagePath
@@ -90,56 +154,73 @@ export async function postToFacebookPage(post: {
         : `${base}${rawImagePath}`
       : null;
 
-    // --- Post with image (preferred) ---
+    // --- Attempt image post ---
     if (imageUrl) {
-      const photoRes = await fetch(`${GRAPH_API_BASE}/${pageId}/photos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: imageUrl,
-          caption,
-          access_token: pageToken,
-        }),
-      });
+      const downloaded = await downloadImage(imageUrl);
 
-      const photoResult = await photoRes.json() as { id?: string; post_id?: string; error?: { message: string; code: number; type?: string; fbtrace_id?: string } };
+      if (downloaded) {
+        // Upload binary → get a Facebook photo ID
+        const photoId = await uploadImageToFacebook(pageId, pageToken, downloaded.buffer, downloaded.mimeType);
 
-      if (photoRes.ok && !photoResult.error) {
-        const fbId = photoResult.post_id ?? photoResult.id ?? null;
-        logger.info({ facebookPostId: fbId, slug: post.slug, imageUrl }, "Article posted to Facebook (photo post)");
-        return { postId: fbId! };
+        if (photoId) {
+          // Publish as a page feed post with the attached photo
+          const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message,
+              attached_media: [{ media_fbid: photoId }],
+              access_token: pageToken,
+            }),
+          });
+          const feedData = await feedRes.json() as { id?: string; error?: { message: string; code: number; type?: string } };
+
+          if (feedRes.ok && feedData.id && !feedData.error) {
+            logger.info(
+              { facebookPostId: feedData.id, photoId, slug: post.slug },
+              "Article posted to Facebook (binary photo upload)"
+            );
+            // Refresh OG cache in the background
+            void triggerOgRescrape(articleUrl, pageToken);
+            return { postId: feedData.id };
+          }
+
+          logger.warn(
+            { facebookError: feedData.error, status: feedRes.status, photoId, slug: post.slug },
+            "Facebook feed post with attached photo failed — falling back to link post"
+          );
+        }
+      } else {
+        logger.warn({ imageUrl, slug: post.slug }, "Could not download article image — falling back to link post");
       }
-
-      logger.warn(
-        { facebookError: photoResult.error, status: photoRes.status, slug: post.slug },
-        "Facebook photo post failed — falling back to link post"
-      );
     }
 
-    // --- Fall back to plain link post (no image available or photo post failed) ---
+    // --- Fall back to plain link post ---
+    void triggerOgRescrape(articleUrl, pageToken); // refresh OG before the link post is indexed
+
     const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: caption,
+        message,
         link: articleUrl,
         access_token: pageToken,
       }),
     });
+    const feedData = await feedRes.json() as { id?: string; error?: { message: string; code: number; type?: string } };
 
-    const feedResult = await feedRes.json() as { id?: string; error?: { message: string; code: number; type?: string; fbtrace_id?: string } };
-
-    if (!feedRes.ok || feedResult.error) {
-      const fbErr = feedResult.error;
-      const detail = fbErr
-        ? `Facebook API error (code ${fbErr.code}): ${fbErr.message}`
+    if (!feedRes.ok || feedData.error) {
+      const e = feedData.error;
+      const detail = e
+        ? `Facebook API error (code ${e.code}): ${e.message}`
         : `Facebook returned HTTP ${feedRes.status}`;
-      logger.warn({ facebookError: fbErr, status: feedRes.status, slug: post.slug }, "Facebook link post failed");
+      logger.warn({ facebookError: e, status: feedRes.status, slug: post.slug }, "Facebook link post failed");
       return { postId: null, errorDetail: detail };
     }
 
-    logger.info({ facebookPostId: feedResult.id, slug: post.slug }, "Article posted to Facebook (link post)");
-    return { postId: feedResult.id ?? null };
+    logger.info({ facebookPostId: feedData.id, slug: post.slug }, "Article posted to Facebook (link post fallback)");
+    return { postId: feedData.id ?? null };
+
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn({ err }, "Facebook posting: unexpected error (non-fatal)");
