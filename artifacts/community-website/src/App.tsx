@@ -14,6 +14,8 @@ import Terms from "@/pages/terms";
 import Privacy from "@/pages/privacy";
 import SearchPage from "@/pages/search";
 import EventsPage from "@/pages/events";
+import TallaghtNewsPage from "@/pages/tallaght-news";
+import TallaghtCommunityPage from "@/pages/tallaght-community";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +40,8 @@ function Router() {
         <Route path="/privacy" component={Privacy} />
         <Route path="/search" component={SearchPage} />
         <Route path="/events" component={EventsPage} />
+        <Route path="/tallaght-news" component={TallaghtNewsPage} />
+        <Route path="/tallaght-community" component={TallaghtCommunityPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
