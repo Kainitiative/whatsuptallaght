@@ -157,7 +157,7 @@ export default function Articles() {
   }
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-4 md:p-8 max-w-5xl">
       {editPost && (
         <ArticleEditModal
           post={editPost}
@@ -171,19 +171,18 @@ export default function Articles() {
         </div>
       )}
 
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Articles</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {loading ? "Loading…" : `${total} article${total !== 1 ? "s" : ""}`}
-          </p>
-        </div>
-        <div className="flex gap-1.5">
+      <div className="mb-5">
+        <h1 className="text-xl md:text-2xl font-bold text-foreground">Articles</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          {loading ? "Loading…" : `${total} article${total !== 1 ? "s" : ""}`}
+        </p>
+        {/* Filter pills — horizontally scrollable on mobile */}
+        <div className="flex gap-1.5 mt-3 overflow-x-auto pb-1 -mx-1 px-1">
           {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setFilter(opt.value)}
-              className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+              className={`flex-shrink-0 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
                 filter === opt.value
                   ? "bg-primary text-white"
                   : "bg-white border border-border text-muted-foreground hover:text-foreground"
@@ -204,46 +203,50 @@ export default function Articles() {
           <div className="divide-y divide-border">
             {posts.map((post) => (
               <div key={post.id}>
-                <div className="px-5 py-4 flex items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${statusColour(post.status)}`}>
-                        {post.status}
+                <div className="px-4 py-4 md:px-5">
+                  {/* Meta row — status badge, score, date */}
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${statusColour(post.status)}`}>
+                      {post.status}
+                    </span>
+                    {post.confidenceScore && (
+                      <span className={`text-xs font-semibold ${confidenceColour(post.confidenceScore)}`}>
+                        {Math.round(parseFloat(post.confidenceScore) * 100)}%
                       </span>
-                      {post.confidenceScore && (
-                        <span className={`text-xs font-medium ${confidenceColour(post.confidenceScore)}`}>
-                          {Math.round(parseFloat(post.confidenceScore) * 100)}%
-                        </span>
-                      )}
-                      {costs[post.id]?.hasData && (
-                        <span className="text-xs font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                          ${parseFloat(costs[post.id].totalCostUsd).toFixed(4)}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">{formatDateShort(post.createdAt)}</span>
-                    </div>
-                    <h3 className="font-medium text-foreground mt-1 leading-tight">{post.title}</h3>
-                    {post.excerpt && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{post.excerpt}</p>
                     )}
-                    <div className="mt-2">
-                      <StarRating
-                        value={post.starRating}
-                        onChange={(rating) => handleStar(post, rating)}
-                        size="sm"
-                      />
-                    </div>
+                    {costs[post.id]?.hasData && (
+                      <span className="text-xs font-mono text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                        ${parseFloat(costs[post.id].totalCostUsd).toFixed(4)}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground ml-auto">{formatDateShort(post.createdAt)}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+
+                  {/* Title — full width */}
+                  <h3 className="font-semibold text-foreground text-base leading-snug mb-1">{post.title}</h3>
+                  {post.excerpt && (
+                    <p className="text-xs text-muted-foreground line-clamp-1 mb-2">{post.excerpt}</p>
+                  )}
+
+                  <div className="mb-3">
+                    <StarRating
+                      value={post.starRating}
+                      onChange={(rating) => handleStar(post, rating)}
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Action buttons — full-width wrapping row */}
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleExpand(post.id)}
-                      className="px-2.5 py-1.5 text-xs border border-border rounded-lg hover:bg-gray-50 transition-colors"
+                      className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       {expanded === post.id ? "Hide" : "Read"}
                     </button>
                     <button
                       onClick={() => setEditPost(post)}
-                      className="px-2.5 py-1.5 text-xs border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                      className="px-3 py-1.5 text-xs border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                     >
                       Edit
                     </button>
@@ -251,7 +254,7 @@ export default function Articles() {
                       <button
                         onClick={() => handleGolden(post)}
                         disabled={working === post.id}
-                        className="px-2.5 py-1.5 text-xs bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg hover:bg-yellow-100 disabled:opacity-50 transition-colors"
+                        className="px-3 py-1.5 text-xs bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg hover:bg-yellow-100 disabled:opacity-50 transition-colors"
                       >
                         ⭐ Add example
                       </button>
@@ -260,7 +263,7 @@ export default function Articles() {
                       <button
                         onClick={() => handleStatusChange(post, "published")}
                         disabled={working === post.id}
-                        className="px-2.5 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                        className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                       >
                         Publish
                       </button>
@@ -269,7 +272,7 @@ export default function Articles() {
                       <button
                         onClick={() => handleStatusChange(post, "held")}
                         disabled={working === post.id}
-                        className="px-2.5 py-1.5 text-xs border border-border text-muted-foreground rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                        className="px-3 py-1.5 text-xs border border-border text-muted-foreground rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
                       >
                         Unpublish
                       </button>
@@ -277,7 +280,7 @@ export default function Articles() {
                     <button
                       onClick={() => handleDelete(post)}
                       disabled={working === post.id}
-                      className="px-2.5 py-1.5 text-xs border border-red-200 text-red-700 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+                      className="px-3 py-1.5 text-xs border border-red-200 text-red-700 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
                     >
                       Delete
                     </button>
