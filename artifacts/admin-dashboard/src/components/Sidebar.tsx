@@ -11,6 +11,7 @@ const NAV = [
   { href: "/events", label: "Events", icon: "📅" },
   { href: "/social", label: "Social Media", icon: "📱" },
   { href: "/entities", label: "Entity Library", icon: "🏛️" },
+  { href: "/competitions", label: "Competitions", icon: "🏆" },
   { href: "/image-assets", label: "Image Library", icon: "🖼️" },
   { href: "/golden", label: "Golden Examples", icon: "⭐" },
   { href: "/usage", label: "AI Usage", icon: "📊" },
