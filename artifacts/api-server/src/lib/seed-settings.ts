@@ -231,6 +231,27 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 31,
   },
 
+  {
+    key: "facebook_webhook_verify_token",
+    label: "Facebook Webhook Verify Token",
+    description:
+      "A secret token you choose that Facebook uses to verify your webhook endpoint for Page feed events (used for competition entry tracking). " +
+      "\n\n" +
+      "HOW TO SET UP:\n" +
+      "Step 1 — Choose any random string (e.g. 'wut-fb-webhook-2024').\n" +
+      "Step 2 — Save that string here.\n" +
+      "Step 3 — In developers.facebook.com, open your app → Webhooks → Page.\n" +
+      "Step 4 — Set Callback URL to: https://whatsuptallaght.ie/api/webhooks/facebook\n" +
+      "Step 5 — Set Verify Token to the same string you saved here.\n" +
+      "Step 6 — Subscribe to the 'feed' field.\n" +
+      "Step 7 — Click Verify and Save.",
+    category: "facebook",
+    isSecret: true,
+    isRequired: false,
+    isConfigured: false,
+    displayOrder: 32,
+  },
+
   // ── Instagram ──────────────────────────────────────────────────────────────────
 
   {

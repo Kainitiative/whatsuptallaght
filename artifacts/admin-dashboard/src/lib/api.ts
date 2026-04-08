@@ -465,3 +465,66 @@ export async function getImageAssets(): Promise<ImageAsset[]> {
 export async function deleteImageAsset(id: number): Promise<void> {
   return request<void>(`/admin/image-assets/${id}`, { method: "DELETE" });
 }
+
+// ---------------------------------------------------------------------------
+// Competitions
+// ---------------------------------------------------------------------------
+
+export interface Competition {
+  id: number;
+  title: string;
+  prize: string;
+  facebookPostId: string;
+  facebookPostUrl: string | null;
+  status: "active" | "closed" | "drawn";
+  closingDate: string | null;
+  winnerEntryId: number | null;
+  entryCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompetitionEntry {
+  id: number;
+  competitionId: number;
+  facebookUserId: string;
+  facebookUserName: string;
+  commentId: string;
+  commentText: string | null;
+  enteredAt: string;
+}
+
+export interface CompetitionDetail extends Competition {
+  entries: CompetitionEntry[];
+  winner: CompetitionEntry | null;
+}
+
+export async function getCompetitions(): Promise<Competition[]> {
+  return request<Competition[]>("/admin/competitions");
+}
+
+export async function getCompetition(id: number): Promise<CompetitionDetail> {
+  return request<CompetitionDetail>(`/admin/competitions/${id}`);
+}
+
+export async function createCompetition(data: {
+  title: string;
+  prize: string;
+  facebookPostId: string;
+  facebookPostUrl?: string;
+  closingDate?: string;
+}): Promise<Competition> {
+  return request<Competition>("/admin/competitions", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function closeCompetition(id: number): Promise<Competition> {
+  return request<Competition>(`/admin/competitions/${id}/close`, { method: "POST" });
+}
+
+export async function drawCompetitionWinner(id: number): Promise<{ competition: Competition; winner: CompetitionEntry }> {
+  return request<{ competition: Competition; winner: CompetitionEntry }>(`/admin/competitions/${id}/draw`, { method: "POST" });
+}
+
+export async function deleteCompetition(id: number): Promise<void> {
+  return request<void>(`/admin/competitions/${id}`, { method: "DELETE" });
+}

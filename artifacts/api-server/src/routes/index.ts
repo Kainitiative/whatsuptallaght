@@ -17,6 +17,8 @@ import imageAssetsRouter from "./image-assets";
 import eventsRouter from "./events";
 import socialRouter from "./social";
 import entitiesRouter from "./entities";
+import competitionsRouter from "./competitions";
+import facebookWebhookRouter from "./webhook-facebook";
 import { adminAuth } from "../lib/admin-auth";
 
 const router: IRouter = Router();
@@ -32,6 +34,7 @@ router.use(contributorsRouter);
 router.use(rssRouter);
 router.use(statsRouter);
 router.use(webhookRouter);
+router.use(facebookWebhookRouter); // GET/POST /webhooks/facebook — public for Meta verification
 router.use(adminRouter); // contains POST /admin/auth — must be unprotected
 router.use(eventsRouter); // GET /public/events is public; admin CRUD protected below
 
@@ -42,6 +45,7 @@ router.use(settingsRouter);
 router.use(goldenExamplesRouter);
 router.use(socialRouter);
 router.use(entitiesRouter);
+router.use(competitionsRouter);
 router.use("/admin/usage", usageRouter);
 
 export default router;
