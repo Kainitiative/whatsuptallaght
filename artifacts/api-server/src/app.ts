@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import path from "path";
 import fs from "fs";
 import router from "./routes";
+import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
 import { db } from "@workspace/db";
 import { postsTable } from "@workspace/db/schema";
@@ -40,6 +41,8 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
+// Sitemap served at root — must be before /api router and static files
+app.use(sitemapRouter);
 app.use("/api", router);
 
 // In production the Express server also serves the Vite-built static apps.
