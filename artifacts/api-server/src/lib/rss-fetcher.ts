@@ -134,11 +134,58 @@ async function fetchEventbritePage(url: string): Promise<NormalisedFeedItem[]> {
       const title: string = ev?.name ?? "";
       const description: string = ev?.description ?? "";
       const startDate: string = ev?.startDate ?? "";
+      const endDate: string = ev?.endDate ?? "";
       const imageUrl: string | null = typeof ev?.image === "string" ? ev.image : null;
 
-      // Build content from available fields
-      const dateLine = startDate ? `Date: ${startDate}` : "";
-      const content = [dateLine, description].filter(Boolean).join("\n");
+      // Location / venue
+      const venueName: string = ev?.location?.name ?? "";
+      const venueAddress: string = [
+        ev?.location?.address?.streetAddress,
+        ev?.location?.address?.addressLocality,
+        ev?.location?.address?.addressRegion,
+      ].filter(Boolean).join(", ");
+      const venueStr = [venueName, venueAddress].filter(Boolean).join(" — ");
+
+      // Organiser
+      const organiserName: string = Array.isArray(ev?.organizer)
+        ? (ev.organizer[0]?.name ?? "")
+        : (ev?.organizer?.name ?? "");
+
+      // Ticket price and booking URL
+      const offers = Array.isArray(ev?.offers) ? ev.offers[0] : ev?.offers;
+      const price: string = offers?.price
+        ? `${offers.priceCurrency ?? "€"}${offers.price}`
+        : (offers?.availability?.includes("SoldOut") ? "Sold out" : "");
+      const ticketUrl: string = offers?.url ?? link;
+
+      // Format date/time in a human-readable way
+      let dateLine = "";
+      if (startDate) {
+        try {
+          const start = new Date(startDate);
+          const dateStr = start.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+          const timeStr = start.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", hour12: true });
+          let end = "";
+          if (endDate) {
+            const endDt = new Date(endDate);
+            end = ` – ${endDt.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+          }
+          dateLine = `${dateStr} at ${timeStr}${end}`;
+        } catch {
+          dateLine = startDate;
+        }
+      }
+
+      // Build structured content block — every field the AI needs to write a useful article
+      const contentParts = [
+        dateLine      ? `Date/Time: ${dateLine}`       : "",
+        venueStr      ? `Venue: ${venueStr}`            : "",
+        organiserName ? `Organiser: ${organiserName}`   : "",
+        price         ? `Price: ${price}`               : "",
+        ticketUrl     ? `Tickets/More info: ${ticketUrl}` : "",
+        description   ? `\n${description}`              : "",
+      ];
+      const content = contentParts.filter(Boolean).join("\n");
 
       items.push({
         guid: link,
