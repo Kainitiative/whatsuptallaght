@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, rematchPostEntity, extractEventFromPost, type Post, type PostCost } from "@/lib/api";
+import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, rematchPostEntity, extractEventFromPost, postArticleToFacebook, type Post, type PostCost } from "@/lib/api";
 import { formatDateShort, statusColour, confidenceColour } from "@/lib/utils";
 import StarRating from "@/components/StarRating";
 import ArticleEditModal from "@/components/ArticleEditModal";
@@ -156,6 +156,19 @@ export default function Articles() {
     }
   }
 
+  async function handlePostToFacebook(post: Post) {
+    if (!confirm(`Post "${post.title}" to Facebook now?`)) return;
+    setWorking(post.id);
+    try {
+      await postArticleToFacebook(post.id);
+      showToast("✅ Posted to Facebook successfully");
+    } catch (err: any) {
+      showToast(`❌ ${err.message ?? "Facebook post failed"}`);
+    } finally {
+      setWorking(null);
+    }
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-5xl">
       {editPost && (
@@ -292,6 +305,16 @@ export default function Articles() {
                       {post.body}
                     </div>
                     <div className="flex flex-wrap gap-2 pt-1">
+                      {post.status === "published" && (
+                        <button
+                          onClick={() => handlePostToFacebook(post)}
+                          disabled={working === post.id}
+                          className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          title="Post this article to the Facebook page as a link post"
+                        >
+                          📘 Post to Facebook
+                        </button>
+                      )}
                       <button
                         onClick={() => handleRegenerateImage(post)}
                         disabled={working === post.id}
