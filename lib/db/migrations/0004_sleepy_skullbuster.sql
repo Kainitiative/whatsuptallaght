@@ -1,0 +1,1 @@
+ALTER TABLE "rss_feeds" ADD COLUMN "feed_type" text DEFAULT 'rss' NOT NULL;
