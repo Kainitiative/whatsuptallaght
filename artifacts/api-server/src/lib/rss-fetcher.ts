@@ -93,45 +93,112 @@ function extractFeedImageUrl(item: Record<string, any>): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Eventbrite page scraper — extracts JSON-LD event list from a search page
+// ---------------------------------------------------------------------------
+
+interface NormalisedFeedItem {
+  guid: string;
+  title: string;
+  content: string;
+  link: string;
+  feedImageUrl: string | null;
+  pubDate: Date;
+}
+
+async function fetchEventbritePage(url: string): Promise<NormalisedFeedItem[]> {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; TallaghtCommunityBot/1.0; +https://whatsuptallaght.ie)",
+      "Accept": "text/html,application/xhtml+xml",
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) throw new Error(`Eventbrite fetch failed: ${res.status}`);
+  const html = await res.text();
+
+  // Extract all JSON-LD blocks
+  const jsonLdBlocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+  const items: NormalisedFeedItem[] = [];
+
+  for (const [, raw] of jsonLdBlocks) {
+    let data: any;
+    try { data = JSON.parse(raw.trim()); } catch { continue; }
+
+    const events = Array.isArray(data?.itemListElement) ? data.itemListElement : [];
+    for (const entry of events) {
+      const ev = entry?.item ?? entry;
+      const link: string = ev?.url ?? ev?.["@id"] ?? "";
+      if (!link) continue;
+
+      const title: string = ev?.name ?? "";
+      const description: string = ev?.description ?? "";
+      const startDate: string = ev?.startDate ?? "";
+      const imageUrl: string | null = typeof ev?.image === "string" ? ev.image : null;
+
+      // Build content from available fields
+      const dateLine = startDate ? `Date: ${startDate}` : "";
+      const content = [dateLine, description].filter(Boolean).join("\n");
+
+      items.push({
+        guid: link,
+        title,
+        content,
+        link,
+        feedImageUrl: imageUrl,
+        pubDate: startDate ? new Date(startDate) : new Date(),
+      });
+    }
+  }
+
+  logger.info({ url, count: items.length }, "RSS: Eventbrite page scraped");
+  return items;
+}
+
+// ---------------------------------------------------------------------------
 // Fetch and process a single RSS feed
 // ---------------------------------------------------------------------------
 
 async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void> {
-  logger.info({ feedId: feed.id, name: feed.name }, "RSS: fetching feed");
+  logger.info({ feedId: feed.id, name: feed.name, feedType: (feed as any).feedType ?? "rss" }, "RSS: fetching feed");
 
-  let parsed: Awaited<ReturnType<typeof parser.parseURL>>;
+  const feedType: string = (feed as any).feedType ?? "rss";
+  let normalisedItems: NormalisedFeedItem[] = [];
 
-  try {
-    parsed = await parser.parseURL(feed.url);
-  } catch (err) {
-    logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to fetch/parse feed");
-    // Update timestamp so we don't hammer a broken feed every 5 minutes
-    await db
-      .update(rssFeedsTable)
-      .set({ lastFetchedAt: new Date() })
-      .where(eq(rssFeedsTable.id, feed.id));
-    return;
+  if (feedType === "eventbrite") {
+    try {
+      normalisedItems = await fetchEventbritePage(feed.url);
+    } catch (err) {
+      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to fetch Eventbrite page");
+      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      return;
+    }
+  } else {
+    let parsed: Awaited<ReturnType<typeof parser.parseURL>>;
+    try {
+      parsed = await parser.parseURL(feed.url);
+    } catch (err) {
+      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to fetch/parse feed");
+      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      return;
+    }
+
+    normalisedItems = (parsed.items ?? []).map((item) => ({
+      guid: (item.guid || item.id || item.link) as string,
+      title: (item.title ?? "").trim(),
+      content: ((item as any).contentEncoded || item.contentSnippet || item.content || item.summary || "").trim(),
+      link: item.link ?? "",
+      feedImageUrl: extractFeedImageUrl(item as Record<string, any>),
+      pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
+    })).filter((i) => !!i.guid);
   }
 
   let newCount = 0;
   let relevantCount = 0;
 
-  for (const item of parsed.items ?? []) {
-    // Need at least a GUID or link to deduplicate
-    const guid = item.guid || item.id || item.link;
+  for (const item of normalisedItems) {
+    const { guid, title, content, link, feedImageUrl, pubDate } = item;
     if (!guid) continue;
-
-    const title = (item.title ?? "").trim();
-    const content = (
-      (item as any).contentEncoded ||
-      item.contentSnippet ||
-      item.content ||
-      item.summary ||
-      ""
-    ).trim();
-    const link = item.link ?? "";
-    const feedImageUrl = extractFeedImageUrl(item as Record<string, any>);
-    const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
 
     // --- Deduplication ---
     const [existing] = await db
