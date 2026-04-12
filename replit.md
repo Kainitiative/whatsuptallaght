@@ -1,1338 +1,309 @@
-# Workspace
+# What's Up Tallaght (WUT) — Platform Overview
 
-## Overview
+## Project Summary
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+WhatsApp-first AI community news platform for Tallaght, Dublin. Community members submit stories via WhatsApp; the AI pipeline processes them into published articles at **whatsuptallaght.ie**. Articles auto-post to Facebook. Additional content sourced from RSS feeds and Eventbrite. Managed via an admin dashboard.
 
-## Stack
+- **Production URL**: https://whatsuptallaght.ie
+- **GitHub repo**: `Kainitiative/whatsuptallaght`
+- **VPS**: `root@185.43.233.219` — app at `/opt/whatsuptallaght/`, deploy via `docker compose`
+- **Admin password**: set via `ADMIN_PASSWORD` env var (current: `tallaght-admin`)
+- **Production DB**: `postgresql://wut:wut_prod_2024@localhost:5432/wut`
+- **Facebook Page ID**: `977887435417701`; App ID `1004031388620003`
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+---
 
-## Structure
+## Workspace Structure
+
+pnpm monorepo. Node.js 24, TypeScript 5.9.
 
 ```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+artifacts/
+  api-server/          Express 5 API server (all backend logic lives here)
+  admin-dashboard/     React + Vite admin UI
+  community-website/   React + Vite public website
+  mockup-sandbox/      Vite component preview server (dev only)
+lib/
+  api-spec/            OpenAPI 3.1 spec + Orval codegen config
+  api-client-react/    Generated React Query hooks + fetch client
+  api-zod/             Generated Zod schemas from OpenAPI
+  db/                  Drizzle ORM schema + DB connection
+scripts/               Utility scripts
 ```
 
-## TypeScript & Composite Projects
+### TypeScript & Composite Projects
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+Every package extends `tsconfig.base.json` (`composite: true`). Always typecheck from root:
+```bash
+pnpm run typecheck          # tsc --build --emitDeclarationOnly
+pnpm run build              # typecheck + all package builds
+pnpm --filter @workspace/api-spec run codegen   # regenerate API client after spec changes
+```
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+In production, migrations run automatically on startup (`drizzle-orm/node-postgres/migrator`).
+In development, use `pnpm --filter @workspace/db run push`.
 
-## Root Scripts
+---
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+## API Server (`artifacts/api-server`)
 
-## Packages
+- **Entry**: `src/index.ts` — reads `PORT`, seeds settings/feeds/demo, starts Express, starts workers
+- **App setup**: `src/app.ts` — CORS, JSON parsing, sitemap, `/api` router, static file serving (production), OG meta injection for `/article/:slug`
+- **Build**: esbuild CJS bundle (`dist/index.cjs`), migrations folder copied at build time
+- **Static serving**: In production, Express serves both the community website (at `/`) and admin dashboard (at `/admin`)
 
-### `artifacts/api-server` (`@workspace/api-server`)
+### Route files (`src/routes/`)
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+| File | Prefix | Purpose |
+|---|---|---|
+| `health.ts` | `/api/health` | Health check |
+| `submissions.ts` | `/api/submissions` | WhatsApp submission management |
+| `posts.ts` | `/api/posts` | Article CRUD, publish, regenerate image |
+| `categories.ts` | `/api/categories` | Category management |
+| `rss.ts` | `/api/rss-feeds` | RSS/Eventbrite feed management |
+| `settings.ts` | `/api/settings` | Encrypted settings store |
+| `admin.ts` | `/api/admin` | Admin-only operations |
+| `public.ts` | `/api/public` | Public-facing endpoints (articles, search, events) |
+| `entities.ts` | `/api/admin/entities` | Entity library CRUD |
+| `image-assets.ts` | `/api/admin/image-assets` | Header image asset library |
+| `events.ts` | `/api/events` | Events calendar |
+| `contributors.ts` | `/api/contributors` | Contributor management |
+| `competitions.ts` | `/api/competitions` | Competitions |
+| `social.ts` | `/api/social` | Social captions |
+| `usage.ts` | `/api/usage` | AI usage/cost tracking |
+| `stats.ts` | `/api/stats` | Platform stats |
+| `storage.ts` | `/api/storage` | Object storage serving |
+| `sitemap.ts` | `/sitemap.xml` | Sitemap |
+| `webhook.ts` | `/api/webhooks/whatsapp` | WhatsApp webhook |
+| `webhook-facebook.ts` | `/api/webhooks/facebook` | Facebook webhook |
+| `golden-examples.ts` | `/api/golden-examples` | Few-shot training examples |
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+---
 
-### `lib/db` (`@workspace/db`)
+## Database Schema (`lib/db/src/schema/`)
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+| Table | Purpose |
+|---|---|
+| `submissions` | Raw WhatsApp inputs (text, audio, images); status tracks pipeline progress |
+| `posts` | Published/held/draft articles; `headerImageUrl`, `bodyImages[]`, `imagePrompt`, `matchedEntityId` |
+| `categories` | Article categories with slugs and colours |
+| `rss_feeds` | Feed URLs with `feedType` (`rss` \| `eventbrite`), interval, trust level, filter mode |
+| `rss_items` | Deduplicated items from all feeds; linked to posts on processing |
+| `contributors` | WhatsApp contributors; hashed phone, consent status, ban flag |
+| `entities` | Entity library — orgs, venues, teams with image URLs and aliases |
+| `header_image_assets` | Reusable DALL·E generated header images; keyed by tone + topic keywords |
+| `events` | Structured event records linked to posts |
+| `job_queue` | Async processing queue with retry scheduling |
+| `ai_usage_log` | Per-call OpenAI token and cost tracking |
+| `settings` | Encrypted key-value settings store |
+| `golden_examples` | Few-shot article examples for the AI writer |
+| `social_captions` | AI-generated Facebook/Twitter/Instagram captions per post |
+| `competitions` | Competitions with entry management |
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
+**Current migrations**: `0000` through `0004` (latest: adds `feed_type` column to `rss_feeds`).
 
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+---
 
-### `lib/api-spec` (`@workspace/api-spec`)
+## AI Pipeline (`src/lib/ai-pipeline.ts`)
 
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
+### WhatsApp pipeline (`processWhatsAppSubmission`)
 
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
+1. **Safety check** — OpenAI Moderation API (free)
+2. **Audio transcription** — Whisper for voice notes
+3. **Image description** — GPT-4o Vision; submitted photos stored as `bodyImages`
+4. **Tone classification** — GPT-4o-mini (JSON); assigns category
+5. **Info extraction** — GPT-4o-mini; headline, location, date, key facts, completeness score
+5b. **Event extraction** — GPT-4o-mini; runs when tone = event or date detected
+6. **Article writing** — GPT-4o with tone guide + golden examples
+7. **Fact-check** — GPT-4o-mini compares article against submission; FAIL → held
+7b. **Header image** — entity image > DALL·E asset library > none
+7c. **Confidence routing** — ≥0.75 + factCheck PASS → published; 0.40–0.74 → held; <0.40 → rejected
+8. **Social captions** — GPT-4o-mini generates Facebook/Twitter/Instagram variants
+9. **Facebook post** — photo upload (direct image) or link post fallback
 
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
+### RSS/Eventbrite pipeline (`processRssSubmission`)
 
-### `lib/api-zod` (`@workspace/api-zod`)
+Same stages but lighter (no media, no WhatsApp replies). Trust level affects auto-publish threshold. Uses GPT-4o-mini for article rewrite. Fact-checked same as WhatsApp pipeline.
 
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
+### Header image asset library (`findOrCreateHeaderAsset`)
 
-### `lib/api-client-react` (`@workspace/api-client-react`)
+Before generating a new DALL·E image, the pipeline checks `header_image_assets` for a matching asset (same tone + ≥2 overlapping topic keywords from headline). If found and under reuse limit (50 articles), reuses it. Otherwise generates new via DALL·E 3 (`1792x1024`, HD quality) and stores to library.
 
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+### Facebook posting (`src/lib/facebook-poster.ts`)
 
-### WhatsApp + AI Pipeline (`artifacts/api-server/src/`)
+When a `headerImageUrl` or `bodyImages[0]` is available:
+1. Uploads the image directly to the Facebook Page (`/{pageId}/photos`, `published: false`)
+2. Creates a feed post with `attached_media` referencing the uploaded photo ID
+3. Caption = excerpt + article URL on new line
 
-Phase 2b — WhatsApp ingestion and AI processing pipeline. All files live in the API server.
+Falls back to a link post (OG-based) when no image is available, preceded by an OG rescrape trigger.
 
-**Webhook** (`src/routes/webhook.ts`):
-- `GET /api/webhooks/whatsapp` — Meta verification handshake (checks `whatsapp_webhook_verify_token` setting)
-- `POST /api/webhooks/whatsapp` — Incoming messages; validates HMAC-SHA256 signature if `whatsapp_app_secret` is set; returns 200 immediately; processes async
-- Phone numbers are hashed (SHA-256) before storage — never stored in plaintext
-- Contributors auto-created on first message; duplicate-safe
-- Checks `isBanned` before processing
-- STOP/HELP commands work without consent (always handled)
-- **GDPR consent flow** (implemented):
-  1. New contributor → submission held as `awaiting_consent`, consent message sent with Terms/Privacy links
-  2. Contributor replies **YES** → `consentStatus` set to `consented`, all held `awaiting_consent` submissions re-queued for AI processing
-  3. Contributor replies **NO** → `consentStatus` set to `declined`, no further processing; reminder offered
-  4. Already-consented → normal flow
-  5. Declined contributor sends message → reminded they can reply YES to change mind
-- `contributors` table: `consentStatus` (`pending` | `consented` | `declined`), `consentGivenAt` timestamp
-- `submissions` table: `awaiting_consent` status added to enum for held submissions
+---
 
-**WhatsApp client** (`src/lib/whatsapp-client.ts`):
-- `sendTextMessage(to, body)` — sends via Meta Cloud API
-- `downloadMedia(mediaId)` — resolves temporary URL then downloads; returns `{buffer, mimeType}`
-- All credentials fetched from encrypted settings at call time
+## RSS / Eventbrite Fetcher (`src/lib/rss-fetcher.ts`)
 
-**Command handler** (`src/lib/commands.ts`):
-- `isCommand(text)` — detects commands
-- `handleCommand(phone, contributorId, text)` — dispatches HELP / MY POSTS / STATUS / DELETE / STOP
+- `startRssScheduler()` — polls every 5 minutes; checks each feed against its `checkIntervalMinutes`
+- Deduplication by GUID — items never processed twice
+- Geo-filter — `isRelevantToTallaght()` — 40+ keyword/place-name match
+- Events-only filter — per-feed opt-in (`filterMode: "events_only"`)
+- `feedType: "rss"` — standard RSS/Atom parser
+- `feedType: "eventbrite"` — `fetchEventbritePage()` scrapes JSON-LD from Eventbrite listing pages
 
-**AI Pipeline** (`src/lib/ai-pipeline.ts`):
-- Stage 1: OpenAI Moderation API (free) — safety gate; rejects + bans on failure
-- Stage 2: Whisper transcription for audio messages
-- Stage 3: GPT-4o Vision for image messages
-- Stage 4: GPT-4o-mini tone classification (JSON)
-- Stage 5: GPT-4o-mini info extraction — headline, location, date, key facts, completeness score (JSON)
-- Stage 6: GPT-4o article writing — uses golden examples for few-shot prompting
-- Stage 7: Confidence routing — ≥ 0.75 → auto-publish; < 0.75 → held; < 0.4 → reject
-- Sends WhatsApp notification on completion (published / held / rejected)
+### Eventbrite scraper (`fetchEventbritePage`)
 
-**Queue worker** (`src/lib/queue-worker.ts`):
-- `startQueueWorker()` — polls `job_queue` table every 5 seconds
+Fetches the Eventbrite listing page HTML and extracts all JSON-LD `ItemList` event entries. For each event extracts:
+- Title, description, start/end date+time (formatted human-readable)
+- Venue name + full address
+- Organiser name
+- Ticket price (with currency) + ticket URL
+- Event image URL
+
+All fields included in the content block passed to the AI — article writer is instructed to always include venue, price, and ticket link for event articles.
+
+### Active feeds
+
+| Feed | Type | Interval | Trust |
+|---|---|---|---|
+| Transport for Ireland | RSS | 20 min | official |
+| The Journal | RSS | 30 min | news |
+| Dublin Live | RSS | 30 min | news |
+| Eventbrite — Tallaght Library | Eventbrite | 6 hr | general |
+| Eventbrite — Tallaght | Eventbrite | 6 hr | general |
+
+SDCC RSS removed by source — disabled. Garda blocks cloud IPs — disabled (works on VPS). Met Éireann RSS removed — disabled.
+
+---
+
+## OG Meta Injection (`src/app.ts`)
+
+In production, Express intercepts every `GET /article/:slug` request before the static file middleware. It fetches the article from the DB and rewrites the OG and Twitter meta tags in the HTML shell:
+- `og:title` / `twitter:title` → article title
+- `og:description` / `twitter:description` → article excerpt
+- `og:image` / `twitter:image` → `bodyImages[0]` ?? `headerImageUrl` (resolved to absolute URL)
+- `og:url` → canonical article URL
+
+This ensures Facebook, WhatsApp link previews, and Twitter cards always show article-specific images — not the generic site image.
+
+---
+
+## Watermarking (`src/lib/watermark.ts`)
+
+All images stored via `uploadImageBuffer()` receive the WUT white logo watermarked to the bottom-left (28% image width, 2.5% margin) using `sharp`. Output is always JPEG quality 88. Falls back silently if compositing fails.
+
+---
+
+## Entity Library (`src/lib/entity-matcher.ts`)
+
+After article writing, `matchEntityInArticle()` checks the article body against all entities in the DB using whole-word string matching against names and aliases. If matched with sufficient centrality, the entity's stored image is used as the header image (overrides DALL·E, loses to submitted photos).
+
+Pre-loaded: St Marks GAA Club, Tallaght University Hospital (TUH/AMNCH), Tallaght Library, Tallaght Community School, Rua Red Arts Centre.
+
+---
+
+## Social Captions (`src/lib/social-caption-agent.ts`)
+
+After article is written, `generateAndStoreSocialCaptions()` uses GPT-4o-mini to generate three platform-specific caption variants (Facebook, Twitter, Instagram). Stored in `social_captions` table. Admin can view and override before posting.
+
+---
+
+## Weekend Roundup (`src/lib/weekend-roundup-scheduler.ts`)
+
+Scheduled job that assembles a weekend event roundup article from upcoming events in the DB. Runs on a configured schedule (Friday afternoon by default).
+
+---
+
+## Queue Worker (`src/lib/queue-worker.ts`)
+
+- Polls `job_queue` every 5 seconds
 - Atomic job claiming via `FOR UPDATE SKIP LOCKED`
-- Retry schedule: 60s → 5min → 15min, then permanent failure
-- Job type: `PROCESS_WHATSAPP_SUBMISSION`
-
-**Credentials required (set via admin settings):**
-- `openai_api_key` — GPT-4o, Whisper, Moderation
-- `whatsapp_access_token` — Meta Cloud API
-- `whatsapp_phone_number_id` — Meta phone number
-- `whatsapp_webhook_verify_token` — webhook verification
-- `whatsapp_app_secret` — signature validation (optional but recommended)
-
-### RSS Ingestion (`artifacts/api-server/src/lib/`)
-
-Phase 2c — RSS feed ingestion with Tallaght geo-filtering and AI rewriting.
-
-**Geo-filter** (`src/lib/geo-filter.ts`):
-- `isRelevantToTallaght(feedUrl, title, content)` — two-pass filter
-- Pass 1: Feed-level always-relevant check (SDCC only — 100% South Dublin scope)
-- Pass 2: Keyword match across 40+ Tallaght/South Dublin place names, infrastructure, and institution keywords
-- `getFeedTrustLevel(feedUrl)` — returns "official" / "news" / "general" for AI pipeline routing
-
-**RSS Fetcher** (`src/lib/rss-fetcher.ts`):
-- `startRssScheduler()` — polls every 5 minutes, respects per-feed `checkIntervalMinutes`
-- On each run: fetches all active feeds that are due, deduplicates by GUID
-- Stores all items (relevant or not) in `rss_items` for analytics
-- Queues `PROCESS_RSS_SUBMISSION` jobs for relevant items
-- Handles 403/404/timeouts gracefully — updates `lastFetchedAt` regardless
-- `onConflictDoNothing` prevents race conditions on duplicate GUIDs
-
-**RSS AI Pipeline** (in `src/lib/ai-pipeline.ts`):
-- Lighter than WhatsApp pipeline — no media processing, no WhatsApp replies
-- Uses GPT-4o-mini for rewriting (cheaper than GPT-4o; content is already structured)
-- Trust-level routing: `official` → auto-publish (≥ 0.75 confidence), `news` → hold, `general` → hold
-- Updates `rss_items.post_id` when article is created
-
-**Active feeds (as of April 2026):**
-- Transport for Ireland (`/feed/`) — keyword-filtered, 20 min interval ✅
-- The Journal (`thejournal.ie/feed/`) — keyword-filtered, 30 min interval ✅
-- Dublin Live (`dublinlive.ie`) — keyword-filtered, 30 min interval ✅
-- SDCC: RSS removed by SDCC — disabled
-- Garda: blocks cloud IPs — disabled (re-enable on VPS)
-- Met Éireann: RSS removed — disabled
-
-**Seed management:**
-- `DEPRECATED_URLS` array in seed-rss-feeds.ts auto-disables old/broken URLs on each startup
-- `onConflictDoUpdate` now also syncs `isActive` so deactivations propagate correctly
+- Job types: `PROCESS_WHATSAPP_SUBMISSION`, `PROCESS_RSS_SUBMISSION`
+- Retry schedule: 60s → 5min → 15min → permanent failure
 
 ---
 
-## Completed Features
+## WhatsApp Integration (`src/lib/whatsapp-client.ts`)
 
-### Feature 1 — AI-generated article header images (DALL·E 3) ✅ BUILT
-
-**Backend**: `imagePrompt` column on `posts`; `generateHeaderImage()` in AI pipeline (Stage 6b); integrated into WhatsApp + RSS pipelines; `regeneratePostImage()` + `POST /posts/:id/regenerate-image` endpoint; `auto_generate_images` setting seeded (defaults off).
-**Frontend**: Admin Articles page — "Regenerate Image" button in expanded article view; sends `POST /posts/:id/regenerate-image`; updates the post in place with a toast notification.
-
-### Feature 2 — Full-text search ✅ BUILT
-
-**Backend**: `GET /api/public/search?q=` — PostgreSQL `tsvector`/`tsquery` across title, excerpt, body; ranked results, paginated.
-**Frontend**: Community website — search icon in header (expands to inline input, submits to `/search`); `/search` page with result cards showing thumbnail, title, excerpt, timestamp; "no results → WhatsApp us" CTA; Search link in footer.
-
-### Feature 3 — Per-article AI cost display ✅ BUILT
-
-**Backend**: `GET /posts/:id/cost` — sums all `ai_usage_log` entries for a post's source submission; returns per-stage breakdown + total USD.
-**Frontend**: Admin Articles page — cost badge (green, monospace) shown next to confidence score once article is expanded; full per-stage breakdown table shown below article body; auto-fetched on first expand.
+- `POST /api/webhooks/whatsapp` — validates HMAC-SHA256; returns 200 immediately; queues async
+- GDPR consent flow: new contributors held at `awaiting_consent`; YES reply consents + re-queues
+- Phone numbers hashed (SHA-256) — never stored in plaintext
+- Commands: STOP, HELP, MY POSTS, STATUS, DELETE
+- `sendTextMessage(to, body)` — Meta Cloud API
+- `downloadMedia(mediaId)` — resolves temp URL and downloads
 
 ---
 
-## Planned Features (not yet built)
+## Settings (encrypted)
 
-### AI-generated article header images (DALL·E 3)
+All credentials stored encrypted in the `settings` table. Key settings:
 
-#### Concept
-When an article has no header image (most WhatsApp submissions and RSS articles), the AI generates a contextually appropriate image using DALL·E 3 and stores it as the article's `headerImageUrl`. This dramatically improves visual impact on the home page and article pages.
-
-#### How it works
-- **Trigger**: After article writing (Stage 6 of the AI pipeline), if no image was submitted with the original content, add an optional Stage 7: image generation
-- **Prompt construction**: Use the article headline + key facts (already extracted in Stage 5) to build a DALL·E 3 prompt. The prompt should describe a scene relevant to the article — not logos or brands.
-- **Style guidance in prompt**: "photorealistic community news photography style, no text, no watermarks, vibrant but factual" — avoids AI-looking imagery
-- **Special cases**:
-  - **Sports/partnership articles**: use team colours and symbolic imagery (e.g. two sets of kit colours, trophies, stadium) rather than actual logos (DALL·E will not render real logos reliably)
-  - **Events**: crowd scenes, event venue, community gathering
-  - **Infrastructure/transport**: roads, buses, Luas, cycling lanes
-  - **Community notices**: local streets, community centre settings
-
-#### Image storage
-- Generated images are returned as URLs from OpenAI's CDN (expire after ~1 hour) — must be downloaded immediately and stored
-- Use Replit Object Storage (already configured in the project) to store images permanently
-- Store the public Object Storage URL in `posts.header_image_url`
-
-#### Cost
-- DALL·E 3 standard quality 1024×1024: ~$0.04 per image
-- Only generate when no image already exists — WhatsApp image submissions skip this step
-- Could be made opt-in per feed trust level (e.g. skip for "official" feeds that don't need it)
-- Admin toggle: "Auto-generate images" on/off in Settings
-
-#### Admin controls
-- Article detail view: "Regenerate image" button — re-runs DALL·E with the same prompt
-- "Edit prompt" — admin can tweak the image prompt before regenerating
-- Show the DALL·E prompt used so admin can understand why the image looks as it does
-
-#### Implementation notes
-- Add `imagePrompt` field to `posts` table (text, nullable) — stores the prompt used for transparency/debugging
-- `object-storage` skill already covers the upload pattern
-- Coordinate with the existing `headerImageUrl` field — no schema changes needed beyond `imagePrompt`
-
-#### WUT logo watermark ✅ BUILT
-All article images (DALL·E generated **and** WhatsApp submitted) automatically receive the white WUT logo watermarked onto the bottom-left corner before the image is stored in Object Storage. This is the single point of application — `uploadImageBuffer()` in `ai-pipeline.ts` calls `applyWatermark()` before saving.
-
-- **Implementation**: `artifacts/api-server/src/lib/watermark.ts` — uses `sharp` for compositing
-- **Logo file**: `artifacts/api-server/src/assets/wut-logo-white.png` — copied to `dist/` at build time via `build.mjs`
-- **Sizing**: logo is 28% of image width, placed 2.5% from the left and bottom edges
-- **Output**: always saved as JPEG (quality 88) regardless of input format
-- **Fallback**: if compositing fails for any reason, the original buffer is used and a warning is logged
-- **Sharp**: externalized in `build.mjs` (uses prebuilt native binaries)
+| Key | Purpose |
+|---|---|
+| `openai_api_key` | GPT-4o, Whisper, Moderation, DALL·E |
+| `whatsapp_access_token` | Meta Cloud API |
+| `whatsapp_phone_number_id` | Meta phone number |
+| `whatsapp_webhook_verify_token` | Webhook verification |
+| `whatsapp_app_secret` | Signature validation |
+| `facebook_page_id` | Facebook Page ID |
+| `facebook_page_access_token` | Page access token |
+| `platform_url` | Base URL (https://whatsuptallaght.ie) |
+| `auto_generate_images` | `"true"` / `"false"` — DALL·E generation toggle |
 
 ---
+
+## Community Website Features
+
+- Home page with featured articles and recent news
+- Article pages with header image, body, event details card, related articles
+- Events calendar page
+- Search (`/search?q=`) — PostgreSQL full-text search across title/excerpt/body
+- WhatsApp submission CTA throughout
+- Category pages
+- About page
+- Sitemap at `/sitemap.xml`
+
+---
+
+## Admin Dashboard Features
+
+- **Articles** — list, expand, edit, publish/unpublish/delete, regenerate image, re-scan entity, extract event, post to Facebook, view AI cost breakdown
+- **RSS Feeds** — add/edit/delete feeds; `feedType` selector (RSS vs Eventbrite); Eventbrite badge in list
+- **Submissions** — raw WhatsApp submissions with status
+- **Contributors** — list, ban/unban
+- **Events** — upcoming/past events calendar management
+- **Entity Library** — add/edit/delete entities with image upload and alias management
+- **Image Assets** — header image asset library viewer
+- **Competitions** — competition management
+- **Settings** — all encrypted settings via UI
+- **AI Usage** — platform-wide token and cost breakdown by stage and model
+- **Golden Examples** — few-shot training examples for the AI writer
+
+---
+
+## Planned / Not Yet Built
+
+### Facebook webhook (one-time setup pending)
+Go to developers.facebook.com → App → Webhooks → Page → Edit. Set:
+- Callback URL: `https://whatsuptallaght.ie/api/webhooks/facebook`
+- Verify Token: from Settings in admin
+- Subscribe to: `feed` field
+
+### Newsletter system
+Monthly newsletter compiled from top articles. WhatsApp + email delivery. Subscribers opt in via website form or WhatsApp. Not yet built.
+
+### Community reaction pieces ("Have Your Say")
+Hashtag-based WhatsApp reactions to articles synthesised by AI into companion "Community Reacts" pieces. Data model designed, not yet built.
 
 ### Social media comments → AI opinion pieces
-
-#### Concept
-When an article is shared to Facebook or Instagram, public comments from the community on that post become a rich source of opinion. The AI can read those comments, run them through the same moderation + sentiment pipeline as WhatsApp reactions, and generate a "Community Reacts" companion piece — exactly like the WhatsApp hashtag reaction system, but sourced from social media engagement.
-
-#### How comment reading works
-Both Facebook and Instagram (Business) expose comments via their Graph API:
-- **Facebook**: `GET /{facebook-post-id}/comments` — returns commenter name, message, timestamp, likes count
-- **Instagram**: `GET /{instagram-media-id}/comments` — same structure
-
-When posting to social media (the planned social distribution feature), the API already receives back the platform post ID. That ID needs to be saved to the article record at post time.
-
-#### Data model additions
-**`posts` table — new columns:**
-- `facebook_post_id` — the Facebook page post ID returned after publishing (e.g. `123456_789012`)
-- `instagram_media_id` — the Instagram media ID returned after publishing
-
-**New `social_comments` table:**
-| Column | Notes |
-|---|---|
-| `id` | serial PK |
-| `article_id` | FK → `posts.id` |
-| `platform` | `facebook` \| `instagram` |
-| `platform_comment_id` | Platform's own comment ID (for deduplication) |
-| `commenter_name` | Display name (never shown publicly in generated piece) |
-| `raw_text` | Comment text |
-| `safety_passed` | Boolean — moderation result |
-| `sentiment` | `positive` \| `negative` \| `neutral` |
-| `included_in_piece` | Boolean — used in generated piece |
-| `likes_count` | Engagement signal — more-liked comments carry more weight |
-| `fetched_at` | Timestamp |
-
-#### Comment polling schedule
-- Fetch comments at: 2 hours, 6 hours, and 24 hours after posting — captures the initial rush and the slower tail
-- De-duplicate by `platform_comment_id` — safe to re-poll without creating duplicates
-- Filter out: very short comments (<5 words), obvious spam patterns, comments that are just emojis
-- Respect API rate limits: Facebook allows ~200 calls/hour per token
-
-#### Generation trigger
-Same as the WhatsApp reaction piece system — manual trigger from admin OR auto-trigger when 10+ safety-passed comments exist:
-- AI receives: original article + all approved comments + sentiment breakdown + engagement counts
-- Prompt instructs it to weight higher-liked comments more heavily as they represent broader agreement
-- Never attribute specific views to named commenters — "One local resident commented…", "Several people pointed out…"
-- Link back to the Facebook/Instagram post so readers can join the discussion
-
-#### Privacy considerations
-- Facebook commenter names are public (unlike WhatsApp) but should still NOT be published in generated pieces — editorial standards
-- Store names in DB for admin reference only (helps spot spam patterns)
-- Do not store profile pictures or profile links — unnecessary PII
-- GDPR: comments are publicly posted by users on a public post — no additional consent required for editorial analysis, but generated pieces should not identify individuals
-
-#### Admin controls needed
-- Article detail: show comment count by platform, sentiment breakdown, list of fetched comments with safety/sentiment status
-- "Fetch latest comments" manual refresh button
-- "Generate reaction piece" button (same as WhatsApp reaction flow)
-- Toggle per-article: "Monitor social comments" on/off
-
-#### API permissions required
-- Facebook: `pages_read_engagement`, `pages_manage_posts` — already needed for posting
-- Instagram: `instagram_manage_comments` — additional permission on top of posting permissions
-- No extra OAuth scopes for reading public post comments if the post was made by your own page
-
-#### Relationship to WhatsApp reaction pieces
-These are the same concept — community opinions synthesised into a companion piece. The two sources (WhatsApp hashtag replies + social media comments) can be merged into a single reaction piece if both exist, giving a richer cross-channel view of community opinion. The `article_reactions` table (WhatsApp) and `social_comments` table could be combined in the AI prompt for a single synthesis.
-
----
-
-### Per-article AI cost display (Articles page & article detail)
-- **What exists**: `ai_usage_log` table already records every OpenAI API call with token counts and USD cost, linked to each submission via `submission_id`. The AI Usage page shows platform-wide totals and breakdowns.
-- **What's missing**: Individual article cards / article detail view don't show how much that specific article cost to generate.
-- **Plan**:
-  - Add a `GET /posts/:id/cost` endpoint (or include cost in the existing post response) that sums all `ai_usage_log` entries for the article's `source_submission_id`
-  - Return total input tokens, output tokens, total cost USD, and a breakdown by stage (tone classify, info extract, write article, etc.)
-  - Display a small cost badge on each article card in the Articles page (e.g. "$0.009")
-  - Show a full cost breakdown in the article detail/edit view — which pipeline stages ran, what each cost, total spend
-- **Join path**: `posts.source_submission_id` → `ai_usage_log.submission_id`
-- **Note**: Articles processed before the usage tracking was added (the first 12) will show $0.00 — add a "legacy — no data" label for those rather than showing zero
-
----
-
-### Newsletter system (WhatsApp + Email delivery)
-
-#### Overview
-A monthly newsletter compiled from the best articles of that month, delivered via WhatsApp (free, using the 24-hour reply window) and/or email. Subscribers manage their own delivery preference. Sign-up available on the public website and via WhatsApp replies.
-
-#### Subscriber data model (`newsletter_subscribers` table)
-| Column | Notes |
-|---|---|
-| `phone` | WhatsApp number — optional, required for WhatsApp delivery |
-| `email` | Email address — optional, required for email delivery |
-| `delivery_pref` | `whatsapp_only` \| `email_only` \| `both` \| `unsubscribed` |
-| `source` | How they signed up: `website_form` \| `whatsapp_auto` \| `whatsapp_reply` |
-| `confirmed_at` | Timestamp of first confirmed contact |
-| `pref_updated_at` | Timestamp of last preference change |
-
-#### Newsletter issues (`newsletters` table)
-| Column | Notes |
-|---|---|
-| `month` | e.g. `2026-04` — unique, one per month |
-| `title` | e.g. "April 2026 — Tallaght Community Newsletter" |
-| `slug` | URL path, e.g. `/newsletter/april-2026` |
-| `body_html` | Full rendered HTML for email delivery |
-| `summary_text` | Short WhatsApp-friendly text summary (with link) |
-| `status` | `draft` \| `published` |
-| `published_at` | When it went live |
-| `article_ids` | Array of post IDs included in this issue |
-
-#### WhatsApp newsletter sends (`newsletter_wa_sends` table)
-Tracks which phone numbers have already received the current month's newsletter via WhatsApp auto-reply, to avoid sending it twice.
-| Column | Notes |
-|---|---|
-| `phone` | Recipient phone number |
-| `newsletter_month` | e.g. `2026-04` |
-| `sent_at` | Timestamp |
-
-#### Website sign-up form
-- Fields: **email** (required) + **phone number** (optional, labelled "Add your WhatsApp number for newsletter delivery")
-- Email only → `email_only` preference
-- Phone only → `whatsapp_only` preference
-- Both → `both` preference
-- Stores to `newsletter_subscribers` table; sends a confirmation reply/email immediately
-
-#### WhatsApp auto-delivery (free — within 24-hour session window)
-- When someone messages the WhatsApp number, the webhook checks: is there a published newsletter for this month, and has this number NOT already received it this month?
-- If yes → append newsletter link and preference prompt to the submission acknowledgment reply: *"While you wait — here's our April newsletter: [link]. Reply EMAIL to switch to email, BOTH for both, or STOP to unsubscribe."*
-- Mark the send in `newsletter_wa_sends` so it only happens once per number per month
-- This is **free** — it is a reply within the customer-initiated 24-hour window, not an outbound template message
-
-#### WhatsApp keyword detection (CRITICAL — must be pre-AI filter)
-Before any message is routed to the AI pipeline, check for control keywords. These must short-circuit immediately and never reach OpenAI:
-- `STOP` / `UNSUBSCRIBE` → mark subscriber as `unsubscribed`, reply confirmation
-- `EMAIL` → prompt for email address; on next reply containing `@`, store email and set `email_only`
-- `BOTH` → prompt for email address; on next reply containing `@`, store email and set `both`
-- `WHATSAPP` → set `whatsapp_only`, reply confirmation
-- A bare email address in a session where the bot is awaiting one → store it and confirm
-- **Note**: This requires a per-number "conversation state" flag (e.g. `awaiting_email`) in the contributors or subscribers table
-
-#### Email delivery
-- External sending service required — **Resend** recommended (3,000 emails/month free tier, simple API, excellent deliverability)
-- Monthly newsletter email: HTML email with top stories, images, and a "Read more on the website" CTA for each article
-- From address: e.g. `hello@[yourdomain].ie` — requires verified domain in Resend
-- Unsubscribe link in every email footer (legal requirement under GDPR)
-
-#### Admin: newsletter generation & publishing
-- New "Newsletter" section in admin dashboard
-- "Generate [Month] newsletter" button → AI selects top articles from the past month (best by category, diversity of topics)
-- Admin previews the selection, can add/remove articles, edit the intro paragraph
-- "Publish" → creates the newsletter page on the public website and queues delivery
-- Delivery queue: emails sent via Resend to all `email_only` and `both` subscribers; WhatsApp links queued for next-contact delivery to `whatsapp_only` and `both` subscribers
-- Stats: how many delivered by channel, open rate (email), click rate
-
-#### GDPR / compliance notes
-- Every email must have a one-click unsubscribe link
-- WhatsApp subscribers must have opted in (website form or explicit WhatsApp reply)
-- Store consent source and timestamp
-- Data deletion: admin should be able to delete a subscriber by phone/email on request
-
----
-
-### Community reaction pieces ("Have Your Say" via WhatsApp hashtags)
-
-#### Concept
-When an article is published, it can be assigned a short reaction hashtag (e.g. `riot`, `watermain`, `busroute`). The social media post and/or article footer invites readers to WhatsApp their opinion using that tag: *"Have your say — WhatsApp us with #riot + your view."* Responses are collected for a set window, then the AI synthesises them into a companion "Community Reacts" article, which goes to the Review Queue for human approval before publishing.
-
-#### How the hashtag routing works (WhatsApp webhook)
-- Pre-AI filter: any incoming message whose text starts with `#` is treated as a reaction, not an article submission
-- Extract the hashtag (e.g. `riot` from `#riot these lads are a disgrace`)
-- Look up which published article has `reaction_hashtag = 'riot'`
-- If found → store as a reaction record; do NOT route to the AI article pipeline
-- If not found → treat as a normal submission (hashtag may be coincidental)
-- Acknowledge the sender: *"Thanks — your view has been noted and may be included in a community response piece."*
-
-#### Data model additions
-**`posts` table — new columns:**
-- `reaction_hashtag` — short tag admin assigns when publishing (e.g. `riot`). Unique. Null = reactions not enabled for this article.
-- `reaction_piece_id` — FK to the generated companion post once it's created
-
-**New `article_reactions` table:**
-| Column | Notes |
-|---|---|
-| `id` | serial PK |
-| `article_id` | FK → `posts.id` — the article this reaction belongs to |
-| `phone` | Submitter's phone number (never shown publicly) |
-| `hashtag` | The tag used (e.g. `riot`) |
-| `raw_text` | Their message, with the hashtag stripped out |
-| `safety_passed` | Boolean — individual moderation check result |
-| `sentiment` | `positive` \| `negative` \| `neutral` — quick AI classify |
-| `included_in_piece` | Boolean — whether this reaction was used in the generated piece |
-| `created_at` | Timestamp |
-
-#### Individual reaction processing
-Each reaction runs through:
-1. **Moderation check** (OpenAI Moderation API, free) — flag and exclude toxic/violating content
-2. **Quick sentiment classify** (GPT-4o-mini, ~0.0001 per reaction) — tag as positive/negative/neutral for balance in the generated piece
-3. Store result regardless — admin can see all reactions including flagged ones in the dashboard
-
-#### Generation trigger
-Two modes, both should exist:
-- **Auto-trigger**: a scheduled job checks every hour for articles where: `reaction_hashtag IS NOT NULL` AND at least 5 reactions have passed safety AND the article was published more than X hours ago (configurable per article, default 4 hours). Queues a `GENERATE_REACTION_PIECE` job.
-- **Manual trigger**: admin can click "Generate reaction piece" on any article in the dashboard at any time, regardless of threshold or timing.
-
-#### AI generation — the reaction piece
-The AI receives:
-- The original article body
-- All safety-passed reactions, with their sentiment labels
-- A count breakdown: e.g. "12 reactions total: 4 positive, 6 negative, 2 neutral"
-
-**System prompt (finalised):**
-```
-You are writing a community reaction article based on multiple anonymous responses from local residents.
-
-STRICT RULES:
-- Do NOT include names or identify any individual.
-- Do NOT quote exact messages unless they are neutral and safe.
-- Do NOT exaggerate or dramatise opinions.
-- Do NOT introduce new facts.
-
-STRUCTURE:
-- Start with a simple summary of the situation.
-- Then describe the overall sentiment (e.g. mostly negative, mixed, etc).
-- Then give a balanced overview of the different views.
-- Keep tone neutral and grounded.
-
-STYLE:
-- Write in simple, natural language.
-- Avoid dramatic or sensational wording.
-- Keep it readable and local in tone.
-
-IMPORTANT:
-- Reflect uncertainty if opinions are mixed.
-- Do not claim "everyone thinks" anything.
-- Use phrases like "some residents said…" or "others felt…"
-
-OUTPUT:
-- Article body only
-```
-
-Generated piece:
-- Always goes to `held` status — never auto-published
-- Tagged as a companion to the original article via `posts.reaction_piece_id`
-- Appears in Review Queue with a "Community Reaction" badge
-- Admin approves, edits if needed, then publishes
-
-#### Admin dashboard additions needed
-- Article edit/detail view: field to set `reaction_hashtag`, toggle to enable/disable reactions
-- Reactions tab on each article: list of all received reactions with safety status, sentiment, phone (admin-only), and included/excluded flag
-- "Generate reaction piece" button (manual trigger)
-- Reaction piece count shown on article cards (e.g. "14 reactions")
-
-#### Cost per reaction piece
-- Moderation per reaction: free
-- Sentiment classify per reaction: ~$0.0001 (GPT-4o-mini, tiny prompt)
-- Reaction piece generation: ~$0.002–0.005 (GPT-4o-mini, short synthesis)
-- A 20-reaction article costs roughly $0.005 total — negligible
-
-#### Edge cases to handle
-- **Duplicate reactions from same number**: allow (people may send multiple thoughts), store all, but flag if more than 3 from one number (possible spam)
-- **No reactions after 24 hours**: auto-expire the hashtag, no piece generated
-- **All reactions flagged by moderation**: do not generate a piece; notify admin
-- **Hashtag clash**: enforce uniqueness in the DB; admin UI warns if tag is already in use
-
----
-
-## Monetisation Plan
-
-The platform has two natural revenue streams that can start generating income almost immediately, both without needing to build any self-serve infrastructure first. Everything in Phase 1 can be done manually while the platform grows.
-
----
-
-### Stream 1 — Newsletter Sponsorship & Advertising
-
-#### Concept
-Each newsletter issue has a fixed number of paid slots. Businesses pay to appear in front of the subscriber list for that month. Price scales automatically with audience size — as the list grows, you raise prices, and the early sponsors who backed you at €30/month benefit from a price lock until they cancel.
-
-#### Ad slot types (within a newsletter issue)
-| Slot | What it is | Launch price | 1k subscribers | 2k+ subscribers |
-|---|---|---|---|---|
-| **Spot ad** | Small text block + logo, ~50 words, appears mid-newsletter | €30/month | €75/month | €150/month |
-| **Section sponsor** | "Sport this week is brought to you by X" — logo + one line at the top of a category section | €60/month | €125/month | €250/month |
-| **Issue sponsor** | "This month's Tallaght Community newsletter is presented by X" — top and bottom of full issue, 150-word editorial piece about the business, logo throughout | €120/month | €250/month | €500/month |
-
-- Maximum 2 paid slots per issue to maintain editorial quality and reader trust
-- Slots for the next issue become available after the current one sends
-- Long-term sponsors (paying 3+ months consecutively) get a 10% loyalty discount — rewards commitment and reduces churn
-
-#### Selling it (Phase 1 — no self-serve portal needed)
-- Reach out to local businesses by WhatsApp or phone — Tallaght is a community, direct is better
-- Send them the stats (subscriber count, open rate, WhatsApp delivery rate) as social proof
-- Collect payment via bank transfer or Revolut to start; move to Stripe when volumes justify it
-- Track bookings in a simple spreadsheet: business name, slot type, issue, paid/unpaid, renewal date
-- Give them a simple brief form (Google Form is fine) — they fill in: business name, tagline, offer (if any), logo image, contact details
-
-#### Admin tools needed (Phase 2)
-- Newsletter issue builder needs "ad slots" section — assign a booked business to Spot/Section/Sponsor position for that issue
-- The newsletter template automatically places their content at the correct position
-- Admin dashboard: "Sponsorship" page — list of all bookings, status (paid/unpaid/upcoming/expired), renewal alerts
-
-#### Stripe integration (Phase 3)
-- Monthly recurring subscriptions per slot type
-- Business receives invoice email automatically
-- Admin gets notified when a subscription cancels (slot becomes available)
-- Self-serve: business can log in to update their ad copy/logo before each issue
-
----
-
-### Stream 2 — Business Listings & Featured Content
-
-This is where it gets interesting, because there are several models and it's worth understanding the tradeoffs before committing to one. The right choice depends on whether the priority is volume of businesses or revenue per business.
-
-#### Option A — AI-Written Business Feature Articles (recommended for early stage)
-A business pays for a professionally written article about them, placed permanently on the platform. The AI writes it from a brief they fill in (what the business does, their story, any current offer or news). It gets published just like any other article but labeled "Sponsored Content" or "Business Feature".
-
-**Why this works well for Tallaght:**
-- Local businesses can't afford a PR agency. A permanent, well-written article on a well-indexed local website is genuinely valuable — it helps their Google ranking for local searches
-- One-time cost means no ongoing commitment to scare them off
-- Low delivery overhead — AI writes the draft, admin reviews, publishes
-- Permanent benefit — unlike an ad that disappears, the article stays forever and keeps generating SEO value
-
-**Pricing:**
-- €75–150 per article (launch price €75, raise to €100+ as traffic grows)
-- Optional add-on: newsletter mention in the same month's issue (€30 — cheaper than standalone spot ad)
-
-**How the brief works:**
-- Business fills in a simple WhatsApp/form submission with: business name, what they do, their story, any special offer or news angle
-- This goes into the standard WhatsApp pipeline but is flagged as a paid submission
-- AI writes a 400-word editorial-style piece (same pipeline, but with a "business feature" system prompt variant that focuses on what makes the business unique to Tallaght)
-- Admin reviews and publishes — or sends the draft to the business for approval first
-
-#### Option B — Enhanced Business Directory Listings
-A permanent directory page on the website for each business, like a mini profile.
-
-| Tier | What's included | Price |
-|---|---|---|
-| **Free basic** | Name, category, phone, website link — automatically indexed if mentioned in an article | Free |
-| **Enhanced** (€12/month or €120/year) | Business photo, opening hours, short description, "Verified Local Business" badge, priority in directory search |
-| **Featured** (€30/month or €300/year) | Everything in Enhanced + prominent placement at top of category, mentioned in relevant newsletter sections, linked from related editorial articles |
-
-**Tradeoff**: A directory needs traffic before businesses will pay for enhanced listings. Works better in 6–12 months when the site is established than at launch.
-
-#### Option C — Category Sponsorship (hybrid approach)
-A business sponsors an entire content category on the website for a month. Their name/logo appears on every article in that category during the sponsorship period.
-
-Examples:
-- A local gym sponsors the "Sport" category — "*Sport coverage this month supported by [Gym]*"
-- A solicitor sponsors "News & Issues" — "*News coverage supported by [Solicitor]*"
-- A restaurant sponsors "Events & What's On"
-
-**Why this is easy to sell**: The pitch is simple and tangible. "Your logo appears on every sport article we publish this month." No confusion about what they're getting.
-
-**Pricing**: €80–200/month depending on category traffic. Sport and News likely command the highest rates.
-
-**Technical need**: A `sponsors` field on the categories table — admin assigns a monthly sponsor to a category. Article templates check if the category has a current sponsor and render the line if so.
-
----
-
-### Recommended rollout order
-
-**Right now (no code needed):**
-1. Start selling newsletter spots for the first newsletter issue manually
-2. Offer AI Business Feature articles to a handful of local businesses at €75 launch price — this funds itself almost immediately (2 articles = €150, covers OpenAI costs for months)
-3. Reach out via WhatsApp to local businesses — Tallaght GAA sponsors, local gyms, solicitors, estate agents — these are the most likely early buyers
-
-**Phase 2 (after first 3 months):**
-4. Build newsletter ad slot management into admin
-5. Add "Sponsored Content" article type with proper labeling in admin
-6. Add simple billing records page to admin (manual payment tracking)
-
-**Phase 3 (when list hits 500+ subscribers):**
-7. Stripe integration for newsletter recurring subscriptions
-8. Business directory with enhanced/featured tiers
-9. Category sponsorship system
-
----
-
-### Important note on editorial integrity
-Sponsored content must be clearly labeled — "Sponsored Content", "Business Feature", or "Supported by [X]" depending on the format. This protects the editorial credibility of the platform which is its most valuable long-term asset. Community trust is worth more than any individual ad deal.
-
----
-
-### Entity Library ✅ BUILT
-
-**Backend**: `entities` table (name, aliases[], type, imageUrl, website, description, matchedEntityId on posts). `entity-matcher.ts` module — fast string-based whole-word matching against entity names + all aliases; called in both WhatsApp and RSS pipelines after article is written. Image precedence: submitted photo > entity image > DALL·E > none. API routes at `/admin/entities` (CRUD + search). **5 seed entities pre-loaded**: St Marks GAA Club, Tallaght University Hospital (+ TUH/AMNCH aliases), Tallaght Library, Tallaght Community School, Rua Red Arts Centre.
-**Frontend**: Admin Entity Library page (`/entities`) — list view with entity images/type badges/aliases, inline add/edit form, image upload via presigned URL, alias chip management, type filter, search. Delete with confirmation dialog. Stats bar shows counts by type and image coverage.
-
-### Entity Library (organisation & person image store) — spec
-
-#### Concept
-A database of named entities — local organisations, people, venues, clubs, and recurring figures — each with a stored image (logo, headshot, team crest). When the AI writes an article, it checks whether any known entities are mentioned and automatically uses the matching image as the header image if no photo was submitted with the original message.
-
-#### How it works end to end
-1. A contributor sends a photo of the Tallaght Rehabilitation logo with a caption like *"Tallaght Rehabilitation are hosting an open day."*
-2. The image classifier detects it is a logo/branding asset (not a scene or event photo) and the admin is prompted: *"Save this as an entity image for Tallaght Rehabilitation?"*
-3. The entity record is created: name, aliases, type, stored image URL
-4. Future: any submission mentioning "Tallaght Rehabilitation" (or any alias) — even with no image — gets the stored logo as its header image automatically
-5. If a submission includes both an event photo and the entity is matched, the submitted photo takes priority (scenes trump logos)
-
-#### Entity record structure (`entities` table)
-| Column | Notes |
-|---|---|
-| `id` | serial PK |
-| `name` | Primary name (e.g. "Tallaght Rehabilitation") |
-| `aliases` | JSON array of alternate names (e.g. ["Tallaght Rehab", "TR"]) |
-| `type` | `organisation` \| `person` \| `venue` \| `team` \| `event` |
-| `imageUrl` | Stored image path (Object Storage) |
-| `website` | Optional |
-| `description` | Short summary (used as AI context when entity is matched) |
-| `createdAt` | Timestamp |
-
-#### AI matching step
-After article writing, the AI receives the entity list and the article body and returns any entities it finds mentioned. Confidence threshold applies — low-confidence matches do not override submitted images.
-
-#### Image precedence rules
-1. Submitted event/scene photo — always first choice
-2. Entity match — used when no photo submitted, or when submitted image is itself a logo
-3. DALL·E generated image — fallback if no entity match and no submitted image
-4. No image — last resort
-
-#### Monetisation angle
-Businesses with paid listings (Option A/B/C) get their logo/image stored as an entity — meaning every editorial article that mentions their business automatically uses their brand image. This is a tangible premium benefit that can be included in paid packages.
-
-#### Admin controls needed
-- Entity Library page in admin — list, add, edit, delete entities
-- On article detail: show which entity was matched (if any) and allow override
-- Image upload for entity logos directly in admin (no need to send via WhatsApp)
-- Alias management — "also known as" field for fuzzy matching
-
----
+Read Facebook/Instagram comments on shared articles via Graph API; synthesise into reaction pieces. Requires additional Graph API permissions.
 
 ### Multi-image grouping (WhatsApp)
+Album detection + 10-second time-window to group multiple images from the same contributor into one submission. Not yet built.
 
-#### The problem
-When a contributor sends two or more images at the same time in WhatsApp, each image arrives as a separate webhook event — milliseconds apart but with no shared identifier. The system currently treats each one as an independent submission and creates a separate article per image.
+### Video upload handling
+Audio extraction + frame sampling for WhatsApp video submissions. Always held for review. Not yet built.
 
-#### Recommended approach: time-window + album detection (two layers)
+### AI Clarification Loop
+After info extraction, AI asks contributor one follow-up question via WhatsApp (vague location, unconfirmed name, etc.) before writing the article. Not yet built.
 
-**Layer 1 — WhatsApp album metadata:**
-When a contributor uses WhatsApp's native multi-select (tap and hold to select multiple photos before sending), Meta's webhook includes a shared `context` field on each message linking them to the same album. If this field is present and matches a previous message, they are definitively the same submission. No delay required.
-
-**Layer 2 — Time-window grouping (fallback):**
-When images arrive individually (not as an album), the system holds each message in a pending state for 10 seconds before processing begins. Any additional message arriving from the same phone number within that window is merged into the same submission. After the window closes with no further messages, processing starts on the combined group.
-
-#### How grouping changes the pipeline
-- The submission record gains a `mediaItems` array (instead of a single image)
-- The image description stage describes all images and produces a combined summary
-- The AI article writer receives all descriptions and any caption text to produce one article
-- The first image (or best compositional image, per AI ranking) becomes the header image
-- Remaining images are stored and associated with the article for potential gallery display
-
-#### Precedence for caption text
-When multiple images are sent, the caption typically only appears on the first image. The pipeline should collect captions from all messages in the group and join them as the primary text source.
-
-#### Photo gallery on the website
-Once multi-image grouping works, an article can display a full photo gallery — multiple images stored and shown as a slideshow or grid on the article page. This is a significant quality upgrade for event coverage (e.g. 5 photos from a football match → one rich article with a gallery, not five thin articles).
-
-#### Admin controls needed
-- Merge tool: select two articles and ask the AI to combine them into one (for cases where automatic grouping missed it)
-- Article detail: show all images associated with the article, reorder them, set which is the header
-- Review Queue: "Combined submission" badge showing how many images were grouped
-
-#### Edge cases
-- Someone sends an image now and another image two hours later about a completely different topic — the 10-second window prevents false grouping
-- All images in a group fail the safety check — treat same as single rejected submission
-- Caption on second image but not first — still collected and used
-
----
-
-### Video upload handling (WhatsApp pipeline)
-- **Rule**: Any WhatsApp submission containing a video file must always be routed to `held` status — no auto-publish regardless of confidence score.
-- **AI assessment approach**:
-  - Extract the audio track from the video and transcribe with Whisper (same as voice notes)
-  - Extract a sample of key frames (e.g. one every 5 seconds) and describe each with GPT-4o Vision
-  - Combine transcript + frame descriptions into a written AI assessment stored on the submission record
-- **Review Queue**: Show a "Contains video" badge on video submissions; display the AI assessment note so editors know what the video contains before approving or rejecting — without needing to watch it first
-- **Tooling note**: Will require `ffmpeg` to extract audio and frames from the video buffer before passing to OpenAI
-
-### AI Clarification Loop (WhatsApp pipeline)
-
-#### Concept
-After the AI extracts key facts from a submission (Stage 5), before writing the article it checks whether anything needs confirming with the contributor. If so, it sends a WhatsApp question and waits for the reply before proceeding to Stage 6. One question at a time, one reply needed.
-
-#### What triggers a clarification question
-- **Name detected in submission** — AI asks: "We noticed the name [Name] in your message — is that your own name, or someone else's? Reply MY NAME or SOMEONE ELSE." If confirmed as their own: "Would you like to be named in the article, or stay anonymous? Reply NAMED or ANONYMOUS."
-- **Vague location** — e.g. "up the road", "near the shops" → AI asks: "Where exactly did this happen? (e.g. Old Bawn Road, Tallaght Town Centre)"
-- **Vague time** — e.g. "yesterday", "earlier" → AI asks: "When did this happen? Reply with a date or day."
-- **Very short/incomplete submission** — AI asks: "Can you tell us a bit more about what happened?"
-- **Unverified claim** — e.g. "I heard that…" → AI asks: "Do you have any more details or do you know who said this?"
-
-#### Data model additions
-**New `submission_clarifications` table:**
-- `id` — serial primary key
-- `submission_id` — FK to submissions
-- `contributor_id` — FK to contributors (for fast webhook lookup)
-- `question_type` — enum: `name_attribution` | `location` | `date` | `detail` | `custom`
-- `question_text` — the exact message sent to the contributor
-- `status` — enum: `pending` | `answered` | `timed_out`
-- `answer` — text, the contributor's reply
-- `asked_at` — timestamp
-- `answered_at` — timestamp (nullable)
-
-**Submissions table — new `pending_clarification` status** added to `submissionStatusEnum`.
-
-#### Webhook changes
-When a consented contributor sends a message, check first if they have an open (`pending`) clarification record. If yes, their reply is treated as the answer (not a new submission):
-1. Store the reply as `answer` on the clarification record, mark `answered`
-2. Check if there are more pending clarifications for the same submission
-3. If no more → update submission status back to `pending`, re-queue for Stage 6 with all clarification answers injected into the context
-4. If more → send the next question
-
-#### AI pipeline changes
-- After Stage 5 (info extraction), a new **Stage 5b** generates clarification questions if needed
-- Returns a structured list: `[{ type, question }]` — empty array if no clarifications needed
-- If questions exist: insert rows into `submission_clarifications`, set submission status to `pending_clarification`, send first question via WhatsApp
-- Stage 6 prompt receives a `clarifications` block: "Contributor confirmed: name is their own, prefers to stay anonymous. Location confirmed: Rossfield Estate."
-
-#### Timeout handling
-- A background job checks for clarifications where `asked_at` is older than 24 hours and status is still `pending`
-- On timeout: mark as `timed_out`, check if remaining questions can be skipped, re-queue submission for Stage 6 without the clarification
-- Contributor receives: "No worries — we'll process your story with the information you gave us."
-
-#### Name attribution — editorial priority
-The name question should always fire if a name is detected, regardless of anything else. Publishing someone's name without explicit consent is the highest-risk outcome; this is the one clarification that should never be skipped or timed out silently.
-
----
-
-### Social Media Distribution — AI Caption Agent ✅ BUILT
-
-**Backend**: `social-caption-agent.ts` — GPT-4o-mini with Social Media Manager persona; generates Facebook, Instagram, X/Twitter captions + hashtags + social score (1–10) + recommended time slot (morning/lunchtime/evening); called automatically on every publish (WhatsApp, RSS, manual admin). Stores in `social_captions` table. Facebook poster uses AI caption via `overrideMessage`. API routes: `GET /admin/social/captions`, `POST /admin/social/captions/:postId/regenerate`, `PUT /admin/social/captions/:id`, `POST /admin/social/captions/:postId/post-facebook`.
-**Frontend**: Admin Social Media page (`/social`) — accordion list of articles with platform tabs (Facebook/Instagram/X), editable caption textarea, copy button, regenerate AI button, "Post to Facebook now" button, social score badge, recommended slot label.
-
-### Social Media Distribution — AI Caption Agent (original spec)
-
-#### The core idea
-The AI that writes articles (factual, careful, no embellishment) is the wrong voice for social media. Social needs scroll-stopping energy — a hook in the first line, a reason to click, a question that pulls people in. A separate AI stage runs after an article is approved, using a completely different role prompt to generate platform-specific social captions.
-
-#### The Social Media Agent — role prompt
-The system prompt for this stage is built around a persona, not just instructions:
-
-> *"You are the social media manager for Tallaght Community Hub, a hyper-local community page serving Tallaght, Dublin. You know the area inside out. You write in a warm, direct, local voice — the way a well-informed neighbour would share news, not the way a media company would. You understand what makes people in Tallaght stop scrolling: local names, local places, things that affect their daily life directly. Your job is to write short, punchy captions that feel human and local. The first line must make someone stop. Never write like a press release. Never say 'we are delighted to announce'. Never use corporate language. Write like you're texting a mate who'd want to know."*
-
-This gives the AI a character to write from, not just a list of rules. The quality difference between a role-prompted social post and a generic summarisation is significant.
-
-#### What the agent produces per article
-For each article approved for social publishing, the agent returns:
-- **Hook line** — the first sentence, written to stop the scroll (question, surprising fact, or local name/place)
-- **Body** — 1–2 follow-up sentences with the key detail
-- **Call to action** — "Full story at the link 👇" or "What do you think? Let us know in the comments"
-- **Hashtags** — 3–5 relevant ones from a managed list: `#Tallaght #SouthDublin #Dublin #TallaghtCommunity` + any article-specific tags (e.g. `#TallaghtFire`, `#SDCCUpdate`)
-- **Platform variant** — slightly different phrasing for Facebook vs Instagram vs X
-- **Post recommendation** — the agent also flags if the article genuinely isn't social-worthy (e.g. a dry planning notice). Admin can override.
-- **Suggested post time** — morning commute (7–9am), lunchtime (12–1pm), or evening (6–8pm) based on content type
-
-#### Platform differences
-| Platform | Style | Length | Special |
-|---|---|---|---|
-| Facebook | Conversational, can spark discussion | 2–4 sentences | End with a question to drive comments |
-| Instagram | Punchy, more visual | 1–2 sentences | Hashtags matter more; emoji acceptable |
-| X / Twitter | Very short, punchy | 1 sentence + link | Under 200 chars ideally |
-
-#### Posting cadence rules (enforced by the system)
-- Maximum **4 posts per day** per platform — excess articles queued to the next day
-- Minimum **1 hour between posts** — no back-to-back flooding
-- Priority order if capped: breaking/urgent news first, then community human interest, then RSS rewrites last
-- Lost & Found listings: posted immediately, bypass the queue (time-sensitive)
-- Campaign submissions (Local Heroes, etc.): posted in the evening slot — feel-good content performs better then
-
-#### Daily Editorial Scheduler — how posting actually works
-Rather than posting articles the moment they're published, the social agent runs a daily scheduling job each morning (default: 6am). It looks at all articles published in the last 24 hours that haven't been posted to social yet, selects the best ones for that day, writes the captions, and sets the posting times. Fully automatic — nothing to do.
-
-**The daily job step by step:**
-1. **Collect** — fetch all articles published yesterday that are flagged as social-eligible and not yet posted
-2. **Score & rank** — the agent reads each article and scores it for social worthiness: How local is it? How specific? Human interest or dry admin? Time-sensitive or evergreen?
-3. **Select** — picks the top N articles based on score (N is configurable in settings, default 4). If fewer than N articles are worth posting, it posts fewer — never pads with weak content
-4. **Write captions** — for each selected article, generates platform-specific captions (Facebook, Instagram, X) using the Social Media Agent role prompt
-5. **Schedule** — assigns each post a time slot across the day based on content type:
-   - Urgent/breaking → first slot of the day (8am)
-   - Community human interest → lunchtime (12:30pm) or evening (6pm)
-   - Feel-good campaign content → evening (7pm)
-   - Multiple posts in the same slot → spread them 90 minutes apart
-6. **Queue** — inserts scheduled posts into a `social_post_queue` table with their post times
-7. A separate **posting worker** polls the queue every minute and sends anything whose scheduled time has passed
-
-**What carries over:**
-Articles that scored well but didn't make the daily cut aren't lost — they're marked as `queued_next_day` and included in tomorrow's pool. Content that's more than 3 days old is retired from the social queue (too stale).
-
-**Settings the admin controls:**
-- `social_daily_post_limit` — max posts per day per platform (default: 4)
-- `social_scheduler_time` — what time the daily job runs (default: 6am)
-- `social_posting_slots` — the time slots posts are distributed across (default: 8am, 12:30pm, 5pm, 7pm)
-
-#### Admin controls
-- **Daily schedule preview** — each morning, after the scheduler runs, the admin can see what's been selected and scheduled for today. Edit a caption, swap an article, or remove a post before it goes live
-- Per-article override: "Post now" bypasses the scheduler for breaking news
-- Global pause: stop all scheduled posts immediately (e.g. during a sensitive local situation)
-- Per-platform toggles: enable/disable Facebook, Instagram, X independently
-- View history: see what was posted each day and its engagement (once social API integration provides that data back)
-
-#### Golden Examples for social (mirrors the article system)
-Just like the article Golden Examples system, the admin can mark a social post as a training example. Over time the agent learns what gets engagement for this specific page and audience.
-
-#### Connection to campaigns
-When a submission matches an active campaign, the social agent receives the campaign name and style note. A "Local Heroes" post gets written differently from a traffic update — warmer, more celebratory, tagged differently.
-
----
-
-### Campaign Engine (admin-configurable community engagement)
-
-#### The problem
-The platform owner needs to be able to launch new types of community engagement — Local Heroes, Valentine's messages, Back to School stories, Christmas memories — without any code changes. Each campaign has its own tone, category, and AI writing style. The system needs to recognise submissions that belong to a campaign naturally, without making the public use keywords or tags.
-
-#### Concept: campaigns as admin-created objects
-The admin creates a campaign in the admin dashboard. That campaign is stored in the database and injected into the AI pipeline at runtime. No deployments, no code changes — just fill in a form and switch it on.
-
-#### Data model — `campaigns` table
-- `id` — serial primary key
-- `name` — e.g. "Local Heroes", "Valentine's Messages", "Christmas Memories"
-- `description` — plain English description used by the AI to recognise matching submissions (e.g. "Nominations or celebrations of a local person who has done something positive for their community in Tallaght")
-- `categorySlug` — which category submissions are published under
-- `aiStyleNote` — optional extra instruction for Stage 6 (e.g. "Write warmly and celebrate the person. Keep it uplifting and personal.")
-- `acknowledgmentMessage` — optional custom WhatsApp reply sent to the contributor after they submit (e.g. "Thanks! We love hearing about Tallaght's local heroes 🌟")
-- `isActive` — boolean, toggleable from admin
-- `startsAt` — optional date (campaign activates automatically)
-- `endsAt` — optional date (campaign deactivates automatically)
-- `createdAt`, `updatedAt`
-
-#### How the AI detects campaign matches
-At Stage 4 (classification), the prompt receives a list of all currently active campaigns (name + description). The AI returns either a standard content type OR a `campaign_match` with the matched campaign ID. No keywords needed from the public — the AI reads the submission and decides whether it fits.
-
-Example: active campaign "Local Heroes" with description "A local person being celebrated or nominated for their contribution to the community". Submission: *"My neighbour has been cutting the grass outside the flats for the elderly residents for years, never asks for anything, just does it."* → AI matches `campaign: local_heroes`.
-
-#### What changes when a campaign is matched
-- Stage 6 uses the campaign's `aiStyleNote` instead of the standard article prompt tone
-- The article is assigned to the campaign's `categorySlug`
-- The contributor receives the campaign's `acknowledgmentMessage` instead of the standard "👍 Got it!"
-- The article lands in Review Queue with a campaign badge so the admin knows which campaign it belongs to
-- Auto-publish threshold may be lower for campaigns (admin-configurable per campaign) — softer content, lower risk
-
-#### Admin dashboard — Campaigns page
-- List of all campaigns: name, status (active/inactive/scheduled/expired), submission count, published count
-- "New Campaign" button → form: name, description, category, AI style note, acknowledgment message, date range, confidence threshold
-- Toggle active/inactive instantly
-- Click a campaign → see all submissions received under it
-
-#### Seasonal / time-limited campaigns
-- Valentine's Day: active Feb 1–14 only
-- Christmas: active Dec 1–25
-- Back to School: active late August
-- The platform automatically activates and deactivates based on `startsAt` / `endsAt` — admin sets it once and forgets it
-
-#### Connection to Lost & Found
-Lost & Found is a special-case campaign with extra behaviour (listing mode, contact consent, resolution detection). When the campaign engine is built, Lost & Found should be migrated into it as a campaign type with `listingMode: true`. The campaign engine becomes the single system that handles all non-standard submission types.
-
-#### Connection to Admin Trigger Phrases
-When an admin creates a new campaign, the natural next step is to publish an announcement article using the `ANNOUNCE:` trigger. The two features work together: campaign engine handles inbound submissions; admin trigger phrase handles the outbound announcement that tells people the campaign exists.
-
----
-
-### Admin WhatsApp Trigger Phrases (owner-submitted tasks)
-
-#### The problem
-The platform owner needs a way to submit instructions to the AI pipeline via WhatsApp — not as a public contribution, but as an internal task. For example: "Write an announcement article introducing the new Lost & Found section." This is fundamentally different from a community submission and needs to be routed separately.
-
-#### Concept: admin trigger phrases
-- The admin's phone number(s) are registered in Settings as `admin_whatsapp_numbers` (comma-separated list of hashed numbers, or stored plaintext since it's the owner's own number)
-- Any message from a registered admin number that begins with a trigger prefix is treated as an **admin task**, not a public submission
-- Suggested prefixes (configurable in settings): `TASK:`, `ANNOUNCE:`, `WRITE:`, `PUBLISH:`
-- Non-prefixed messages from admin numbers still go through the normal contributor pipeline (admin may also be a regular contributor)
-
-#### How admin tasks differ from submissions
-| | Contributor submission | Admin task |
-|---|---|---|
-| Source | Community member | Platform owner |
-| Pipeline | Full AI pipeline (Stage 1–7) | Simplified — skips moderation, goes straight to article writing |
-| Default routing | Confidence-based (auto-publish or hold) | Always goes to Review Queue — admin still approves before publishing |
-| Consent gate | Required | Skipped (owner is operating the platform) |
-| Attribution | "A local resident" | Can be set to "Editorial" or "Tallaght Community Hub" |
-
-#### Example usage
-Admin sends via WhatsApp:
-> `ANNOUNCE: We've just launched a new Lost & Found section. People can now submit found or lost items via WhatsApp and we'll publish them here. Encourage neighbours to use it.`
-
-The system:
-1. Detects the `ANNOUNCE:` prefix and admin number match
-2. Skips consent/moderation — goes straight to a tailored AI article prompt
-3. AI writes a short community announcement article
-4. Lands in Review Queue with an "Admin task" badge for final approval
-5. Admin publishes it — it goes live like any other article
-
-#### Settings needed
-- `admin_whatsapp_numbers` — list of hashed phone numbers that get admin routing
-- `admin_task_prefixes` — comma-separated list of recognised prefixes (default: `TASK:,ANNOUNCE:,WRITE:,PUBLISH:`)
-
-#### Article attribution for admin tasks
-- Byline: "Tallaght Community Hub" (not "a local resident")
-- Category: admin selects in Review Queue before publishing (or can be detected from the instruction)
-
----
-
-### Lost & Found — Listing Mode (category-specific submission type)
-
-#### Concept
-Lost & Found is fundamentally different from a news article. It's a structured short listing — a brief description, a photo if available, a location, and a way to get in touch. The full AI article pipeline (300-word articles) is the wrong format. Lost & Found needs a **listing mode**: short, structured, card-based output.
-
-Crucially, **the public never needs to use a prefix or keyword**. Someone just sends a natural message — "I lost me dog, it's a black lab, if anyone sees it please get in touch" — and the AI detects that this is a lost/found submission from the content itself.
-
-#### How the AI detects lost/found submissions
-Stage 4 (tone classification) is extended with a new classification type: `lost_and_found`. The AI looks for natural language signals:
-- "I lost...", "has anyone seen...", "missing since...", "can't find..."
-- "I found...", "found a...", "handed in...", "nobody claimed..."
-- Mentions of pets, keys, wallets, phones, bags, bikes
-- An appeal for contact ("please get in touch", "if you see her")
-
-If the classification returns `lost_and_found`, the submission bypasses the standard Stage 6 article prompt and uses the listing mode prompt instead.
-
-#### Contact consent — the follow-up question (links to AI Clarification Loop)
-After detecting a lost/found submission, before writing anything, the system sends one clarification question via WhatsApp:
-
-> "Will we share your WhatsApp number with anyone who says they've found it? Reply YES or NO."
-
-- **YES** → the published listing includes: "To get in touch, WhatsApp [platform number] and we'll connect you."  The contributor's number is stored privately on the listing record so admin can pass it on when someone responds.
-- **NO** → the published listing says: "If you have information, WhatsApp [platform number] and we'll pass on the message." Contact is always mediated through the platform.
-
-This question is treated as a clarification record (same `submission_clarifications` table as the AI Clarification Loop). The listing is not published until the contributor replies, or until 24 hours pass (in which case it defaults to NO — never share without explicit consent).
-
-#### What the AI does differently in listing mode
-- Does NOT write a 300-word article — target is 2–4 sentences max
-- Does NOT invent detail — only uses what was given
-- Fills in gaps naturally: if no date, uses "recently"; if no location, omits it rather than guessing
-- Strips raw phone numbers or personal addresses from the published text
-- Always goes to Review Queue — no auto-publish for lost/found listings
-
-#### Category routing
-- `lost_and_found` classification → automatically assigned to the Lost & Found category
-- Skips tone scoring and topic extraction — listing type is already established
-- Review Queue shows a "Lost & Found" badge and displays whether the contributor consented to number sharing
-
-#### Natural resolution — no commands needed
-When the contributor who submitted the original lost/found listing sends a follow-up message, the AI checks whether it sounds like a resolution:
-- "We found her!", "She's home safe", "Got him back", "Keys turned up", "Someone handed it in"
-- Natural positive language after a period of a live lost/found listing
-
-**How the link is made:**
-The system looks up the contributor's most recent active (unresolved) lost/found listing by their phone hash. If one exists and the new message reads as a resolution, it is treated as a resolution update — not a new submission.
-
-**What happens:**
-1. The listing is automatically marked as **Resolved** in the database
-2. The listing card on the website updates to show "✓ Reunited" or "✓ Claimed"
-3. The contributor receives a warm reply: "Delighted to hear that! We've updated your listing. 🐾" (tone adjusted for pets vs objects)
-4. No admin action required — the resolution is instant
-
-**Ambiguity handling:**
-If the AI isn't confident the message is a resolution (e.g. it could be a new submission unrelated to the listing), it asks:
-> "Great news! Does this mean [dog/item description] has been found? Reply YES to close your listing or NO if this is something else."
-
-**Edge cases:**
-- If the contributor has no active listing → treated as a normal submission
-- If the contributor has multiple active listings → AI asks which one: "Is this about your lost [description]? Reply YES or NO."
-- Resolution messages are never published as new articles
-
-#### Website display
-- Lost & Found category page shows cards, not article previews
-- Each card: photo (if any) + short listing text + "Lost" or "Found" badge + date posted
-- Cards expire (archived, not deleted) after 30 days, or when admin marks as "Resolved"
-- "Resolved" cards show a ✓ Reunited or ✓ Claimed label — positive community signal
-- Resolved cards stay visible for 7 days then archive — gives the community the feel-good moment before it disappears
-
-#### Introducing the section — link to Admin Trigger Phrases
-The admin would use the `ANNOUNCE:` trigger (see above) to write and publish an introductory article explaining the new section — written by the AI in the platform's editorial voice, published under "Tallaght Community Hub". This is the connection between the two features.
-
----
-
-### Story Deduplication & Live Article Updates
-
-#### The problem
-When a major local incident occurs (fire, accident, flooding), multiple people WhatsApp about it simultaneously or in quick succession. Without deduplication, the system publishes multiple near-identical articles about the same event.
-
-#### Concept: event matching + article enrichment
-When a submission arrives, before processing it runs a **duplicate check** against recently published and in-progress articles. If it matches an existing story, instead of creating a new article, it enriches the existing one with any new information and updates the published article in place.
-
-#### How matching works
-- After Stage 5 (info extraction), the extracted facts (location, event type, date/time) are compared against articles published in the last 6 hours
-- Matching is semantic, not keyword — the AI judges whether two submissions are clearly about the same real-world event
-- Match confidence threshold: configurable, default 0.8 (must be very confident before merging)
-- If unsure → create a separate article (better to have two than to wrongly merge unrelated stories)
-
-#### What happens on a match
-1. The new submission's facts are merged into the existing article — any genuinely new detail is added (e.g. John submitted "massive fire on M50", Mary adds "2 cars crashed")
-2. The article body is rewritten by the AI with the combined information
-3. The article gains a **"Updated [time]"** timestamp visible on the website
-4. The article is tagged as **"Multiple contributors"** — shown as a badge on the article and in the admin
-5. Both contributor records are linked to the article (`article_contributors` join table)
-6. The new contributor receives a different acknowledgment: "Thanks — your update has been added to our existing story on this."
-7. If the article was already published, the update goes live immediately (no re-review needed for factual additions). If it changes the core facts significantly, it is re-routed to the Review Queue
-
-#### Data model additions
-- `article_contributors` table: `articleId`, `contributorId`, `submissionId`, `role` (`original` | `update`)
-- `articles` table: `lastUpdatedAt` (timestamp), `isMultiContributor` (boolean), `updateCount` (integer)
-
-#### Admin visibility
-- Review Queue shows "Updated story" badge on enriched articles
-- Article detail shows full contribution history: who submitted what and when
-- Admin can revert an update if it was incorrectly merged
-
----
-
-### Contributor Reputation Tiers
-
-#### Concept
-A contributor with 50 accurate published articles should be treated differently from a first-time anonymous sender. Reputation tiers give trusted contributors lower barriers to publication and higher trust weighting in the AI pipeline.
-
-#### Tier system
-| Tier | Name | Criteria | Benefit |
-|---|---|---|---|
-| 0 | New | First submission | Full pipeline, consent required, standard thresholds |
-| 1 | Regular | 3+ published articles, no violations | Confidence threshold reduced by 0.05 |
-| 2 | Trusted | 10+ published, no violations in 90 days | Confidence threshold reduced by 0.10, skips Stage 1 moderation |
-| 3 | Verified | Admin-manually assigned | Auto-publish regardless of confidence, bypasses Review Queue |
-
-#### How tiers are calculated
-- Tiers 0–2 are calculated automatically based on `publishedCount` and violation history on the contributor record
-- Tier 3 (Verified) is admin-assigned only — for known community figures, local organisations, councillors, trusted sources
-- Tier is recalculated each time a submission is processed — no separate scheduler needed
-
-#### Data model additions
-- `contributors` table: `reputationTier` integer (0–3), `violationCount` integer, `lastViolationAt` timestamp
-- A violation is recorded when a submission is rejected at moderation (Stage 1) or manually rejected by admin with a "quality" or "violation" reason
-
-#### Admin visibility
-- Contributor profile shows tier, published count, violation count
-- Admin can manually promote to Tier 3 (Verified) or demote back to Tier 0
-- Review Queue shows contributor tier badge next to each submission — helps admin prioritise review
-
----
-
-### WhatsApp 24-Hour Messaging Window — Constraint & Workarounds
-
-#### The constraint
-Meta's WhatsApp Business API only allows a business to send **outbound messages** to a user within **24 hours of the user's last message** to the business. After that window closes, any attempt to message them fails. This is called the "Customer Service Window."
-
-#### Where this affects the platform
-1. **AI Clarification Loop** — if a clarification question isn't answered and the window closes, follow-up messages can't be sent. The question must be asked within 24 hours of the original submission.
-2. **Publication notifications** — if a submission takes more than 24 hours to process and publish (e.g. a manual Review Queue hold), the "your article is live" notification cannot be sent.
-3. **Contributor pre-publish review** (see below) — the review request must be sent and responded to within 24 hours.
-
-#### Workarounds and design rules
-- **Acknowledge immediately** — the current system already sends "👍 Got it!" the moment a submission arrives. This opens the 24-hour window. Any subsequent clarification questions or notifications must fire before that window closes.
-- **Priority processing** — submissions from contributors with an open window should be processed with higher urgency. The queue worker should track window expiry times.
-- **Graceful degradation** — if the window has closed when the system tries to send a notification, log it silently and don't crash. The article still publishes — the contributor just doesn't get notified. This is acceptable.
-- **Message Templates** — for messages sent outside the 24-hour window (e.g. if a delayed notification is important), Meta allows pre-approved Message Templates. These are fixed-format messages submitted to Meta for approval in advance. Planning needed: which notifications (if any) are important enough to warrant a template.
-- **`windowExpiresAt` field** — add to the `contributors` table: timestamp of when the current 24-hour window closes. Updated every time the contributor sends a message. The pipeline checks this before attempting outbound messages.
-
----
-
-### Events Calendar & Directory — COMPLETED
-
-#### What was built
-- New `events` table in the DB (`lib/db/src/schema/events.ts`) with full fields: `title`, `eventDate`, `eventTime`, `endDate`, `endTime`, `location`, `organiser`, `description`, `price`, `contactInfo`, `websiteUrl`, `status`, `articleId` (nullable FK).
-- AI pipeline stage 5b (`extractEventDetails`) — runs GPT-4o-mini when tone === "event" to extract all structured fields including resolving relative dates.
-- `maybeCreateEventRecord` helper called at end of both WhatsApp and RSS pipelines.
-- API routes in `artifacts/api-server/src/routes/events.ts`: `GET /public/events` (public, filterable by status/date), `GET /events` (admin, auth required), `PUT /events/:id` (admin), `DELETE /events/:id` (admin).
-- Admin Events page (`artifacts/admin-dashboard/src/pages/Events.tsx`) — list with status filter, full edit modal for all fields, delete with confirmation. "Source article removed" warning when article is deleted.
-- Community website `/events` page (`artifacts/community-website/src/pages/events.tsx`) — upcoming/past toggle, date card with month/day, location/time/price/organiser chips, link to article, WhatsApp CTA at bottom.
-- Events link added to community website header nav, mobile menu, and footer.
-- Events link added to admin sidebar.
-
-#### How the AI detects events
-Stage 4 classification already supports tone `"event"`. When tone === "event", a new parallel extraction step runs specifically to pull structured data: ISO dates (resolves relative dates like "this Saturday"), time, venue, organiser, price, contact, website URL, 1-2 sentence description.
-
-#### Data model — `events` table
-`id`, `articleId` (FK nullable, onDelete: set null), `title`, `eventDate` (date), `eventTime` (text), `endDate`, `endTime`, `location`, `description`, `organiser`, `contactInfo`, `websiteUrl`, `price`, `status` (upcoming/past/cancelled), `articleDeleted` (bool), `createdAt`, `updatedAt`
-
----
-
-### Contributor Pre-Publish Review (WhatsApp approval loop)
-
-#### Concept
-Before an article is published, the AI sends a summary back to the contributor via WhatsApp and asks them to approve it. This improves accuracy, builds trust with contributors, and catches factual errors before they go public. The contributor replies YES or NO; a NO triggers a correction loop.
-
-#### The flow
-1. AI writes the article (Stage 6 complete)
-2. Instead of routing to Review Queue immediately, the system sends the contributor a preview via WhatsApp:
-   > "Here's the article we've written based on your message — please read it and let us know if it's correct.\n\n[article headline]\n[article body — first 2 paragraphs]\n\nReply YES to approve, or NO and tell us what needs changing."
-3. Contributor replies:
-   - **YES** → article moves to Review Queue (or auto-publishes if confidence is high enough). Contributor gets: "Great, it's now with our editor for final review."
-   - **NO + reason** → the reason is fed back into the AI with an instruction to revise. The revised article is sent back for re-approval. Maximum 2 revision rounds before it falls back to admin manual review.
-   - **No reply within 24 hours** → article moves to Review Queue anyway (contributor had their chance). Noted in the Review Queue as "contributor did not review."
-
-#### When pre-publish review is triggered
-Not every article needs this — it adds delay and costs a WhatsApp message. Triggered when:
-- Submission confidence score is between 0.50 and 0.74 (uncertain enough to warrant a check)
-- Submission contains a personal name (higher stakes)
-- Submission is the contributor's first or second article (build trust early)
-- Admin has enabled "always review" for a specific contributor
-
-High-confidence articles from Tier 2+ contributors skip this and go straight to Review Queue.
-
-#### WhatsApp 24-hour window note
-The preview must be sent within the 24-hour window (see above). If the window has expired, skip the pre-publish review and route directly to admin Review Queue with a note.
-
----
-
-### Analytics Integrations — Google & Meta
-
-#### Concept
-The admin dashboard connects to Google Analytics, Google Search Console, and the Meta Business Suite to pull in performance data. No need to log into three separate platforms — key metrics are surfaced directly in the admin.
-
-#### Google Analytics (website traffic)
-- Embed the GA4 tracking script in the public website (one-line addition to `index.html`)
-- Admin dashboard pulls from GA4 API: daily/weekly unique visitors, page views, top articles by traffic, traffic sources (direct, social, search)
-- Requires: Google Analytics account, GA4 property, API credentials stored as environment secrets
-
-#### Google Search Console (SEO performance)
-- Verify the public website domain in Search Console
-- Admin dashboard pulls: top search queries driving traffic, click-through rates, average position for key local terms ("Tallaght news", "what's happening in Tallaght")
-- Requires: Search Console property, API credentials
-
-#### Meta Business Suite (social media insights)
-- Connect via Meta Graph API (same credentials used for WhatsApp sending)
-- Pull: Facebook page reach, post engagement (likes, comments, shares) per post, follower growth, best-performing posts
-- Match social post engagement back to the article that was posted — admin can see which article types drive the most Facebook engagement
-- Requires: Facebook Page connected to the same Meta Business account as the WhatsApp number
-
-#### Admin analytics dashboard
-A dedicated Analytics page in the admin showing:
-- Website: visitors this week vs last week, top 5 articles, traffic sources
-- Search: top 10 queries, average position for target terms
-- Social: reach this week, top performing post, follower count
-- Content: submissions received this week, published count, auto-published vs held vs rejected breakdown
-- WhatsApp: new contributors this week, consent rate (% who reply YES)
-
-#### Note on Google Analytics vs privacy
-GA4 uses cookies. The Privacy Policy already states "we do not use tracking cookies" — this will need to be updated if GA4 is added, and a cookie consent banner added to the website (GDPR requirement).
-
----
-
-### Search
-
-#### Concept
-Full-text search across all published articles, available from the public website from day one. Local residents should be able to search for "Tallaght fire", "Jobstown flooding", "Old Bawn road" and find relevant articles instantly.
-
-#### Implementation approach
-- PostgreSQL has built-in full-text search (`tsvector` / `tsquery`) — no additional search infrastructure needed
-- A `searchVector` computed column is added to the `articles` table, updated automatically when an article is published or edited
-- The public website gets a search bar in the header; the `/search?q=...` route queries the database
-
-#### What gets indexed
-- Article headline (highest weight)
-- Article body text
-- Category name
-- Location extracted during AI processing (if stored on the article)
-- Tags (once a tagging system exists)
-
-#### Search result display
-- Ranked by relevance score (PostgreSQL handles this natively)
-- Each result shows: headline, category, date, first 2 sentences of body
-- If no results → "No articles found for '[query]'. Got a story about this? WhatsApp us." — turns a zero result into a submission prompt
-
-#### Admin search
-The admin dashboard also gets search — searching across submissions (including unpublished), contributors, and the Review Queue.
-
----
-
-### AI Transcription Correction — Domain-Aware Whisper Fix
-
-#### The problem
-Whisper is a general-purpose model. When a voice message mentions Irish football clubs or local proper nouns (e.g. "Bohs", "Rovers", "Jobstown", "Belgard"), Whisper picks the nearest-sounding common English word instead — "Bohs" → "bowels", "Rovers" → "robbers", etc. The AI pipeline then inherits the corrupted text and writes an article with the wrong word.
-
-#### Fix 1 — Whisper prompt priming (free, no extra API call)
-The Whisper API accepts an optional `prompt` field that biases the transcription toward vocabulary you supply. Pass a curated string of Tallaght-specific proper nouns before transcription starts:
-
-```
-"Tallaght, Shamrock Rovers, Bohemians, Bohs, St Patrick's Athletic, Shelbourne, Dundalk, Drogheda United, Peamount United, Tallaght Stadium, League of Ireland, Luas Red Line, SDCC, Jobstown, Belgard, Fettercairn, Killinardan, Old Bawn, Firhouse, Knocklyon, Rathfarnham, Templeogue, Citywest"
-```
-
-Whisper uses this as phonetic context — when it hears something that sounds like one of those words, it will strongly prefer the supplied spelling. No extra API call, no extra cost.
-
-This list should grow over time as new local names appear — sports clubs, community organisations, schools, road names, local politicians.
-
-#### Fix 2 — GPT-4o transcription correction pass (small extra cost per voice message)
-After Stage 2 (Whisper transcription), add a new Stage 2b: a lightweight GPT-4o-mini call that receives the raw transcript and a system prompt:
-
-> "You are a transcription editor for a community news platform in Tallaght, Dublin. The following text was produced by voice-to-text transcription and may contain errors, especially with Irish place names, football clubs, and local proper nouns. Silently correct any obvious transcription errors. Return only the corrected text — do not explain changes."
-
-GPT-4o-mini already knows the League of Ireland, Irish geography, and Dublin place names — it will catch what Whisper missed. Cost: ~$0.0001 per voice message (negligible).
-
-#### Implementation plan
-1. In `ai-pipeline.ts`, find the Whisper API call (Stage 2) and add the `prompt` field with the curated proper noun list.
-2. After the Whisper call, add Stage 2b: a GPT-4o-mini completion that cleans the raw transcript. Use the corrected text for all downstream stages.
-3. Log whether Stage 2b made any changes — useful for monitoring quality over time.
-4. The proper noun list should be stored as a configurable setting (admin can add new terms as they come up).
-
-#### Where to edit
-- `artifacts/api-server/src/lib/ai-pipeline.ts` — Stage 2 (Whisper), add prompt field + Stage 2b correction call.
-- Admin Settings: add a "Local vocabulary" textarea where the admin can maintain the proper noun list (stored in the `settings` table as `whisper_prompt_vocabulary`).
-
----
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
-
----
-
-## VPS Deployment (www.whatsuptallaght.ie)
-
-**VPS:** 185.43.233.219 · **Domain:** www.whatsuptallaght.ie
-
-### Architecture
-
-A single Docker container runs the full stack on port 8080. Nginx sits in front (installed natively on the VPS) for SSL termination via Let's Encrypt.
-
-| Request path | Served by |
-|---|---|
-| `/api/*` | Express routes inside the container |
-| `/admin/*` | Admin dashboard (Vite build, served as static by Express) |
-| `/*` | Community website (Vite build, served as static by Express) |
-| Uploaded images | Local disk at `/data/uploads` (Docker volume) |
-
-### Image storage
-
-`STORAGE_TYPE=local` (set in `.env.production`) switches the API server to store uploaded and AI-generated images on the Docker volume `/data/uploads` instead of Replit's GCS sidecar. Images are served at `/api/storage/objects/<path>`. In Replit dev, `STORAGE_TYPE` is unset and GCS is used as before.
-
-### CI / CD pipeline
-
-Push to `main` → GitHub Actions (`.github/workflows/deploy.yml`):
-1. Builds the Docker image (multi-stage: builder compiles Vite apps + esbuild bundle; production stage installs runtime-only native deps)
-2. Pushes image to GHCR (`ghcr.io/<your-repo>/whatsuptallaght:latest`)
-3. SSHs to VPS, copies `docker-compose.yml`, pulls new image, runs `docker compose up -d`
-
-### Required GitHub Actions secrets
-
-| Secret | Value |
-|---|---|
-| `VPS_HOST` | `185.43.233.219` |
-| `VPS_USER` | your SSH user (e.g. `root`) |
-| `VPS_SSH_KEY` | private key matching an authorized key on the VPS |
-
-`GITHUB_TOKEN` is provided automatically by GitHub Actions for GHCR push.
-
-### VPS one-time setup
-
-```bash
-# 1. Install Docker + Compose
-curl -fsSL https://get.docker.com | sh
-apt install docker-compose-plugin nginx certbot python3-certbot-nginx -y
-
-# 2. Create app directory
-mkdir -p /opt/whatsuptallaght
-cd /opt/whatsuptallaght
-
-# 3. Place secrets (copy .env.production.example, fill in real values)
-nano .env.production
-
-# 4. Copy Nginx config from repo, enable it
-cp nginx.conf /etc/nginx/sites-available/whatsuptallaght
-ln -s /etc/nginx/sites-available/whatsuptallaght /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-
-# 5. Obtain SSL cert
-certbot --nginx -d whatsuptallaght.ie -d www.whatsuptallaght.ie
-
-# 6. Log in to GHCR (one-time; token needs read:packages scope)
-echo "<GITHUB_PAT>" | docker login ghcr.io -u <github-username> --password-stdin
-
-# 7. First deploy — CI will handle subsequent deploys automatically
-GITHUB_REPOSITORY=<your-org/repo> docker compose pull
-GITHUB_REPOSITORY=<your-org/repo> docker compose up -d
-```
-
-### Database migrations on VPS
-
-After deploying a schema change, run:
-```bash
-cd /opt/whatsuptallaght
-docker run --rm --env-file .env.production \
-  ghcr.io/<your-org/repo>/whatsuptallaght:latest \
-  node -e "import('./dist/index.mjs').catch(()=>{})"
-```
-Or simpler: add `db push` to the deploy step. The `drizzle-orm` migration is idempotent.
-
-### Key env vars for VPS (see `.env.production.example`)
-
-- `DATABASE_URL` — PostgreSQL connection string
-- `SETTINGS_ENCRYPTION_KEY` — 32-byte hex, generated once, never changed
-- `STORAGE_TYPE=local` and `LOCAL_STORAGE_PATH=/data/uploads`
-- `OPENAI_API_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`
-- `FACEBOOK_PAGE_ID` + `FACEBOOK_PAGE_ACCESS_TOKEN` (optional)
+### Newsletter sponsorship / business features
+Ad slots in newsletter issues, AI-written business feature articles, enhanced directory listings, category sponsorship. Not yet built.
