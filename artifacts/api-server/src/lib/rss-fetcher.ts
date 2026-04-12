@@ -46,9 +46,51 @@ const parser = new Parser({
   timeout: 15000,
   headers: { "User-Agent": "TallaghtCommunityPlatform/1.0 (+https://tallaght.community)" },
   customFields: {
-    item: [["media:content", "mediaContent"], ["content:encoded", "contentEncoded"]],
+    item: [
+      ["media:content", "mediaContent"],
+      ["media:thumbnail", "mediaThumbnail"],
+      ["content:encoded", "contentEncoded"],
+    ],
   },
 });
+
+/**
+ * Extracts the best available image URL from an RSS item.
+ * Priority: media:content → media:thumbnail → <enclosure> → first <img> in content:encoded
+ */
+function extractFeedImageUrl(item: Record<string, any>): string | null {
+  // media:content (most common in WordPress/podcast feeds)
+  const mc = item.mediaContent;
+  if (mc) {
+    const url = mc?.["$"]?.url ?? (Array.isArray(mc) ? mc[0]?.["$"]?.url : null);
+    if (url && typeof url === "string") return url;
+  }
+
+  // media:thumbnail
+  const mt = item.mediaThumbnail;
+  if (mt) {
+    const url = mt?.["$"]?.url ?? (Array.isArray(mt) ? mt[0]?.["$"]?.url : null);
+    if (url && typeof url === "string") return url;
+  }
+
+  // <enclosure> tag (podcasts, some news feeds)
+  if (item.enclosure?.url && item.enclosure?.type?.startsWith("image/")) {
+    return item.enclosure.url;
+  }
+
+  // First <img src="..."> in content:encoded HTML
+  const html: string = item.contentEncoded || item.content || "";
+  const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (imgMatch?.[1]) {
+    const src = imgMatch[1];
+    // Skip tracking pixels, icons, and tiny images (common in email templates)
+    if (!src.includes("pixel") && !src.includes("tracking") && !src.endsWith(".gif")) {
+      return src;
+    }
+  }
+
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Fetch and process a single RSS feed
@@ -88,6 +130,7 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
       ""
     ).trim();
     const link = item.link ?? "";
+    const feedImageUrl = extractFeedImageUrl(item as Record<string, any>);
     const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
 
     // --- Deduplication ---
@@ -159,6 +202,7 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
         title,
         content,
         link,
+        feedImageUrl: feedImageUrl ?? undefined,
       },
       status: "pending",
       maxAttempts: 2,
