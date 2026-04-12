@@ -529,17 +529,18 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
   const facts = keyFacts.slice(0, 3).filter(Boolean).join(", ");
 
   // Photorealistic camera/lighting specs per tone.
+  // Key goals: warm, bright, positive, community-focused — NOT grey, grim or documentary-dark.
   // Deliberately avoid scene types that produce signs/banners (stadium hoardings, scoreboards,
   // protest placards) — DALL-E renders text on these as garbled nonsense.
   const styleByTone: Record<string, string> = {
-    news:      "photorealistic editorial press photograph, 35mm lens, f/4 aperture, overcast natural daylight, documentary style, candid moment — focus on people and environment, no constructed signage in frame",
-    event:     "photorealistic event photograph, wide-angle lens, vibrant natural light, authentic crowd atmosphere, professional press photography — capture faces and movement, no banners or signs in foreground",
-    sport:     "photorealistic sports action photograph, telephoto lens, fast shutter speed, shallow depth of field, players on open grass pitch, dynamic composition — tight crop on athletic action, no hoardings or advertising boards visible",
-    community: "photorealistic community documentary photograph, 50mm lens, warm natural light, genuine authentic moment, neighbourhood setting — architecture and people, no close-up signage",
-    business:  "photorealistic commercial photograph, professional natural lighting, 35mm lens, clean composition, local business environment — exterior or interior without visible signage or text on surfaces",
-    warning:   "photorealistic documentary photograph, overcast sky, desaturated colour grading, journalistic style, reportage photography — environmental wide shot, no text-bearing objects in focus",
-    memorial:  "photorealistic respectful photograph, soft diffused natural light, 50mm lens, quiet dignified scene, muted tones — flowers, candles, gathering people, no written text elements",
-    other:     "photorealistic news photograph, 50mm lens, natural lighting, editorial documentary style — clean scene without signs or text",
+    news:      "photorealistic press photograph, 35mm lens, bright warm golden-hour sunlight, optimistic uplifting mood, vibrant colours, smiling people engaged in their community, cheerful neighbourhood atmosphere — clean composition, no constructed signage in frame",
+    event:     "photorealistic event photograph, wide-angle lens, warm golden sunlight, joyful celebratory crowd, bright vibrant colours, happy faces and lively energy, professional press photography — people enjoying themselves, no banners or signs in foreground",
+    sport:     "photorealistic sports action photograph, telephoto lens, fast shutter speed, bright afternoon sunshine, vivid grass-green pitch, dynamic athletic action, energetic and exciting — tight crop on players in motion, no hoardings or advertising boards visible",
+    community: "photorealistic community photograph, 50mm lens, warm bright sunshine, neighbours gathering together happily, colourful houses and gardens, friendly welcoming atmosphere — smiling people, vibrant neighbourhood streetscape, no close-up signage",
+    business:  "photorealistic commercial photograph, bright natural lighting, 35mm lens, clean inviting composition, thriving local business environment, warm welcoming ambience — cheerful exterior or interior, no visible signage or text on surfaces",
+    warning:   "photorealistic documentary photograph, soft overcast light, calm composed scene, concerned but dignified community members, muted but not desaturated colour palette, thoughtful journalistic style — environmental wide shot, no text-bearing objects in focus",
+    memorial:  "photorealistic respectful photograph, soft warm diffused light, 50mm lens, quiet dignified scene, gentle warm tones — flowers, candles, people gathered in quiet remembrance, peaceful atmosphere, no written text elements",
+    other:     "photorealistic community photograph, 50mm lens, bright warm natural lighting, uplifting positive mood, vibrant colours — clean welcoming scene without signs or text",
   };
   const style = styleByTone[tone] ?? styleByTone.other;
   const factsClause = facts ? ` Scene context: ${facts}.` : "";
@@ -548,7 +549,7 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
   // The no-text rule is stated three different ways and placed FIRST so DALL-E weights it heavily.
   const noText = "CRITICAL RULES — strictly no text, writing, letters, words, numbers, legible signs, banners, placards, scoreboards, advertising hoardings, or logos anywhere in the image. If any text would naturally appear (shirt numbers excepted), replace it with abstract pattern or blur it out of focus.";
 
-  return `${noText} ${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland. No watermarks. No identifiable real faces. Shot on professional camera, high resolution, sharp focus, cinematic depth.`;
+  return `${noText} ${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland — bright, welcoming, vibrant. No watermarks. No identifiable real faces. Shot on professional camera, high resolution, sharp focus, cinematic depth.`;
 }
 
 /**
