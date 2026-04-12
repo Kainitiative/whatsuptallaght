@@ -12,6 +12,8 @@ export const rssFeedsTable = pgTable("rss_feeds", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   // "events_only" = skip items that don't describe a real upcoming event with a date
   filterMode: text("filter_mode"),
+  // "rss" (default) | "eventbrite" — controls which fetcher strategy is used
+  feedType: text("feed_type").notNull().default("rss"),
 });
 
 export const rssItemsTable = pgTable("rss_items", {
