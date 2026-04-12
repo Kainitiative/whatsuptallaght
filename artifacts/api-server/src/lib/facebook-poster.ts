@@ -98,13 +98,17 @@ export async function postToFacebookPage(post: {
     // Refresh Facebook's OG cache first so the card image/title are correct
     await triggerOgRescrape(articleUrl, pageToken);
 
-    // Post as a link post — renders as a clickable article card on the timeline
+    // Post as a link post — renders as a clickable article card on the timeline.
+    // privacy: EVERYONE is required — without it Facebook may default to a restricted
+    // audience meaning the post is invisible to non-admins even though it appears fine
+    // when logged in as the page manager.
     const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
         link: articleUrl,
+        privacy: { value: "EVERYONE" },
         access_token: pageToken,
       }),
     });
