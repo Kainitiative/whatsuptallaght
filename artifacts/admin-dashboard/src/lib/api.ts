@@ -517,6 +517,10 @@ export async function createCompetition(data: {
   return request<Competition>("/admin/competitions", { method: "POST", body: JSON.stringify(data) });
 }
 
+export async function postArticleToFacebook(id: number): Promise<{ success: boolean; facebookPostId: string }> {
+  return request<{ success: boolean; facebookPostId: string }>(`/posts/${id}/post-to-facebook`, { method: "POST" });
+}
+
 export async function closeCompetition(id: number): Promise<Competition> {
   return request<Competition>(`/admin/competitions/${id}/close`, { method: "POST" });
 }

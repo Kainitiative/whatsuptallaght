@@ -378,6 +378,45 @@ router.get("/posts/:id/cost", async (req, res) => {
   }
 });
 
+router.post("/posts/:id/post-to-facebook", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
+
+  try {
+    const [post] = await db
+      .select()
+      .from(postsTable)
+      .where(eq(postsTable.id, id))
+      .limit(1);
+
+    if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
+    if (post.status !== "published") {
+      return res.status(400).json({ error: "not_published", message: "Only published articles can be posted to Facebook" });
+    }
+
+    // Use stored AI caption if available, otherwise fall back to excerpt
+    const storedCaptions = await getSocialCaptionsForPost(post.id);
+    const facebookCaption = storedCaptions?.captionFacebook ?? undefined;
+
+    const result = await postToFacebookPage({
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      overrideMessage: facebookCaption,
+      headerImageUrl: post.headerImageUrl,
+      bodyImages: post.bodyImages as string[] | null,
+    });
+
+    if (!result.postId) {
+      return res.status(502).json({ error: "facebook_error", message: result.errorDetail ?? "Facebook post failed" });
+    }
+
+    res.json({ success: true, facebookPostId: result.postId });
+  } catch (err) {
+    res.status(500).json({ error: "internal_error", message: "Failed to post to Facebook" });
+  }
+});
+
 router.post("/posts/:id/regenerate-image", async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
