@@ -1251,10 +1251,11 @@ export interface RssPipelinePayload {
   title: string;
   content: string;
   link: string;
+  feedImageUrl?: string; // real photo from the RSS feed — used as header instead of DALL-E when present
 }
 
 export async function processRssSubmission(payload: RssPipelinePayload & { jobId?: number }): Promise<void> {
-  const { submissionId, rssItemId, feedName, feedUrl, trustLevel, title, content, link, jobId } = payload;
+  const { submissionId, rssItemId, feedName, feedUrl, trustLevel, title, content, link, feedImageUrl, jobId } = payload;
   const ctx: UsageCtx = { submissionId, jobId };
 
   logger.info({ submissionId, feedName }, "RSS pipeline: starting");
@@ -1347,12 +1348,39 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   const rssEntityMatch = await matchEntityInArticle(articleBody, openai);
   const rssEntityImagePath = rssEntityMatch?.entityImageUrl ?? null;
 
-  // --- Generate header image (only for articles that will be published) ---
-  // Precedence: entity image > DALL·E asset library > none
+  // --- Generate header image ---
+  // Precedence: real feed photo > entity image > DALL·E asset library > none
   // For held articles we save the prompt text only — image is sourced from library when admin publishes.
-  let rssImagePath: string | null = rssEntityImagePath ?? null;
+  let rssImagePath: string | null = null;
   let rssImagePrompt: string | null = buildDallePrompt(infoResult.headline || title, infoResult.keyFacts, toneResult.tone);
-  if (!rssEntityImagePath) {
+
+  if (feedImageUrl) {
+    // Download and store the real photo from the RSS feed
+    try {
+      const imgRes = await fetch(feedImageUrl, { signal: AbortSignal.timeout(15_000) });
+      if (imgRes.ok) {
+        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+        const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+        const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+        const storagePath = `header-images/rss-${submissionId}-${Date.now()}.${ext}`;
+        const { storeObject } = await import("./object-storage");
+        await storeObject(storagePath, imgBuffer, contentType.split(";")[0]);
+        rssImagePath = `/${storagePath}`;
+        logger.info({ submissionId, feedImageUrl, storagePath }, "RSS pipeline: using real feed photo as header");
+      } else {
+        logger.warn({ submissionId, feedImageUrl, status: imgRes.status }, "RSS pipeline: feed image download failed — falling back");
+      }
+    } catch (err) {
+      logger.warn({ submissionId, feedImageUrl, err }, "RSS pipeline: feed image fetch threw — falling back");
+    }
+  }
+
+  if (!rssImagePath && rssEntityImagePath) {
+    rssImagePath = rssEntityImagePath;
+    logger.info({ submissionId, entityName: rssEntityMatch?.entityName }, "RSS pipeline: using entity image as header");
+  }
+
+  if (!rssImagePath) {
     if (postStatus === "published") {
       const autoGenerate = await getSettingValue("auto_generate_images");
       if (autoGenerate === "true") {
@@ -1366,8 +1394,6 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     } else {
       logger.info({ submissionId }, "RSS pipeline: skipping image generation — article held for review");
     }
-  } else {
-    logger.info({ submissionId, entityName: rssEntityMatch?.entityName }, "RSS pipeline: using entity image as header");
   }
 
   const slug =
