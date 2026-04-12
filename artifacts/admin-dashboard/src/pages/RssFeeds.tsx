@@ -40,14 +40,15 @@ export default function RssFeeds() {
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [newInterval, setNewInterval] = useState(60);
-
   const [newFilterMode, setNewFilterMode] = useState<string>("");
+  const [newFeedType, setNewFeedType] = useState<string>("rss");
 
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editUrl, setEditUrl] = useState("");
   const [editInterval, setEditInterval] = useState(60);
   const [editFilterMode, setEditFilterMode] = useState<string>("");
+  const [editFeedType, setEditFeedType] = useState<string>("rss");
 
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
@@ -70,8 +71,8 @@ export default function RssFeeds() {
     if (!newName.trim() || !newUrl.trim()) return;
     setWorking("new");
     try {
-      await createRssFeed({ name: newName.trim(), url: newUrl.trim(), checkIntervalMinutes: newInterval, filterMode: newFilterMode || null });
-      setNewName(""); setNewUrl(""); setNewInterval(60); setNewFilterMode(""); setShowAdd(false);
+      await createRssFeed({ name: newName.trim(), url: newUrl.trim(), checkIntervalMinutes: newInterval, filterMode: newFilterMode || null, feedType: newFeedType });
+      setNewName(""); setNewUrl(""); setNewInterval(60); setNewFilterMode(""); setNewFeedType("rss"); setShowAdd(false);
       showToast("Feed added");
       load();
     } catch (err: any) {
@@ -87,6 +88,7 @@ export default function RssFeeds() {
     setEditUrl(feed.url);
     setEditInterval(feed.checkIntervalMinutes);
     setEditFilterMode(feed.filterMode ?? "");
+    setEditFeedType(feed.feedType ?? "rss");
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -94,7 +96,7 @@ export default function RssFeeds() {
     if (!editId || !editName.trim() || !editUrl.trim()) return;
     setWorking(editId);
     try {
-      await updateRssFeed(editId, { name: editName.trim(), url: editUrl.trim(), checkIntervalMinutes: editInterval, filterMode: editFilterMode || null });
+      await updateRssFeed(editId, { name: editName.trim(), url: editUrl.trim(), checkIntervalMinutes: editInterval, filterMode: editFilterMode || null, feedType: editFeedType });
       setEditId(null);
       showToast("Feed updated");
       load();
@@ -154,25 +156,29 @@ export default function RssFeeds() {
 
       {showAdd && (
         <form onSubmit={handleAdd} className="mb-8 bg-muted/40 border border-border rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">New RSS Feed</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-4">New Feed</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <input
               className={inputClass}
-              placeholder="Feed name (e.g. The Square Tallaght)"
+              placeholder="Feed name (e.g. Eventbrite Tallaght)"
               value={newName}
               onChange={e => setNewName(e.target.value)}
               required
             />
             <input
               className={inputClass}
-              placeholder="RSS URL"
+              placeholder={newFeedType === "eventbrite" ? "Eventbrite page URL (e.g. eventbrite.ie/d/ireland--dublin/tallaght-library/)" : "RSS / Atom feed URL"}
               value={newUrl}
               onChange={e => setNewUrl(e.target.value)}
               type="url"
               required
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <select className={selectClass} value={newFeedType} onChange={e => setNewFeedType(e.target.value)} title="Feed type">
+              <option value="rss">RSS / Atom feed</option>
+              <option value="eventbrite">Eventbrite page</option>
+            </select>
             <select className={selectClass} value={newInterval} onChange={e => setNewInterval(Number(e.target.value))}>
               {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
             </select>
@@ -212,7 +218,11 @@ export default function RssFeeds() {
                     <input className={inputClass} value={editName} onChange={e => setEditName(e.target.value)} required />
                     <input className={inputClass} value={editUrl} onChange={e => setEditUrl(e.target.value)} type="url" required />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <select className={selectClass} value={editFeedType} onChange={e => setEditFeedType(e.target.value)}>
+                      <option value="rss">RSS / Atom feed</option>
+                      <option value="eventbrite">Eventbrite page</option>
+                    </select>
                     <select className={selectClass} value={editInterval} onChange={e => setEditInterval(Number(e.target.value))}>
                       {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
                     </select>
@@ -243,6 +253,7 @@ export default function RssFeeds() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm text-foreground">{feed.name}</span>
                       {!feed.isActive && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Paused</span>}
+                      {feed.feedType === "eventbrite" && <span className="text-xs text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Eventbrite</span>}
                       {feed.filterMode === "events_only" && <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Events only</span>}
                     </div>
                     <a
