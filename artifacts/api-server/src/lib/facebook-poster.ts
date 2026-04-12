@@ -25,61 +25,9 @@ async function resolvePageToken(pageId: string, storedToken: string): Promise<st
 }
 
 /**
- * Downloads an image and returns it as a Buffer plus its MIME type.
- * Tries up to two candidate URLs — the full absolute URL first, then the relative path
- * via the platform base URL.
- */
-async function downloadImage(imageUrl: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
-  try {
-    const res = await fetch(imageUrl, { signal: AbortSignal.timeout(15_000) });
-    if (!res.ok) {
-      logger.warn({ imageUrl, status: res.status }, "Image download failed");
-      return null;
-    }
-    const contentType = res.headers.get("content-type") ?? "image/jpeg";
-    const mimeType = contentType.split(";")[0].trim();
-    const buffer = Buffer.from(await res.arrayBuffer());
-    logger.debug({ imageUrl, bytes: buffer.length, mimeType }, "Image downloaded for Facebook upload");
-    return { buffer, mimeType };
-  } catch (err) {
-    logger.warn({ imageUrl, err }, "Image download threw");
-    return null;
-  }
-}
-
-/**
- * Uploads an image binary to Facebook as an unpublished photo and returns its photo ID.
- * Uploading binary data is far more reliable than passing a URL for Facebook to fetch.
- */
-async function uploadImageToFacebook(
-  pageId: string,
-  pageToken: string,
-  buffer: Buffer,
-  mimeType: string
-): Promise<string | null> {
-  const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
-  const form = new FormData();
-  form.append("source", new Blob([buffer], { type: mimeType }), `article.${ext}`);
-  form.append("published", "false"); // upload only, not a post yet
-  form.append("access_token", pageToken);
-
-  const res = await fetch(`${GRAPH_API_BASE}/${pageId}/photos`, {
-    method: "POST",
-    body: form,
-  });
-  const data = await res.json() as { id?: string; error?: { message: string; code: number } };
-
-  if (res.ok && data.id && !data.error) {
-    logger.debug({ photoId: data.id }, "Image uploaded to Facebook (unpublished)");
-    return data.id;
-  }
-  logger.warn({ facebookError: data.error, status: res.status }, "Facebook image upload failed");
-  return null;
-}
-
-/**
  * Tells Facebook to re-scrape an article URL so its OG cache is refreshed.
- * Best-effort — errors are logged but not thrown.
+ * We do this BEFORE posting the link so the article card shows the correct
+ * image, title and description immediately.
  */
 async function triggerOgRescrape(articleUrl: string, pageToken: string): Promise<void> {
   try {
@@ -103,16 +51,18 @@ export type FacebookPostResult =
   | { postId: null; errorDetail: string };
 
 /**
- * Posts a published article to the configured Facebook Page.
+ * Posts a published article to the configured Facebook Page as a link post.
+ *
+ * A link post renders as a clickable article card on the timeline — showing the
+ * article title, excerpt, header image and a direct link to whatsuptallaght.ie.
+ * This is the correct format for a news page and is far more engaging than a
+ * photo post with the URL buried in the caption text.
  *
  * Strategy:
- *  1. Download the article image locally (avoids Facebook remote-fetch issues with
- *     internal storage URLs).
- *  2. Upload as unpublished photo, then publish it as a page post via /{pageId}/feed
- *     with `attached_media` — this ensures the correct image always appears.
- *  3. If image handling fails, fall back to a plain link post via /{pageId}/feed.
- *  4. After every successful post, trigger an OG rescrape so future link shares show
- *     the right image.
+ *  1. Trigger an OG rescrape so Facebook's cache has the correct image/title.
+ *  2. Post to /{pageId}/feed with `link: articleUrl` — Facebook renders this as
+ *     a proper article preview card.
+ *  3. The caption above the card is the article excerpt (or title as fallback).
  */
 export async function postToFacebookPage(post: {
   title: string;
@@ -137,67 +87,18 @@ export async function postToFacebookPage(post: {
     const base = (platformUrl ?? "https://whatsuptallaght.ie").replace(/\/$/, "");
     const articleUrl = `${base}/article/${post.slug}`;
 
-    // Build caption
+    // Build the caption shown above the link card — keep it punchy
     const captionBody = post.overrideMessage
       ? post.overrideMessage
       : post.excerpt
         ? post.excerpt
         : post.title;
-    const message = `${captionBody}\n\n🔗 Read the full story: ${articleUrl}`;
+    const message = captionBody;
 
-    // Resolve the image URL — prefer WhatsApp submitted photo, then AI header
-    const bodyImgs: string[] = Array.isArray(post.bodyImages) ? (post.bodyImages as string[]) : [];
-    const rawImagePath = bodyImgs[0] ?? post.headerImageUrl ?? null;
-    const imageUrl = rawImagePath
-      ? rawImagePath.startsWith("http")
-        ? rawImagePath
-        : `${base}${rawImagePath}`
-      : null;
+    // Refresh Facebook's OG cache first so the card image/title are correct
+    await triggerOgRescrape(articleUrl, pageToken);
 
-    // --- Attempt image post ---
-    if (imageUrl) {
-      const downloaded = await downloadImage(imageUrl);
-
-      if (downloaded) {
-        // Upload binary → get a Facebook photo ID
-        const photoId = await uploadImageToFacebook(pageId, pageToken, downloaded.buffer, downloaded.mimeType);
-
-        if (photoId) {
-          // Publish as a page feed post with the attached photo
-          const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              message,
-              attached_media: [{ media_fbid: photoId }],
-              access_token: pageToken,
-            }),
-          });
-          const feedData = await feedRes.json() as { id?: string; error?: { message: string; code: number; type?: string } };
-
-          if (feedRes.ok && feedData.id && !feedData.error) {
-            logger.info(
-              { facebookPostId: feedData.id, photoId, slug: post.slug },
-              "Article posted to Facebook (binary photo upload)"
-            );
-            // Refresh OG cache in the background
-            void triggerOgRescrape(articleUrl, pageToken);
-            return { postId: feedData.id };
-          }
-
-          logger.warn(
-            { facebookError: feedData.error, status: feedRes.status, photoId, slug: post.slug },
-            "Facebook feed post with attached photo failed — falling back to link post"
-          );
-        }
-      } else {
-        logger.warn({ imageUrl, slug: post.slug }, "Could not download article image — falling back to link post");
-      }
-    }
-
-    // --- Fall back to plain link post ---
-    void triggerOgRescrape(articleUrl, pageToken); // refresh OG before the link post is indexed
-
+    // Post as a link post — renders as a clickable article card on the timeline
     const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -218,7 +119,7 @@ export async function postToFacebookPage(post: {
       return { postId: null, errorDetail: detail };
     }
 
-    logger.info({ facebookPostId: feedData.id, slug: post.slug }, "Article posted to Facebook (link post fallback)");
+    logger.info({ facebookPostId: feedData.id, slug: post.slug }, "Article posted to Facebook (link post)");
     return { postId: feedData.id ?? null };
 
   } catch (err) {
