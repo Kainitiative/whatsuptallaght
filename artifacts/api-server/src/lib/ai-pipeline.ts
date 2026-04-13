@@ -113,10 +113,25 @@ function logUsage(
 // Stage 1 — Safety check (OpenAI Moderation, free)
 // ---------------------------------------------------------------------------
 
+// Categories that warrant an immediate hard rejection — genuinely harmful content.
+// Everything else that OpenAI flags (political rhetoric, protest language, strong opinions)
+// gets routed to "held" for editor review rather than auto-rejected.
+const HARD_REJECT_CATEGORIES = new Set([
+  "hate",
+  "hate/threatening",
+  "sexual",
+  "sexual/minors",
+  "self-harm",
+  "self-harm/intent",
+  "self-harm/instructions",
+  "harassment/threatening",
+  "violence/graphic",
+]);
+
 async function runSafetyCheck(
   openai: OpenAI,
   text: string,
-): Promise<{ passed: boolean; reason?: string }> {
+): Promise<{ passed: boolean; holdForReview?: boolean; reason?: string }> {
   if (!text.trim()) return { passed: true };
 
   const result = await openai.moderations.create({ input: text });
@@ -126,9 +141,27 @@ async function runSafetyCheck(
     .filter(([, v]) => v)
     .map(([k]) => k);
 
+  if (!flagged) return { passed: true };
+
+  // Check whether any flagged category is a hard-reject category.
+  // If only softer categories are flagged (e.g. "violence" which catches protest
+  // language, "harassment" which catches political criticism), route to review
+  // instead of silently rejecting a real community story.
+  const hasHardReject = flaggedCategories.some((c) => HARD_REJECT_CATEGORIES.has(c));
+
+  if (hasHardReject) {
+    return {
+      passed: false,
+      holdForReview: false,
+      reason: `Flagged: ${flaggedCategories.join(", ")}`,
+    };
+  }
+
+  // Soft flag — route to editor review, don't reject
   return {
-    passed: !flagged,
-    reason: flagged ? `Flagged: ${flaggedCategories.join(", ")}` : undefined,
+    passed: false,
+    holdForReview: true,
+    reason: `Soft flag (held for review): ${flaggedCategories.join(", ")}`,
   };
 }
 
@@ -949,37 +982,75 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
 
   const openai = await getOpenAI();
 
-  // --- Stage 1: Safety check ---
+  // --- Minimum content check (pre-AI) ---
+  // Reject single words or empty replies (e.g. "Why", "Ok", "?") before they reach the
+  // AI — the pipeline has no facts to work with and will hallucinate content.
   const rawText = submission.rawText ?? "";
-  const safety = await runSafetyCheck(openai, rawText);
+  const mediaUrls = submission.mediaUrls ?? [];
+  const wordCount = rawText.trim().split(/\s+/).filter(Boolean).length;
 
-  if (!safety.passed) {
-    logger.warn({ submissionId, reason: safety.reason }, "AI pipeline: safety check failed");
+  if (wordCount < 6 && mediaUrls.length === 0) {
     await db
       .update(submissionsTable)
       .set({
         status: "rejected",
-        safetyCheckPassed: "false",
-        rejectionReason: safety.reason,
+        rejectionReason: "Submission too short to process",
         updatedAt: new Date(),
       })
       .where(eq(submissionsTable.id, submissionId));
 
     await sendTextMessage(
       phoneNumber,
-      "We were unable to process your submission as it didn't meet our community guidelines. If you believe this is an error, please contact us.",
+      "Thanks for getting in touch! Your message was too short for us to write a story from. Send us more details — what happened, where, and when — and we'll get it published.",
     ).catch(() => {});
 
     return;
   }
 
-  await db
-    .update(submissionsTable)
-    .set({ safetyCheckPassed: "true", updatedAt: new Date() })
-    .where(eq(submissionsTable.id, submissionId));
+  // --- Stage 1: Safety check ---
+  const safety = await runSafetyCheck(openai, rawText);
+
+  if (!safety.passed) {
+    if (safety.holdForReview) {
+      // Soft flag (political content, protest language, strong opinions) —
+      // don't reject. Write the article and hold it for editor review.
+      // The editor can approve or decline after reading the actual content.
+      logger.warn({ submissionId, reason: safety.reason }, "AI pipeline: soft safety flag — routing to held for review");
+      await db
+        .update(submissionsTable)
+        .set({ safetyCheckPassed: "flagged_soft", updatedAt: new Date() })
+        .where(eq(submissionsTable.id, submissionId));
+      // Fall through — continue processing but force "held" routing below
+    } else {
+      // Hard reject — genuinely harmful content
+      logger.warn({ submissionId, reason: safety.reason }, "AI pipeline: hard safety reject");
+      await db
+        .update(submissionsTable)
+        .set({
+          status: "rejected",
+          safetyCheckPassed: "false",
+          rejectionReason: safety.reason,
+          updatedAt: new Date(),
+        })
+        .where(eq(submissionsTable.id, submissionId));
+
+      await sendTextMessage(
+        phoneNumber,
+        "We were unable to process your submission as it didn't meet our community guidelines. If you believe this is an error, please contact us.",
+      ).catch(() => {});
+
+      return;
+    }
+  } else {
+    await db
+      .update(submissionsTable)
+      .set({ safetyCheckPassed: "true", updatedAt: new Date() })
+      .where(eq(submissionsTable.id, submissionId));
+  }
+
+  const softFlagged = !safety.passed && safety.holdForReview === true;
 
   // --- Stage 2 & 3: Media processing ---
-  const mediaUrls = submission.mediaUrls ?? [];
   const transcripts: string[] = [];
   const imageDescriptions: string[] = [];
   // All submitted images go into the article body — header is always DALL·E generated
@@ -1119,8 +1190,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   }
 
   // --- Create the post ---
-  // Fact-check FAIL forces "held" — editor must review before the article can go live
-  const postStatus = (confidence >= 0.75 && factCheck.result === "PASS") ? "published" : "held";
+  // Soft safety flag OR fact-check FAIL forces "held" — editor must review before the article can go live
+  const postStatus = (confidence >= 0.75 && factCheck.result === "PASS" && !softFlagged) ? "published" : "held";
 
   // --- Stage 7.5: Entity matching (with centrality check) ---
   logger.info({ submissionId }, "AI pipeline: matching entities");
