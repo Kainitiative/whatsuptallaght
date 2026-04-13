@@ -165,7 +165,6 @@ export async function postToFacebookPage(post: {
           body: JSON.stringify({
             message,
             attached_media: [{ media_fbid: photoId }],
-            privacy: { value: "EVERYONE" },
             access_token: pageToken,
           }),
         });
@@ -198,7 +197,6 @@ export async function postToFacebookPage(post: {
       body: JSON.stringify({
         message: linkMessage,
         link: articleUrl,
-        privacy: { value: "EVERYONE" },
         access_token: pageToken,
       }),
     });
