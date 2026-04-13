@@ -1147,9 +1147,12 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     .limit(3);
 
   // --- Stage 7: Write article ---
-  // Minimal mode activates when submission is thin (not all 4 completeness criteria met)
-  // to prevent padding and hallucination on weak input
-  const minimalMode = infoResult.completenessScore <= 0.75;
+  // Minimal mode activates when both the completeness score is low AND the raw submission
+  // is thin. A long submission (opinion pieces, detailed community messages) should always
+  // get full article treatment — don't cap it at 1-3 sentences just because it lacks
+  // structured who/what/where/when facts.
+  const submissionWordCount = combinedText.trim().split(/\s+/).filter(Boolean).length;
+  const minimalMode = infoResult.completenessScore <= 0.75 && submissionWordCount < 50;
   logger.info({ submissionId, minimalMode }, "AI pipeline: writing article");
   const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode);
 
