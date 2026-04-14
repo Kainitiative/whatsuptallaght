@@ -8,6 +8,7 @@ import {
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { isRelevantToTallaght, getFeedTrustLevel } from "./geo-filter";
+import { getSettingValue } from "../routes/settings";
 import { logger } from "./logger";
 
 // ---------------------------------------------------------------------------
@@ -209,6 +210,13 @@ async function fetchEventbritePage(url: string): Promise<NormalisedFeedItem[]> {
 async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void> {
   logger.info({ feedId: feed.id, name: feed.name, feedType: (feed as any).feedType ?? "rss" }, "RSS: fetching feed");
 
+  // Load admin-configured extra geo keywords once per run (cached in settings table)
+  let customGeoKeywords: string[] = [];
+  try {
+    const raw = await getSettingValue("geo_custom_keywords");
+    if (raw) customGeoKeywords = JSON.parse(raw);
+  } catch { /* ignore — fall back to built-in keywords only */ }
+
   const feedType: string = (feed as any).feedType ?? "rss";
   let normalisedItems: NormalisedFeedItem[] = [];
 
@@ -258,7 +266,7 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
     newCount++;
 
     // --- Geo-filter ---
-    const geoRelevant = isRelevantToTallaght(feed.url, title, content);
+    const geoRelevant = isRelevantToTallaght(feed.url, title, content, customGeoKeywords);
 
     // --- Events-only filter (per-feed opt-in) ---
     const eventsOnly = (feed as any).filterMode === "events_only";
