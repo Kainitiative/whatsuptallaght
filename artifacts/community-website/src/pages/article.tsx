@@ -120,6 +120,19 @@ export default function Article() {
   // Body images — WhatsApp-submitted photos placed inline after the article text
   const bodyImages: string[] = (post as any).bodyImages ?? [];
 
+  // Convert plain-text URLs in the article body into clickable links that open in a new tab.
+  // Safe: body comes from our own AI and is only operated on server-sourced content.
+  function linkifyBody(text: string): string {
+    const urlRegex = /https?:\/\/[^\s<>"']+/g;
+    const withLinks = text.replace(urlRegex, (url) => {
+      // Strip trailing punctuation that's likely not part of the URL
+      const clean = url.replace(/[.,;:!?)]+$/, "");
+      const trailing = url.slice(clean.length);
+      return `<a href="${clean}" target="_blank" rel="noopener noreferrer" class="text-primary underline break-all hover:opacity-80">${clean}</a>${trailing}`;
+    });
+    return withLinks.replace(/\n/g, "<br/>");
+  }
+
   const relatedPosts = relatedData?.posts?.filter(p => p.id !== post.id).slice(0, 3) || [];
 
   return (
@@ -195,7 +208,7 @@ export default function Article() {
           )}
           
           <div 
-            dangerouslySetInnerHTML={{ __html: post.body.replace(/\n/g, '<br/>') }} 
+            dangerouslySetInnerHTML={{ __html: linkifyBody(post.body) }} 
             className="leading-relaxed"
           />
         </div>
