@@ -160,6 +160,9 @@ export interface Post {
   isSponsored: boolean;
   isFeatured: boolean;
   starRating: number | null;
+  headerImageUrl: string | null;
+  bodyImages: string[] | null;
+  imagePrompt: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;

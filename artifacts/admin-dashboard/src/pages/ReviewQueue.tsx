@@ -136,10 +136,48 @@ export default function ReviewQueue() {
                 </div>
               </div>
               {expanded === post.id && (
-                <div className="border-t border-border px-5 py-4 bg-gray-50">
-                  <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap text-sm leading-relaxed">
-                    {post.body}
+                <div className="border-t border-border bg-gray-50">
+                  {/* Header image */}
+                  {post.headerImageUrl ? (
+                    <div className="w-full aspect-[16/7] overflow-hidden bg-gray-100">
+                      <img
+                        src={post.headerImageUrl}
+                        alt="Header"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : post.imagePrompt ? (
+                    <div className="px-5 pt-4">
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+                        <span className="font-medium">No image yet</span> — AI will generate one on publish.
+                        <span className="block mt-0.5 text-amber-700 italic">"{post.imagePrompt}"</span>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Article body */}
+                  <div className="px-5 py-4">
+                    <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap text-sm leading-relaxed">
+                      {post.body}
+                    </div>
                   </div>
+
+                  {/* Submitted WhatsApp photos */}
+                  {post.bodyImages && post.bodyImages.length > 0 && (
+                    <div className="px-5 pb-4">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Submitted photos</p>
+                      <div className="flex flex-wrap gap-2">
+                        {post.bodyImages.map((img, i) => (
+                          <img
+                            key={i}
+                            src={img}
+                            alt={`Submitted photo ${i + 1}`}
+                            className="h-28 w-auto rounded-lg object-cover border border-border"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

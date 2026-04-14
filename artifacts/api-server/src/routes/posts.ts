@@ -92,6 +92,8 @@ router.get("/posts", async (req, res) => {
         body: postsTable.body,
         excerpt: postsTable.excerpt,
         headerImageUrl: postsTable.headerImageUrl,
+        bodyImages: postsTable.bodyImages,
+        imagePrompt: postsTable.imagePrompt,
         status: postsTable.status,
         confidenceScore: postsTable.confidenceScore,
         wordCount: postsTable.wordCount,
