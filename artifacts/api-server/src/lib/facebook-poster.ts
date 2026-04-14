@@ -181,22 +181,29 @@ export async function postToFacebookPage(post: {
     }
 
     // ---------------------------------------------------------------------------
-    // Path B — Link post fallback (no image, or photo upload failed)
+    // Path B — Text post fallback (no image, or photo upload failed)
+    //
+    // We deliberately do NOT use `link:` here. Using `link:` causes Facebook to
+    // render an OG preview card — and if the article has no real header image the
+    // OG scraper picks up the site's generic placeholder, making every imageless
+    // post look identical. Instead we embed the URL in the message text; Facebook
+    // still renders it as a clickable hyperlink but without an image card.
     // ---------------------------------------------------------------------------
-    await triggerOgRescrape(articleUrl, pageToken);
 
-    const linkMessage = post.overrideMessage
+    const fallbackCaption = post.overrideMessage
       ? post.overrideMessage
       : post.excerpt
         ? post.excerpt
         : post.title;
+
+    // URL appended to the caption — Facebook renders it as a clickable link
+    const linkMessage = `${fallbackCaption}\n\n${articleUrl}`;
 
     const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message: linkMessage,
-        link: articleUrl,
         access_token: pageToken,
       }),
     });
@@ -207,11 +214,11 @@ export async function postToFacebookPage(post: {
       const detail = e
         ? `Facebook API error (code ${e.code}): ${e.message}`
         : `Facebook returned HTTP ${feedRes.status}`;
-      logger.warn({ facebookError: e, status: feedRes.status, slug: post.slug }, "Facebook link post failed");
+      logger.warn({ facebookError: e, status: feedRes.status, slug: post.slug }, "Facebook text post failed");
       return { postId: null, errorDetail: detail };
     }
 
-    logger.info({ facebookPostId: feedData.id, slug: post.slug }, "Article posted to Facebook (link post)");
+    logger.info({ facebookPostId: feedData.id, slug: post.slug }, "Article posted to Facebook (text post, no image)");
     return { postId: feedData.id ?? null };
 
   } catch (err) {
