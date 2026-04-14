@@ -91,6 +91,19 @@ export async function clearSetting(key: string) {
   return request<void>(`/admin/settings/${key}`, { method: "DELETE" });
 }
 
+export async function getGeoKeywords(): Promise<string[]> {
+  const data = await request<{ keywords: string[] }>("/admin/geo-keywords");
+  return data.keywords;
+}
+
+export async function saveGeoKeywords(keywords: string[]): Promise<string[]> {
+  const data = await request<{ keywords: string[] }>("/admin/geo-keywords", {
+    method: "PUT",
+    body: JSON.stringify({ keywords }),
+  });
+  return data.keywords;
+}
+
 export interface RssFeed {
   id: number;
   name: string;

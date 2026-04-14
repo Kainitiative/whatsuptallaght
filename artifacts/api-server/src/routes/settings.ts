@@ -167,6 +167,40 @@ router.get("/admin/facebook/test", async (_req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Geo keyword management (stored as JSON array in platform_settings)
+// ---------------------------------------------------------------------------
+
+router.get("/admin/geo-keywords", async (_req, res) => {
+  try {
+    const raw = await getSettingValue("geo_custom_keywords");
+    const keywords: string[] = raw ? JSON.parse(raw) : [];
+    res.json({ keywords });
+  } catch {
+    res.json({ keywords: [] });
+  }
+});
+
+router.put("/admin/geo-keywords", async (req, res) => {
+  const { keywords } = req.body as { keywords?: unknown };
+  if (!Array.isArray(keywords) || keywords.some((k) => typeof k !== "string")) {
+    res.status(400).json({ error: "validation_error", message: "keywords must be an array of strings" });
+    return;
+  }
+  const cleaned = (keywords as string[]).map((k) => k.trim().toLowerCase()).filter(Boolean);
+  const value = JSON.stringify(cleaned);
+
+  const existing = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, "geo_custom_keywords"));
+  const encrypted = encrypt(value);
+  if (existing.length > 0) {
+    await db.update(platformSettingsTable).set({ encryptedValue: encrypted }).where(eq(platformSettingsTable.key, "geo_custom_keywords"));
+  } else {
+    await db.insert(platformSettingsTable).values({ key: "geo_custom_keywords", encryptedValue: encrypted });
+  }
+
+  res.json({ keywords: cleaned });
+});
+
 // Internal helper — used by the pipeline to read a decrypted setting value
 // NOT exposed to the public; imported directly by other server modules
 export async function getSettingValue(key: string): Promise<string | null> {
