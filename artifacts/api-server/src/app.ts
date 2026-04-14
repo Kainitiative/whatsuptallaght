@@ -107,11 +107,14 @@ if (process.env.NODE_ENV === "production") {
       // and authentic than a generated header. Fall back to the AI-generated header.
       const bodyImgs: string[] = Array.isArray(post.bodyImages) ? (post.bodyImages as string[]) : [];
       const ogImagePath = bodyImgs[0] || post.headerImageUrl;
+      // Only build an absolute URL when there's a REAL image — never fall back to the generic
+      // site placeholder, because platforms like Facebook will scrape and post it on every
+      // article that doesn't have its own image, making the page look identical.
       const ogImage = ogImagePath
         ? ogImagePath.startsWith("http")
           ? ogImagePath
           : `${platformUrl}${ogImagePath}`
-        : `${platformUrl}/images/tallaght-news.png`;
+        : null;
 
       const title = escapeAttr(post.title ?? "Tallaght Community");
       const desc = escapeAttr(post.excerpt ?? "Local news from Tallaght, Dublin.");
@@ -120,10 +123,17 @@ if (process.env.NODE_ENV === "production") {
       let html = communityIndexHtml;
       html = html.replace(/(<meta property="og:title" content=")[^"]*(")/g, `$1${title}$2`);
       html = html.replace(/(<meta property="og:description" content=")[^"]*(")/g, `$1${desc}$2`);
-      html = html.replace(/(<meta property="og:image" content=")[^"]*(")/g, `$1${ogImage}$2`);
       html = html.replace(/(<meta name="twitter:title" content=")[^"]*(")/g, `$1${title}$2`);
       html = html.replace(/(<meta name="twitter:description" content=")[^"]*(")/g, `$1${desc}$2`);
-      html = html.replace(/(<meta name="twitter:image" content=")[^"]*(")/g, `$1${ogImage}$2`);
+      if (ogImage) {
+        // Real image available — inject it
+        html = html.replace(/(<meta property="og:image" content=")[^"]*(")/g, `$1${ogImage}$2`);
+        html = html.replace(/(<meta name="twitter:image" content=")[^"]*(")/g, `$1${ogImage}$2`);
+      } else {
+        // No real image — remove the og:image tags entirely so platforms don't show the generic placeholder
+        html = html.replace(/<meta property="og:image" content="[^"]*"\s*\/?>\s*/g, "");
+        html = html.replace(/<meta name="twitter:image" content="[^"]*"\s*\/?>\s*/g, "");
+      }
       // Inject og:url just before </head>
       html = html.replace("</head>", `  <meta property="og:url" content="${articleUrl}" />\n</head>`);
 
