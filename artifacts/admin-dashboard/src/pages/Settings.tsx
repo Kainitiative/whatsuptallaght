@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getSettings, updateSetting, clearSetting, checkFacebookStatus, type Setting, type FacebookStatus } from "@/lib/api";
+import { getSettings, updateSetting, clearSetting, checkFacebookStatus, getGeoKeywords, saveGeoKeywords, type Setting, type FacebookStatus } from "@/lib/api";
 
 const CATEGORY_LABELS: Record<string, string> = {
   openai: "OpenAI",
@@ -18,6 +18,10 @@ export default function Settings() {
   const [fbTest, setFbTest] = useState<FacebookStatus | null>(null);
   const [fbTesting, setFbTesting] = useState(false);
 
+  const [geoKeywords, setGeoKeywords] = useState<string[]>([]);
+  const [kwInput, setKwInput] = useState("");
+  const [kwSaving, setKwSaving] = useState(false);
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -26,14 +30,38 @@ export default function Settings() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getSettings();
+      const [data, kws] = await Promise.all([getSettings(), getGeoKeywords()]);
       setSettings(data);
+      setGeoKeywords(kws);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function handleAddKeyword() {
+    const kw = kwInput.trim().toLowerCase();
+    if (!kw || geoKeywords.includes(kw)) { setKwInput(""); return; }
+    const updated = [...geoKeywords, kw];
+    setKwSaving(true);
+    try {
+      const saved = await saveGeoKeywords(updated);
+      setGeoKeywords(saved);
+      setKwInput("");
+      showToast("✅ Keyword added");
+    } finally { setKwSaving(false); }
+  }
+
+  async function handleRemoveKeyword(kw: string) {
+    const updated = geoKeywords.filter((k) => k !== kw);
+    setKwSaving(true);
+    try {
+      const saved = await saveGeoKeywords(updated);
+      setGeoKeywords(saved);
+      showToast("Keyword removed");
+    } finally { setKwSaving(false); }
+  }
 
   async function handleSave(key: string) {
     if (!value.trim()) return;
@@ -225,6 +253,52 @@ export default function Settings() {
           ))}
         </div>
       )}
+
+      {/* Geo Keywords Manager */}
+      <div className="mt-8">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">Geo Keywords</h2>
+        <div className="bg-white border border-border rounded-xl px-5 py-4">
+          <p className="text-sm font-medium text-foreground mb-0.5">Custom relevance keywords</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Articles from RSS feeds must mention one of these words to pass the local relevance check. The built-in list covers Tallaght and its sub-areas. Add any extra terms here — club names, local landmarks, estate names — so articles that don't mention "Tallaght" directly aren't filtered out.
+          </p>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {geoKeywords.length === 0 && (
+              <span className="text-xs text-muted-foreground italic">No custom keywords yet — built-in list only.</span>
+            )}
+            {geoKeywords.map((kw) => (
+              <span key={kw} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2.5 py-1 rounded-full">
+                {kw}
+                <button
+                  onClick={() => handleRemoveKeyword(kw)}
+                  disabled={kwSaving}
+                  className="ml-0.5 hover:text-red-500 disabled:opacity-40 transition-colors leading-none"
+                  title="Remove keyword"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={kwInput}
+              onChange={(e) => setKwInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddKeyword()}
+              placeholder="e.g. thomas davis, kiltipper, firhouse road"
+              className="flex-1 px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+            <button
+              onClick={handleAddKeyword}
+              disabled={!kwInput.trim() || kwSaving}
+              className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {kwSaving ? "Saving…" : "Add"}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="mt-8 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
         <p className="text-sm font-medium text-amber-900 mb-1">Admin password</p>
