@@ -83,12 +83,13 @@ export function isFeedAlwaysRelevant(feedUrl: string): boolean {
   return ALWAYS_RELEVANT_URL_FRAGMENTS.some((fragment) => feedUrl.includes(fragment));
 }
 
-export function hasKeywordMatch(title: string, content: string): boolean {
+export function hasKeywordMatch(title: string, content: string, extraKeywords: string[] = []): boolean {
   const combined = `${title} ${content}`.toLowerCase();
-  return TALLAGHT_KEYWORDS.some((kw) => combined.includes(kw));
+  const allKeywords = extraKeywords.length > 0 ? [...TALLAGHT_KEYWORDS, ...extraKeywords] : TALLAGHT_KEYWORDS;
+  return allKeywords.some((kw) => combined.includes(kw.toLowerCase()));
 }
 
-export function isRelevantToTallaght(feedUrl: string, title: string, content: string): boolean {
+export function isRelevantToTallaght(feedUrl: string, title: string, content: string, extraKeywords: string[] = []): boolean {
   if (isFeedAlwaysRelevant(feedUrl)) return true;
-  return hasKeywordMatch(title, content);
+  return hasKeywordMatch(title, content, extraKeywords);
 }
