@@ -10,6 +10,7 @@ interface Props {
 export default function ArticleEditModal({ post, onClose, onSaved }: Props) {
   const [title, setTitle] = useState(post.title);
   const [body, setBody] = useState(post.body ?? "");
+  const [imagePrompt, setImagePrompt] = useState(post.imagePrompt ?? "");
   const [asExample, setAsExample] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +21,7 @@ export default function ArticleEditModal({ post, onClose, onSaved }: Props) {
     try {
       const excerpt = body.split(". ").slice(0, 2).join(". ") + ".";
       const status = publishAfter ? "published" : post.status;
-      const updated = await updatePost(post.id, { title, body, excerpt, status });
+      const updated = await updatePost(post.id, { title, body, excerpt, status, imagePrompt: imagePrompt || undefined });
       if (asExample) {
         await createGoldenExample(post.id, "Manually corrected by editor");
       }
@@ -67,6 +68,20 @@ export default function ArticleEditModal({ post, onClose, onSaved }: Props) {
               onChange={(e) => setBody(e.target.value)}
               rows={16}
               className="w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+              Image prompt
+              <span className="ml-2 normal-case text-muted-foreground/70 font-normal">Used by AI to generate the header image on publish</span>
+            </label>
+            <textarea
+              value={imagePrompt}
+              onChange={(e) => setImagePrompt(e.target.value)}
+              rows={3}
+              placeholder="Describe the image you want — e.g. 'Wide cinematic photo of Tallaght town centre at dusk, community gathering'"
+              className="w-full border border-border rounded-lg px-3 py-2 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
             />
           </div>
 

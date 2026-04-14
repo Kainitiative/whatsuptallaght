@@ -191,7 +191,7 @@ router.patch("/posts/:id", async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
 
-  const { title, body, excerpt, headerImageUrl, status, confidenceScore, primaryCategoryId, isSponsored, isFeatured, publishedAt, starRating } = req.body;
+  const { title, body, excerpt, headerImageUrl, imagePrompt, status, confidenceScore, primaryCategoryId, isSponsored, isFeatured, publishedAt, starRating } = req.body;
 
   try {
     const [currentPost] = await db
@@ -212,6 +212,7 @@ router.patch("/posts/:id", async (req, res) => {
     if (body !== undefined) updates.body = body;
     if (excerpt !== undefined) updates.excerpt = excerpt;
     if (headerImageUrl !== undefined) updates.headerImageUrl = headerImageUrl;
+    if (imagePrompt !== undefined) updates.imagePrompt = imagePrompt;
     if (status !== undefined) updates.status = status;
     if (confidenceScore !== undefined) updates.confidenceScore = String(confidenceScore);
     if (primaryCategoryId !== undefined) updates.primaryCategoryId = primaryCategoryId;
