@@ -1205,19 +1205,17 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   // Header is always a purpose-built wide image (entity image or DALL·E from asset library).
   // Submitted WhatsApp photos go into bodyImages — displayed inline in the article body.
   // For held articles we save the prompt text only — image is sourced from the library when admin publishes.
+  // Images are always generated for published articles so Facebook always has a real photo to post.
   let headerImagePath: string | null = entityImagePath ?? null;
   let headerImagePrompt: string | null = null;
   if (!entityImagePath) {
     headerImagePrompt = buildDallePrompt(infoResult.headline, infoResult.keyFacts, toneResult.tone);
     if (postStatus === "published") {
-      const autoGenerate = await getSettingValue("auto_generate_images");
-      if (autoGenerate === "true") {
-        logger.info({ submissionId }, "AI pipeline: sourcing header image from asset library");
-        const asset = await findOrCreateHeaderAsset(openai, infoResult.headline, infoResult.keyFacts, toneResult.tone, ctx);
-        if (asset) {
-          headerImagePath = asset.imageUrl;
-          headerImagePrompt = asset.imagePrompt;
-        }
+      logger.info({ submissionId }, "AI pipeline: sourcing header image from asset library");
+      const asset = await findOrCreateHeaderAsset(openai, infoResult.headline, infoResult.keyFacts, toneResult.tone, ctx);
+      if (asset) {
+        headerImagePath = asset.imageUrl;
+        headerImagePrompt = asset.imagePrompt;
       }
     } else {
       logger.info({ submissionId }, "AI pipeline: skipping header image — article held for review");
@@ -1466,14 +1464,13 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
 
   if (!rssImagePath) {
     if (postStatus === "published") {
-      const autoGenerate = await getSettingValue("auto_generate_images");
-      if (autoGenerate === "true") {
-        logger.info({ submissionId }, "RSS pipeline: sourcing header image from asset library");
-        const asset = await findOrCreateHeaderAsset(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
-        if (asset) {
-          rssImagePath = asset.imageUrl;
-          rssImagePrompt = asset.imagePrompt;
-        }
+      // Always generate an image for published RSS articles — asset library reuses matching
+      // images so cost is minimised, and Facebook always gets a real photo for its link card.
+      logger.info({ submissionId }, "RSS pipeline: sourcing header image from asset library");
+      const asset = await findOrCreateHeaderAsset(openai, infoResult.headline || title, infoResult.keyFacts, toneResult.tone, ctx);
+      if (asset) {
+        rssImagePath = asset.imageUrl;
+        rssImagePrompt = asset.imagePrompt;
       }
     } else {
       logger.info({ submissionId }, "RSS pipeline: skipping image generation — article held for review");

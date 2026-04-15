@@ -231,43 +231,40 @@ router.patch("/posts/:id", async (req, res) => {
     if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
     res.json(post);
 
-    // --- Auto-generate header image when a held article is published ---
-    // The pipeline saves the prompt but skips DALL·E for held articles to avoid wasted spend.
-    // Now that the admin has approved it, generate the image if one isn't already set.
-    if (
-      status === "published" &&
-      currentPost.status !== "published" &&
-      !currentPost.headerImageUrl &&
-      currentPost.imagePrompt
-    ) {
-      getSettingValue("auto_generate_images").then(async (autoGenerate) => {
-        if (autoGenerate !== "true") return;
-        try {
-          const keyFacts = post.body.split(". ").slice(0, 3).map((s: string) => s.trim()).filter(Boolean);
-          const generated = await regeneratePostImage(
-            post.id,
-            post.title,
-            keyFacts,
-            "news",
-            post.sourceSubmissionId ?? post.id,
-          );
-          if (generated) {
-            await db
-              .update(postsTable)
-              .set({ headerImageUrl: generated.imageUrl, imagePrompt: generated.imagePrompt, updatedAt: new Date() })
-              .where(eq(postsTable.id, post.id));
-          }
-        } catch (err) {
-          // Non-fatal — image generation failure should never block publish
-        }
-      }).catch(() => {});
-    }
-
-    // --- Generate social captions + post to Facebook when manually published ---
+    // --- Auto-generate image + social captions + post to Facebook when manually published ---
+    // Runs as a single sequential async task so Facebook always receives the image.
+    // Image generation must complete before Facebook posting — running them concurrently
+    // caused Facebook to fire before the image was ready, resulting in imageless posts.
     if (status === "published" && currentPost.status !== "published") {
       (async () => {
         try {
-          // Fetch category name for richer caption context
+          // Step 1: Generate header image if one isn't already set.
+          // We always generate regardless of the auto_generate_images setting so that
+          // Facebook always has a real photo to attach to the link card.
+          let resolvedHeaderImageUrl: string | null = post.headerImageUrl ?? null;
+          if (!resolvedHeaderImageUrl && currentPost.imagePrompt) {
+            try {
+              const keyFacts = post.body.split(". ").slice(0, 3).map((s: string) => s.trim()).filter(Boolean);
+              const generated = await regeneratePostImage(
+                post.id,
+                post.title,
+                keyFacts,
+                "news",
+                post.sourceSubmissionId ?? post.id,
+              );
+              if (generated) {
+                await db
+                  .update(postsTable)
+                  .set({ headerImageUrl: generated.imageUrl, imagePrompt: generated.imagePrompt, updatedAt: new Date() })
+                  .where(eq(postsTable.id, post.id));
+                resolvedHeaderImageUrl = generated.imageUrl;
+              }
+            } catch {
+              // Non-fatal — image generation failure should never block Facebook posting
+            }
+          }
+
+          // Step 2: Fetch category name for richer caption context
           let categoryName: string | null = null;
           if (post.primaryCategoryId) {
             const [cat] = await db
@@ -277,7 +274,7 @@ router.patch("/posts/:id", async (req, res) => {
             categoryName = cat?.name ?? null;
           }
 
-          // Generate and store AI social captions
+          // Step 3: Generate and store AI social captions
           await generateAndStoreSocialCaptions({
             id: post.id,
             title: post.title,
@@ -286,7 +283,7 @@ router.patch("/posts/:id", async (req, res) => {
             categoryName,
           });
 
-          // Use the stored AI caption for Facebook — fall back to excerpt
+          // Step 4: Post to Facebook with the now-resolved image
           const storedCaptions = await getSocialCaptionsForPost(post.id);
           const facebookCaption = storedCaptions?.captionFacebook ?? undefined;
 
@@ -295,7 +292,7 @@ router.patch("/posts/:id", async (req, res) => {
             slug: post.slug,
             excerpt: post.excerpt,
             overrideMessage: facebookCaption,
-            headerImageUrl: post.headerImageUrl,
+            headerImageUrl: resolvedHeaderImageUrl ?? undefined,
             bodyImages: post.bodyImages,
           });
         } catch {
