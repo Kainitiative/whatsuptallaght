@@ -94,6 +94,130 @@ function extractFeedImageUrl(item: Record<string, any>): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// SDCC news page scraper — scrapes https://www.sdcc.ie/en/news/
+// SDCC publish no RSS feed, so we parse the HTML index then fetch each article.
+// ---------------------------------------------------------------------------
+
+const SDCC_BASE = "https://www.sdcc.ie";
+
+async function fetchSdccNewsPage(url: string): Promise<NormalisedFeedItem[]> {
+  // --- Step 1: Fetch the news index page ---
+  const indexRes = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; TallaghtCommunityBot/1.0; +https://whatsuptallaght.ie)",
+      Accept: "text/html,application/xhtml+xml",
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!indexRes.ok) throw new Error(`SDCC index fetch failed: ${indexRes.status}`);
+  const indexHtml = await indexRes.text();
+
+  // --- Step 2: Extract all unique /en/news/*.html article links ---
+  // The page has both featured tiles and card-1 items — grab every news article href.
+  const hrefPattern = /href="([^"]*\/en\/news\/[^"]+\.html)"/g;
+  const seen = new Set<string>();
+  const articleUrls: string[] = [];
+
+  for (const [, href] of indexHtml.matchAll(hrefPattern)) {
+    const full = href.startsWith("http") ? href : `${SDCC_BASE}${href}`;
+    // Normalise to www.sdcc.ie
+    const normalised = full.replace("https://sdcc.ie/", "https://www.sdcc.ie/");
+    if (!seen.has(normalised)) {
+      seen.add(normalised);
+      articleUrls.push(normalised);
+    }
+  }
+
+  // Extract thumbnail images from card-1-img blocks (best-effort, keyed by href)
+  const thumbMap = new Map<string, string>();
+  const cardPattern = /href="([^"]+)"[^>]*>[\s\S]{0,200}?<img[^>]+src="([^"]+)"/g;
+  for (const [, href, src] of indexHtml.matchAll(cardPattern)) {
+    const full = href.startsWith("http") ? href : `${SDCC_BASE}${href}`;
+    const normalised = full.replace("https://sdcc.ie/", "https://www.sdcc.ie/");
+    const imgFull = src.startsWith("http") ? src : `${SDCC_BASE}${src}`;
+    if (!thumbMap.has(normalised)) thumbMap.set(normalised, imgFull);
+  }
+
+  logger.info({ url, articleCount: articleUrls.length }, "SDCC: found article links on index page");
+
+  // --- Step 3: Fetch each article page (cap at 12 to be polite) ---
+  const items: NormalisedFeedItem[] = [];
+
+  for (const articleUrl of articleUrls.slice(0, 12)) {
+    try {
+      const artRes = await fetch(articleUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; TallaghtCommunityBot/1.0; +https://whatsuptallaght.ie)",
+          Accept: "text/html,application/xhtml+xml",
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!artRes.ok) {
+        logger.debug({ articleUrl, status: artRes.status }, "SDCC: skipping article (non-200)");
+        continue;
+      }
+      const artHtml = await artRes.text();
+
+      // Title: <h1> inside the content news-doc block
+      const h1Match = artHtml.match(/<div[^>]+class="[^"]*content news-doc[^"]*"[^>]*>[\s\S]{0,200}?<h1[^>]*>([^<]+)<\/h1>/);
+      const title = h1Match ? h1Match[1].trim() : "";
+      if (!title) {
+        logger.debug({ articleUrl }, "SDCC: skipping article (no title found)");
+        continue;
+      }
+
+      // Date: <div class="date">14 Apr 26</div>
+      const dateMatch = artHtml.match(/<div[^>]+class="date"[^>]*>([^<]+)<\/div>/);
+      let pubDate = new Date();
+      if (dateMatch) {
+        const parsed = new Date(dateMatch[1].trim());
+        if (!isNaN(parsed.getTime())) pubDate = parsed;
+      }
+
+      // Body: all <p> tags inside <div class="content news-doc">
+      const contentBlockMatch = artHtml.match(/<div[^>]+class="[^"]*content news-doc[^"]*"[^>]*>([\s\S]*?)(?:<script|<div[^>]+class="[^"]*(?:news-nav|footer|related)[^"]*")/);
+      let content = "";
+      if (contentBlockMatch) {
+        const paragraphs = [...contentBlockMatch[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)];
+        content = paragraphs
+          .map(([, inner]) => inner.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim())
+          .filter((p) => p.length > 20) // skip navigation fragments
+          .join("\n\n");
+      }
+
+      if (!content) {
+        logger.debug({ articleUrl, title }, "SDCC: skipping article (no body content extracted)");
+        continue;
+      }
+
+      // Image: prefer thumbnail from index, fall back to first <img> in article body
+      let feedImageUrl: string | null = thumbMap.get(articleUrl) ?? null;
+      if (!feedImageUrl) {
+        const imgMatch = artHtml.match(/<div[^>]+class="[^"]*content news-doc[^"]*"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"/);
+        if (imgMatch) {
+          const src = imgMatch[1];
+          feedImageUrl = src.startsWith("http") ? src : `${SDCC_BASE}${src}`;
+        }
+      }
+
+      items.push({
+        guid: articleUrl,
+        title,
+        content: `${content}\n\nSource: ${articleUrl}`,
+        link: articleUrl,
+        feedImageUrl,
+        pubDate,
+      });
+    } catch (err) {
+      logger.warn({ err, articleUrl }, "SDCC: failed to fetch individual article (skipping)");
+    }
+  }
+
+  logger.info({ url, scraped: items.length }, "RSS: SDCC news page scraped");
+  return items;
+}
+
+// ---------------------------------------------------------------------------
 // Eventbrite page scraper — extracts JSON-LD event list from a search page
 // ---------------------------------------------------------------------------
 
@@ -225,6 +349,14 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
       normalisedItems = await fetchEventbritePage(feed.url);
     } catch (err) {
       logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to fetch Eventbrite page");
+      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      return;
+    }
+  } else if (feedType === "sdcc") {
+    try {
+      normalisedItems = await fetchSdccNewsPage(feed.url);
+    } catch (err) {
+      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to scrape SDCC news page");
       await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
       return;
     }
