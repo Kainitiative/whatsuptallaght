@@ -561,28 +561,36 @@ function extractTopicKeywords(headline: string): string[] {
 function buildDallePrompt(headline: string, keyFacts: string[], tone: string, entityContext?: string | null): string {
   const facts = keyFacts.slice(0, 3).filter(Boolean).join(", ");
 
-  // Photorealistic camera/lighting specs per tone.
-  // Key goals: warm, bright, positive, community-focused — NOT grey, grim or documentary-dark.
-  // Deliberately avoid scene types that produce signs/banners (stadium hoardings, scoreboards,
-  // protest placards) — DALL-E renders text on these as garbled nonsense.
+  // Global style base — applies to every image regardless of tone.
+  // Goal: images that look like real photographs, not AI-generated art.
+  const GLOBAL_STYLE = "true-to-life photography, natural colours, realistic skin tones, slightly imperfect lighting, subtle shadows, real-world exposure, mild grain, natural contrast, no oversaturation, no stylisation, no illustration, no CGI look, no painterly effects";
+
+  // Tone-specific style — defines the genre/mood of the shoot.
+  // Deliberately avoid scenes that produce signs/banners (scoreboards, placards) —
+  // DALL-E renders text on these as garbled nonsense.
   const styleByTone: Record<string, string> = {
-    news:      "photorealistic press photograph, 35mm lens, bright warm golden-hour sunlight, optimistic uplifting mood, vibrant colours, smiling people engaged in their community, cheerful neighbourhood atmosphere — clean composition, no constructed signage in frame",
-    event:     "photorealistic event photograph, wide-angle lens, warm golden sunlight, joyful celebratory crowd, bright vibrant colours, happy faces and lively energy, professional press photography — people enjoying themselves, no banners or signs in foreground",
-    sport:     "photorealistic sports action photograph, telephoto lens, fast shutter speed, bright afternoon sunshine, vivid grass-green pitch, dynamic athletic action, energetic and exciting — tight crop on players in motion, no hoardings or advertising boards visible",
-    community: "photorealistic community photograph, 50mm lens, warm bright sunshine, neighbours gathering together happily, colourful houses and gardens, friendly welcoming atmosphere — smiling people, vibrant neighbourhood streetscape, no close-up signage",
-    business:  "photorealistic commercial photograph, bright natural lighting, 35mm lens, clean inviting composition, thriving local business environment, warm welcoming ambience — cheerful exterior or interior, no visible signage or text on surfaces",
-    warning:   "photorealistic documentary photograph, soft overcast light, calm composed scene, concerned but dignified community members, muted but not desaturated colour palette, thoughtful journalistic style — environmental wide shot, no text-bearing objects in focus",
-    memorial:  "photorealistic respectful photograph, soft warm diffused light, 50mm lens, quiet dignified scene, gentle warm tones — flowers, candles, people gathered in quiet remembrance, peaceful atmosphere, no written text elements",
-    other:     "photorealistic community photograph, 50mm lens, bright warm natural lighting, uplifting positive mood, vibrant colours — clean welcoming scene without signs or text",
+    news:      "journalistic press photography, neutral composition, natural lighting, authentic documentary feel, like a newspaper photo, not staged, no constructed signage in frame",
+    event:     "real event photography, natural ambient lighting, candid crowd moments, genuine unposed atmosphere, authentic documentary feel, no banners or signs in foreground",
+    sport:     "real sports photography, telephoto lens, fast shutter speed, natural daylight, slight motion blur on movement, background crowd softly out of focus, captured mid-action like a real match photo, no hoardings or advertising boards visible",
+    community: "real candid street photography, 50mm lens, natural light, unposed people, genuine interactions, slightly imperfect framing, like a real moment captured without staging, no close-up signage",
+    business:  "real commercial photography, natural interior or exterior lighting, clean but realistic, not staged, no artificial glow or colour boost, no visible signage or text on surfaces",
+    warning:   "documentary-style photography, overcast or soft natural light, grounded tone, realistic environment, slightly muted colours, serious but natural atmosphere, no text-bearing objects in focus",
+    memorial:  "documentary-style photography, soft natural diffused light, quiet dignified scene, gentle muted tones, peaceful respectful atmosphere, no written text elements",
+    other:     "real candid photography, natural light, authentic unposed scene, documentary feel, clean realistic composition, no signs or text",
   };
+
   const style = styleByTone[tone] ?? styleByTone.other;
   const factsClause = facts ? ` Scene context: ${facts}.` : "";
   const entityClause = entityContext ? ` Visual detail: ${entityContext}` : "";
 
-  // The no-text rule is stated three different ways and placed FIRST so DALL-E weights it heavily.
-  const noText = "CRITICAL RULES — strictly no text, writing, letters, words, numbers, legible signs, banners, placards, scoreboards, advertising hoardings, or logos anywhere in the image. If any text would naturally appear (shirt numbers excepted), replace it with abstract pattern or blur it out of focus.";
+  // No-text rule stated first and twice — DALL-E weights the start of the prompt heavily.
+  // Anti-CGI rule added immediately after to reinforce the real-photography requirement.
+  const noText = "CRITICAL RULES — strictly no text, writing, letters, words, numbers, legible signs, banners, placards, scoreboards, advertising hoardings, or logos anywhere in the image. If any text would naturally appear (shirt numbers excepted), replace it with abstract pattern or blur it out of focus. Do not generate illustration, painting, cartoon, or CGI-style imagery. The image must look like a real photograph taken with a camera.";
 
-  return `${noText} ${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland — bright, welcoming, vibrant. No watermarks. No identifiable real faces. Shot on professional camera, high resolution, sharp focus, cinematic depth.`;
+  // Camera realism anchor — appended last to reinforce the photographic medium.
+  const cameraAnchor = "Shot on DSLR camera, 35mm or 50mm lens, natural depth of field, realistic exposure settings, slight lens imperfections.";
+
+  return `${noText} ${GLOBAL_STYLE}. ${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland. No watermarks. No identifiable real faces. ${cameraAnchor}`;
 }
 
 /**
