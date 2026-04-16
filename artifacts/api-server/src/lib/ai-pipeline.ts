@@ -136,7 +136,7 @@ async function runSafetyCheck(
 
   const result = await openai.moderations.create({ input: text });
   const flagged = result.results[0].flagged;
-  const categories = result.results[0].categories as Record<string, boolean>;
+  const categories = result.results[0].categories as unknown as Record<string, boolean>;
   const flaggedCategories = Object.entries(categories)
     .filter(([, v]) => v)
     .map(([k]) => k);
@@ -594,47 +594,82 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
 }
 
 /**
- * Looks up visual context for real-world entities mentioned in the headline/facts
- * using GPT's knowledge — team colours, venue details, brand identity etc.
- * Returns a short descriptive string to enrich the DALL-E prompt, or null if nothing useful found.
+ * Researches visual context for real-world entities mentioned in the headline/facts.
+ * Uses the OpenAI Responses API with the built-in web_search_preview tool so that
+ * results are grounded in live web data — current-season kit colours, actual ground
+ * photos, real venue details — rather than the model's training memory alone.
+ *
+ * Falls back to a training-data-only lookup if the Responses API call fails,
+ * so image generation always has at least a best-effort visual context.
+ *
+ * Returns a short descriptive string to enrich the DALL-E prompt, or null if nothing useful.
  */
 async function researchEntityContext(
   openai: OpenAI,
   headline: string,
   keyFacts: string[],
 ): Promise<string | null> {
+  const text = `${headline}. ${keyFacts.slice(0, 4).join(". ")}`;
+
+  const SYSTEM_PROMPT = `You are a visual research assistant for a news image generator powered by DALL-E 3.
+
+Given a headline and facts, search the web to find accurate visual details about any specific real-world entities mentioned (sports clubs, organisations, venues, events, Irish landmarks).
+
+Use your web search to verify:
+- Sports clubs: current-season kit colours, jersey style, shorts colour (search "[club name] kit 2025" or "[club name] jersey")
+- Football/GAA grounds: pitch surface (grass or artificial), rough ground size/feel, terrace vs seating (search "[ground name] stadium")
+- Venues: building style, interior/exterior look (search "[venue name] Tallaght" or "[venue name] Dublin")
+- Organisations: brand colour palette, typical physical setting
+
+Return your findings as 1–2 sentences of pure VISUAL detail ONLY.
+
+CRITICAL CONSTRAINTS for DALL-E compatibility:
+- Never include text, signs, banners, hoardings, scoreboards, logos, or any readable identifiers
+- Focus on colours, materials, textures, surfaces, body language — describe what things LOOK like
+- Only include details you found or are confident are accurate — do not invent
+- If no specific real-world entities are identifiable, return an empty string
+- Return ONLY the visual description, no explanations, no citations, no source references`;
+
+  // --- Primary: web-grounded lookup via Responses API ---
+  // Uses gpt-4o with the web_search_preview built-in tool.
+  // Note: gpt-4o-mini-search-preview / gpt-4o-search-preview are separate model SKUs
+  // that require specific API tier access; gpt-4o + web_search_preview tool works universally.
   try {
-    const text = `${headline}. ${keyFacts.slice(0, 4).join(". ")}`;
-    const response = await openai.chat.completions.create({
+    const response = await (openai.responses.create as Function)({
+      model: "gpt-4o",
+      tools: [{ type: "web_search_preview" }],
+      input: `${SYSTEM_PROMPT}\n\nArticle: ${text}`,
+    });
+
+    const raw: string = (response.output_text ?? "").trim();
+    // Strip any markdown citation links [text](url) that the model sometimes includes
+    const result = raw.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
+
+    if (result.length > 10) {
+      logger.debug({ headline, result }, "AI pipeline: web-grounded entity research succeeded");
+      return result;
+    }
+  } catch (err) {
+    logger.debug({ err, headline }, "AI pipeline: web search entity research failed — falling back to training-data lookup");
+  }
+
+  // --- Fallback: training-data-only lookup (original behaviour) ---
+  try {
+    const fallback = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.1,
       messages: [
         {
           role: "system",
           content: `You are a visual research assistant for a news image generator powered by DALL-E 3.
-
-Given a headline and facts, identify any specific real-world entities (sports clubs, organisations, venues, events, Irish landmarks).
-For each recognised entity, provide brief VISUAL details to help generate an accurate photorealistic image:
-- Sports clubs: kit colours and style only (e.g. "hooped green and white jerseys, dark shorts")
-- Venues: surface type, rough size/feel, architecture style — NO named stands or signage
-- Organisations: brand colour palette, typical physical setting without branded signage
-
-CRITICAL CONSTRAINTS for DALL-E compatibility:
-- Never suggest scenes that would contain text, signs, banners, hoardings, scoreboards, or logos
-- Focus on colours, materials, textures, and body language — not readable identifiers
-- Describe WHAT things look like, not what they say
-- Only include details you are CONFIDENT are accurate. Do not invent or guess.
-- Return 1–2 sentences of visual detail only. No explanations.
-- If no specific real-world entities are identifiable, return an empty string.`,
+Given a headline and facts, identify any specific real-world entities (sports clubs, organisations, venues, Irish landmarks).
+Provide brief VISUAL details: kit colours and style for sports clubs, surface/architecture for venues, brand colours for organisations.
+CRITICAL: no text, signs, banners, logos, or hoardings. Colours and materials only. 1–2 sentences. Empty string if nothing identifiable.`,
         },
-        {
-          role: "user",
-          content: text,
-        },
+        { role: "user", content: text },
       ],
     });
-
-    const result = response.choices[0].message.content?.trim() ?? "";
+    const result = fallback.choices[0].message.content?.trim() ?? "";
     return result.length > 10 ? result : null;
   } catch {
     return null;
@@ -1451,12 +1486,9 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
       if (imgRes.ok) {
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
         const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
-        const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
-        const storagePath = `header-images/rss-${submissionId}-${Date.now()}.${ext}`;
-        const { storeObject } = await import("./object-storage");
-        await storeObject(storagePath, imgBuffer, contentType.split(";")[0]);
-        rssImagePath = `/${storagePath}`;
-        logger.info({ submissionId, feedImageUrl, storagePath }, "RSS pipeline: using real feed photo as header");
+        const storedPath = await uploadImageBuffer(imgBuffer, contentType.split(";")[0] ?? "image/jpeg");
+        rssImagePath = storedPath;
+        logger.info({ submissionId, feedImageUrl, storedPath }, "RSS pipeline: using real feed photo as header");
       } else {
         logger.warn({ submissionId, feedImageUrl, status: imgRes.status }, "RSS pipeline: feed image download failed — falling back");
       }
