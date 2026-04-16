@@ -219,7 +219,11 @@ export async function postToFacebookPage(post: {
     }
 
     logger.info({ facebookPostId: feedData.id, slug: post.slug }, "Article posted to Facebook (text post, no image)");
-    return { postId: feedData.id ?? null };
+    const resultPostId = feedData.id ?? null;
+    if (resultPostId === null) {
+      return { postId: null, errorDetail: "Facebook returned no post ID" };
+    }
+    return { postId: resultPostId };
 
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
