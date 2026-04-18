@@ -752,24 +752,79 @@ This is the phase where everything connects. Entity pages go public, and the AI 
 
 ---
 
-### Phase 4 — Google Trends CSV Upload
-**Fixes covered:** Fix 7 enhancement (search trend data for AI)
+### Phase 4A — Trends Ingestion + AI Summary
+**Fixes covered:** Fix 7 enhancement (trends data — ingestion and summarisation only)
 **Blocked by:** Phase 2 must be complete (needs the entity page admin form to exist)
-**Effort:** Small-medium — CSV parser, one new DB column, admin UI section, pipeline injection
-**Deployable standalone:** Yes — adds to existing entity pages, no breaking changes
+**Effort:** Small-medium — CSV parser, new DB columns, admin UI section, one AI summarisation call
+**Deployable standalone:** Yes — adds to existing entity pages, no pipeline changes yet
 
-This phase adds the Google Trends data layer on top of entity pages. It extends the admin form, the DB, and the pipeline prompt — but changes nothing about the public page or the core pipeline matching logic.
+The goal of this phase is to get trends data into the system cleanly and have the AI produce a human-readable summary that admin can review and trust. The pipeline does not use it yet — that comes in Phase 4B, once there is confidence the summary is accurate and well-formed.
 
 **What gets built:**
-- New `trendsData` JSONB column on `entity_pages`
-- CSV upload endpoint on the entity pages API route — accepts a Google Trends CSV file, parses it (handling the multi-section format: interest over time, related topics, related queries), extracts rising queries + top queries + peak months, merges with any existing trend data, saves to `trendsData`
-- Admin "Search Trends" section on the Entity Page Edit form:
-  - Instructions telling admin how to download the CSV from Google Trends (region: Ireland, past 12 months)
-  - File upload field (accepts `.csv`)
-  - After upload: preview card showing top 5 rising queries with % change, top 5 established queries, peak interest months — admin can see exactly what the AI will use before saving
-- AI pipeline: when a matched entity has `trendsData`, inject rising and top queries into both the headline prompt and the article writing prompt. Instruction to AI: use these terms where they fit naturally — not forced
 
-**What admin needs to do after Phase 4:** For each entity page that matters most (Shamrock Rovers, Tallaght Stadium, Tallaght Library), go to Google Trends, search the entity name, set Ireland + past 12 months, download CSV, upload it in the admin. Takes about 5 minutes per entity. Repeat roughly every 3–6 months or before a new season starts.
+*Database:*
+- New `trendsData` JSONB column on `entity_pages` — stores the raw parsed data (rising queries + top queries + peak months + upload timestamp)
+- New `trendsSummary` text column on `entity_pages` — stores the AI-generated SEO summary (plain English, reviewed by admin before it ever influences articles)
+
+*API:*
+- CSV upload endpoint on the entity pages API route — accepts a Google Trends CSV file, parses the multi-section format (interest over time / related topics / related queries), extracts rising queries with % changes, top queries, and peak months, saves to `trendsData`
+- After parsing, immediately calls GPT-4o to generate a `trendsSummary` — a short, plain-English paragraph that describes what the trends mean for this entity in practical terms. Example output for Shamrock Rovers:
+  > "People searching for Shamrock Rovers in Ireland are increasingly using the phrase 'shamrock rovers fixtures 2026' (up 400%) and 'league of ireland table 2026' (up 300%). Interest peaks strongly from March through October, aligning with the League of Ireland season. Established searches include 'shamrock rovers tickets' and 'tallaght stadium capacity'. Articles about Rovers should naturally include fixture and league table context during the season."
+
+*Admin UI:*
+- New "Search Trends" section on the Entity Page Edit form
+- Instructions: how to get the CSV from Google Trends (region: Ireland, past 12 months)
+- File upload field (`.csv`)
+- After upload and AI summarisation: a preview card showing:
+  - The AI-written `trendsSummary` paragraph (admin reads this and decides if it makes sense)
+  - Top 5 rising queries with % change
+  - Top 5 established queries
+  - Peak months bar or list
+- Admin can edit the `trendsSummary` before saving if the AI got anything wrong
+- Save button stores both `trendsData` and `trendsSummary` to the entity page
+
+**What admin can verify after Phase 4A:** Open any entity page, upload a Google Trends CSV, read the generated summary paragraph. If it accurately describes how people search for that entity, it is ready to be used by the pipeline in Phase 4B. If it looks off, admin edits it. The summary is visible in the admin and nowhere else — articles are completely unaffected at this point.
+
+**What admin needs to do after Phase 4A:** For the highest-priority entities, download and upload CSVs from Google Trends. Review the summaries. Correct any that look wrong. Once satisfied, these entities are ready for Phase 4B.
+
+---
+
+### Phase 4B — Pipeline Trend Influence
+**Fixes covered:** Fix 7 enhancement (trends data — article headline and body influence)
+**Blocked by:** Phase 4A must be complete and summaries must be reviewed/approved by admin
+**Effort:** Small — the heavy lifting is already done; this is adding the summary to the pipeline prompt with careful guardrails
+**Deployable standalone:** Yes — purely additive to the pipeline, no breaking changes
+
+This phase wires the `trendsSummary` into the article writing pipeline. The reason it is a separate phase is that raw trend term injection can go wrong quickly — the AI can over-use terms, force them where they sound unnatural, or prioritise keyword density over readability. By using the AI-generated *summary* (rather than the raw term list), and by reviewing that summary in Phase 4A before it ever influences articles, there is a human quality gate between the trend data and what reaches readers.
+
+**The key distinction:**
+- Phase 4A injects: raw CSV data → AI → readable summary → human review
+- Phase 4B injects: that reviewed summary → article pipeline → natural influence on phrasing
+
+**What gets built:**
+
+*AI pipeline change:*
+- When a matched entity has a `trendsSummary`, append it to the article writing prompt as optional context — clearly labelled so the AI understands its role:
+  ```
+  SEARCH CONTEXT for [Entity Name] (use as background awareness only — do not repeat terms verbatim or force them into the article):
+  [trendsSummary text]
+  ```
+- The same summary is passed to the headline generation step with a similar framing:
+  ```
+  SEARCH CONTEXT: [trendsSummary] — write the headline to reflect how people search naturally, but only if the search language genuinely fits this article.
+  ```
+- If `trendsSummary` is empty or the entity has no trends data, behaviour is unchanged — no fallback needed
+
+*Guardrails built into the prompt instruction:*
+- The AI is told the summary is background context, not a list of terms to include
+- It is explicitly told not to repeat terms verbatim or use them where they don't fit
+- The framing mirrors how a good editor would brief a journalist: "people search for 'fixtures 2026' a lot this season — keep that in mind when you write the headline" rather than "include the phrase fixtures 2026"
+
+*Admin monitoring:*
+- No new UI needed — admin reviews articles as normal and can judge whether the trend influence is working well or being overdone
+- If the influence looks heavy-handed on a specific entity, admin can edit that entity's `trendsSummary` to tone it down (e.g. remove specific phrases that the AI is overusing), without touching any code
+
+**What admin needs to do after Phase 4B:** Monitor the first few articles for each entity that has trend data. Check that headlines read naturally and that the article body doesn't feel like it's straining to include keywords. If something looks off, edit the entity's trend summary in the admin to soften it.
 
 ---
 
@@ -777,9 +832,10 @@ This phase adds the Google Trends data layer on top of entity pages. It extends 
 
 | Phase | What It Builds | Effort | Google Impact | When to Ship |
 |-------|---------------|--------|---------------|--------------|
-| 1 | Meta tags, robots.txt, sitemap, AI prompts | Small | 🔴 Immediate — fixes critical SEO gaps | First, standalone |
+| 1 | Meta tags, robots.txt, sitemap, AI prompts | Small | Immediate — fixes critical SEO gaps | First, standalone |
 | 2 | Entity pages: DB + admin UI | Medium | None yet (admin only) | After Phase 1 |
-| 3 | Entity pages: public site + AI pipeline | Medium-high | 🟠 High — new rankable pages + smarter articles | After Phase 2 |
-| 4 | Google Trends CSV upload | Small-medium | 🟡 Medium — better keyword alignment over time | After Phase 2 |
+| 3 | Entity pages: public site + AI pipeline | Medium-high | High — new rankable pages + smarter articles | After Phase 2 |
+| 4A | Trends ingestion: CSV upload + AI summary | Small-medium | None yet — data collection and review only | After Phase 2 |
+| 4B | Trends influence: summary into pipeline | Small | Medium — better keyword alignment, safely gated | After 4A reviewed |
 
-Phases 3 and 4 are independent of each other once Phase 2 is done — they can be built in parallel or in either order.
+Phases 3 and 4A are independent of each other once Phase 2 is done and can run in parallel. Phase 4B should only ship after Phase 4A summaries have been reviewed and trusted.
