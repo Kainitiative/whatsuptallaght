@@ -439,6 +439,119 @@ This adds genuine, verifiable, useful content to short articles without breaking
 
 ---
 
+### Google Trends Integration (Entity Page Enhancement)
+
+#### The Idea
+
+When the admin creates a pillar page for Shamrock Rovers, they also go to Google Trends, search for related terms ("shamrock rovers", "tallaght stadium", "league of ireland", etc.), download the CSV, and upload it to the entity page. The AI pipeline then reads this trend data when writing any article matched to that entity — using it to pick the search terms that real people are actually using right now.
+
+This is a significant upgrade because the AI stops guessing at keywords and starts working from real search demand data specific to each entity.
+
+#### What Google Trends CSVs Contain
+
+When you download a Google Trends CSV it has several sections:
+- **Interest over time** — week-by-week relative popularity (0–100) for each searched term
+- **Related topics** — top and rising topics people also look at
+- **Related queries** — the actual search phrases people type along with the main term, split into "Top" (established volume) and "Rising" (momentum, often shown as a % increase like +250%)
+
+The **Related queries** section is the most useful. "Rising" queries show what people are actively starting to search for — these are the best headline keywords. "Top" queries show what's already established.
+
+**Example for "shamrock rovers" + "tallaght stadium":**
+```
+Rising queries might include:
+- "shamrock rovers fixtures 2026" (+400%)
+- "league of ireland table 2026" (+300%)
+- "rovers vs bohemians" (+200%)
+- "tallaght stadium capacity" (+150%)
+
+Top queries might include:
+- "shamrock rovers fc"
+- "shamrock rovers tickets"
+- "tallaght stadium parking"
+```
+
+#### Admin Flow
+
+On the entity page edit form, a new "Search Trends" section:
+1. Admin goes to [trends.google.com](https://trends.google.com), searches their entity name plus any related terms (can compare up to 5 terms at once)
+2. Sets the region to Ireland, time range to "Past 12 months"
+3. Downloads the CSV (Google provides a download button)
+4. Uploads the CSV file in the admin form
+5. The server parses it immediately and shows a preview summary: top 5 rising queries, top 5 established queries, and which months show peak interest
+6. Admin saves — the parsed data is stored in the entity page DB record
+
+Multiple CSVs can be uploaded over time (e.g. one for "shamrock rovers", another for "tallaght stadium"). The system merges the rising and top queries across all uploads, deduplicates, and keeps the most recent data.
+
+#### Data Model
+
+A `trendsData` JSONB column on `entity_pages`:
+
+```jsonc
+{
+  "lastUploadedAt": "2026-04-18T12:00:00Z",
+  "searchTerms": ["shamrock rovers", "tallaght stadium"],
+  "risingQueries": [
+    { "query": "shamrock rovers fixtures 2026", "changePercent": 400 },
+    { "query": "league of ireland table 2026", "changePercent": 300 },
+    { "query": "rovers vs bohemians", "changePercent": 200 },
+    { "query": "tallaght stadium capacity", "changePercent": 150 }
+  ],
+  "topQueries": [
+    "shamrock rovers fc",
+    "shamrock rovers tickets",
+    "tallaght stadium parking",
+    "shamrock rovers squad"
+  ],
+  "peakMonths": ["March", "April", "May", "September", "October"],
+  "trendNote": "Interest peaks during spring and autumn league fixtures season"
+}
+```
+
+The raw CSV is parsed server-side on upload and then discarded — only the structured data above is stored. The parser needs to handle the Google Trends CSV format which has multiple sections separated by blank lines, each with its own header row.
+
+#### How the AI Pipeline Uses It
+
+When a matched entity is found during article processing, the trends data is passed into both the headline generation step and the article writing step as additional context:
+
+**Injected into the headline prompt:**
+```
+SEARCH TREND DATA for Shamrock Rovers (from Google Trends — real search demand):
+- People are increasingly searching: "shamrock rovers fixtures 2026" (+400%), "league of ireland table 2026" (+300%), "rovers vs bohemians" (+200%)
+- Established searches include: "shamrock rovers tickets", "tallaght stadium parking", "shamrock rovers squad"
+- Peak interest months: March–May and September–October
+
+Use this data to make the headline match how people actually search. If the article is about fixtures, use "fixtures 2026" naturally. If it's a match report, "rovers vs [opponent]" is a proven search pattern. Do NOT force keywords that don't fit the article — only use what is genuinely relevant.
+```
+
+**Injected into the article writing prompt:**
+```
+RELEVANT SEARCH TERMS for this entity (use naturally where they fit — do not force):
+- Rising: "shamrock rovers fixtures 2026", "league of ireland table 2026"
+- Established: "shamrock rovers tickets", "tallaght stadium capacity"
+```
+
+The AI instruction is explicit: use these terms only where they fit naturally. The goal is alignment with real search language, not keyword stuffing. A match report should naturally say "Shamrock Rovers" rather than "Rovers" if the trend data shows "shamrock rovers" has far higher search volume than "rovers".
+
+#### Seasonal Awareness
+
+If the trend data shows peak months (e.g. March–October for football), the pipeline could in future flag when an article is published outside peak season and adjust expectations accordingly. This is a nice-to-have for later.
+
+#### What This Does Not Do
+
+- It does not automatically update trend data — admin needs to re-download and re-upload periodically (e.g. every 3–6 months or before a new season)
+- It does not use the Google Trends API (which requires a commercial arrangement) — CSV upload keeps it free and human-curated
+- It does not guarantee ranking — it improves keyword alignment, which is one of several ranking factors
+
+#### Files That Would Need Changing (when building)
+
+In addition to the existing Fix 7 file list:
+- `artifacts/api-server/src/routes/entity-pages.ts` — add CSV upload endpoint; parse Google Trends CSV format; merge into `trendsData` JSONB
+- `lib/db/src/schema/entity-pages.ts` — add `trendsData` jsonb column
+- `artifacts/api-server/src/lib/ai-pipeline.ts` — inject `trendsData.risingQueries` and `trendsData.topQueries` into headline and article prompts when entity is matched
+- `artifacts/admin-dashboard/src/pages/EntityPageEdit.tsx` — add "Search Trends" section with CSV upload + parsed preview
+
+---
+
 ## Priority Order
 
 1. 🔴 **Per-page meta tags** (`react-helmet-async`) — biggest Google impact, clean and safe change
