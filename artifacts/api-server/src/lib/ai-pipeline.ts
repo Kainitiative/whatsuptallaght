@@ -3,7 +3,7 @@ import { applyWatermark } from "./watermark";
 import { postToFacebookPage } from "./facebook-poster";
 import { generateAndStoreSocialCaptions, getSocialCaptionsForPost } from "./social-caption-agent";
 import { matchEntityInArticle } from "./entity-matcher";
-import { linkEntityPagesToPost } from "./entity-page-linker";
+import { linkEntityPagesToPost, findEntityPageHeaderPhoto } from "./entity-page-linker";
 import { db } from "@workspace/db";
 import {
   submissionsTable,
@@ -1330,14 +1330,24 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   const entityMatch = await matchEntityInArticle(articleBody, openai);
   const entityImagePath = entityMatch?.entityImageUrl ?? null;
 
+  // --- Phase 4C: Entity page photo lookup ---
+  // Check if any matched entity PAGE has photos — real community photos take
+  // priority over DALL-E generated images. Runs in parallel with no blocking.
+  const entityPagePhoto = await findEntityPageHeaderPhoto(articleBody);
+
   // --- Stage 7b: Generate header image ---
-  // Header is always a purpose-built wide image (entity image or DALL·E from asset library).
+  // Priority: entity page photo (real) > old entity image > DALL-E asset library.
   // Submitted WhatsApp photos go into bodyImages — displayed inline in the article body.
   // For held articles we save the prompt text only — image is sourced from the library when admin publishes.
   // Images are always generated for published articles so Facebook always has a real photo to post.
-  let headerImagePath: string | null = entityImagePath ?? null;
+  let headerImagePath: string | null = entityPagePhoto ?? entityImagePath ?? null;
   let headerImagePrompt: string | null = null;
-  if (!entityImagePath) {
+  if (headerImagePath) {
+    logger.info(
+      { submissionId, source: entityPagePhoto ? "entity_page_photo" : "entity_image" },
+      "AI pipeline: using real photo as header — skipping DALL-E",
+    );
+  } else {
     headerImagePrompt = buildDallePrompt(infoResult.headline, infoResult.keyFacts, toneResult.tone);
     if (postStatus === "published") {
       logger.info({ submissionId }, "AI pipeline: sourcing header image from asset library");
@@ -1349,8 +1359,6 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     } else {
       logger.info({ submissionId }, "AI pipeline: skipping header image — article held for review");
     }
-  } else {
-    logger.info({ submissionId, entityName: entityMatch?.entityName }, "AI pipeline: using entity image as header");
   }
 
   const [newPost] = await db
@@ -1397,8 +1405,8 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     infoResult.hasDateTime,
   ).catch((err) => logger.warn({ err, postId: newPost.id }, "AI pipeline: event record creation failed (non-fatal)"));
 
-  // --- Link entity pages (non-fatal) ---
-  linkEntityPagesToPost(newPost.id, articleBody).catch((err) =>
+  // --- Link entity pages + Phase 4C: append body photos to entity page galleries (non-fatal) ---
+  linkEntityPagesToPost(newPost.id, articleBody, bodyImagePaths).catch((err) =>
     logger.warn({ err, postId: newPost.id }, "AI pipeline: entity page linking failed (non-fatal)"),
   );
 
@@ -1564,9 +1572,13 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   const rssEntityMatch = await matchEntityInArticle(articleBody, openai);
   const rssEntityImagePath = rssEntityMatch?.entityImageUrl ?? null;
 
+  // --- Phase 4C: Entity page photo lookup ---
+  const rssEntityPagePhoto = await findEntityPageHeaderPhoto(articleBody);
+
   // --- Generate header image ---
-  // Precedence: real feed photo > entity image > DALL·E asset library > none
+  // Precedence: real feed photo > entity page photo (real) > old entity image > DALL·E asset library > none
   // For held articles we save the prompt text only — image is sourced from library when admin publishes.
+  let rssStoredFeedImagePath: string | null = null; // stored URL of feed image (used for gallery append too)
   let rssImagePath: string | null = null;
   let rssImagePrompt: string | null = buildDallePrompt(infoResult.headline || title, infoResult.keyFacts, toneResult.tone);
 
@@ -1578,6 +1590,7 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
         const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
         const storedPath = await uploadImageBuffer(imgBuffer, contentType.split(";")[0] ?? "image/jpeg");
+        rssStoredFeedImagePath = storedPath;
         rssImagePath = storedPath;
         logger.info({ submissionId, feedImageUrl, storedPath }, "RSS pipeline: using real feed photo as header");
       } else {
@@ -1586,6 +1599,11 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     } catch (err) {
       logger.warn({ submissionId, feedImageUrl, err }, "RSS pipeline: feed image fetch threw — falling back");
     }
+  }
+
+  if (!rssImagePath && rssEntityPagePhoto) {
+    rssImagePath = rssEntityPagePhoto;
+    logger.info({ submissionId }, "RSS pipeline: using entity page photo as header (Phase 4C)");
   }
 
   if (!rssImagePath && rssEntityImagePath) {
@@ -1630,7 +1648,7 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
       sourceSubmissionId: submissionId,
       publishedAt: postStatus === "published" ? new Date() : null,
       matchedEntityId: rssEntityMatch?.entityId ?? null,
-      headerImageUrl: rssEntityImagePath ?? rssImagePath ?? undefined,
+      headerImageUrl: rssImagePath ?? undefined,
       imagePrompt: rssImagePrompt ?? undefined,
     })
     .returning();
@@ -1647,8 +1665,9 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     .set({ postId: newPost.id })
     .where(eq(rssItemsTable.id, rssItemId));
 
-  // --- Link entity pages (non-fatal) ---
-  linkEntityPagesToPost(newPost.id, articleBody).catch((err) =>
+  // --- Link entity pages + Phase 4C: append RSS photo to entity page galleries (non-fatal) ---
+  const rssPhotoUrls = rssStoredFeedImagePath ? [rssStoredFeedImagePath] : [];
+  linkEntityPagesToPost(newPost.id, articleBody, rssPhotoUrls).catch((err) =>
     logger.warn({ err, postId: newPost.id }, "RSS pipeline: entity page linking failed (non-fatal)"),
   );
 
