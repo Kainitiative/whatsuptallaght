@@ -644,7 +644,7 @@ In addition to the existing Fix 7 file list:
 
 ## Files to Change When Building
 
-### Fixes 1–6 (meta tags, sitemap, AI prompts)
+### Phase 1 files (meta tags, sitemap, AI prompts)
 - `artifacts/community-website/package.json` — add `react-helmet-async`
 - `artifacts/community-website/src/App.tsx` — HelmetProvider wrapper
 - `artifacts/community-website/src/pages/article.tsx` — per-article Helmet block
@@ -658,17 +658,128 @@ In addition to the existing Fix 7 file list:
 - `artifacts/api-server/src/lib/ai-pipeline.ts:332` — headline instruction
 - `artifacts/api-server/src/lib/ai-pipeline.ts:845–900` — writeArticle system prompt (venue names rule)
 
-### Fix 7 (Entity Pillar Pages + AI Knowledge Base)
+### Phase 2 files (entity page infrastructure)
 - `lib/db/src/schema/entity-pages.ts` — new `entity_pages` and `entity_page_articles` tables (create)
 - `lib/db/src/schema/index.ts` — export new tables
-- `artifacts/api-server/src/routes/entity-pages.ts` — admin CRUD + AI generation endpoint (create)
+- `artifacts/api-server/src/routes/entity-pages.ts` — admin CRUD + AI page generation endpoint (create)
 - `artifacts/api-server/src/routes/index.ts` — register new router
-- `artifacts/api-server/src/routes/public.ts` — public GET `/entity/:slug` endpoint
 - `artifacts/api-server/src/routes/sitemap.ts` — include published entity pages
-- `artifacts/api-server/src/lib/ai-pipeline.ts` — `matchEntityPage` function; entity context injected into DALL-E prompt; article body enrichment; pillar link appended
-- `artifacts/admin-dashboard/src/pages/EntityPages.tsx` — list view (create)
+- `artifacts/admin-dashboard/src/pages/EntityPages.tsx` — admin list view (create)
 - `artifacts/admin-dashboard/src/pages/EntityPageEdit.tsx` — create/edit form with type-specific fields + AI generation + photo upload (create)
 - `artifacts/admin-dashboard/src/App.tsx` — register new admin routes
 - `artifacts/admin-dashboard/src/lib/api.ts` — API helpers for entity pages
-- `artifacts/community-website/src/pages/entity.tsx` — public entity page component (create)
+
+### Phase 3 files (public pages + AI pipeline)
+- `artifacts/api-server/src/routes/public.ts` — public GET `/entity/:slug` endpoint
+- `artifacts/api-server/src/lib/ai-pipeline.ts` — `matchEntityPage` function; `dalleStyle` injection into DALL-E prompt; article body enrichment; "More about X" link appended
+- `artifacts/community-website/src/pages/entity.tsx` — public entity page component with hero, about, quick info, photo gallery, latest news (create)
 - `artifacts/community-website/src/App.tsx` — register `/entity/:slug` route
+
+### Phase 4 files (Google Trends CSV upload)
+- `lib/db/src/schema/entity-pages.ts` — add `trendsData` jsonb column
+- `artifacts/api-server/src/routes/entity-pages.ts` — add CSV upload endpoint + Google Trends CSV parser
+- `artifacts/admin-dashboard/src/pages/EntityPageEdit.tsx` — add "Search Trends" section: CSV upload + parsed preview card
+
+---
+
+## Build Phases
+
+### Phase 1 — Quick Wins
+**Fixes covered:** 1 (meta tags), 2 (robots.txt + sitemap), 3 (AI headlines), 4 (venue names in body)
+**Effort:** Small — no new DB tables, no new pages, mostly configuration and prompt changes
+**Deployable standalone:** Yes — ship this first, independent of everything else
+
+This phase fixes the two critical issues Google sees right now (every page showing the same title, and the pillar pages being invisible to search engines), and improves the quality of every article the AI writes going forward.
+
+**What gets built:**
+- Install `react-helmet-async` in the community website. Wrap the app in `HelmetProvider`. Add a `<Helmet>` block to every page type: articles (title = headline, description = first 160 chars of body, og:image = header image), category pages (title = category name + "News | What's Up Tallaght"), and each of the five existing pillar pages (events, tallaght-news, tallaght-community, whats-on-tallaght, search)
+- Add JSON-LD Article schema to article pages so Google classifies them as news content
+- Fix `robots.txt` — replace the Cloudflare boilerplate with a proper file that includes the `Sitemap:` directive pointing to the sitemap URL
+- Add the five existing pillar pages to the sitemap at `priority 0.8`
+- Update the AI headline instruction from 12-word cap to 16-word cap with explicit venue name and month/year requirements
+- Add the venue full-name rule to the article writing prompt
+
+**What admin needs to do after Phase 1:** Nothing. Every future article automatically gets a proper page title, meta description, and social share image. Every future article headline will start including the full venue name and date context.
+
+---
+
+### Phase 2 — Entity Page Infrastructure (Admin Side)
+**Fixes covered:** Fix 7 (entity pages — database + admin UI only)
+**Blocked by:** Nothing (can start immediately after Phase 1 ships)
+**Effort:** Medium — new DB tables, new admin section, AI generation endpoint
+**Deployable standalone:** Yes — admin can start creating entity pages even before the public pages exist (Phase 3). Pages sit in draft until Phase 3 is deployed.
+
+This phase builds everything on the admin side. By the end of it, admin can create a full entity page for Shamrock Rovers — enter the kit colours, home ground, aliases, directions, upload photos, hit "Generate Page", review the AI-written content, and save it. It just won't be visible to the public yet.
+
+**What gets built:**
+- New DB tables: `entity_pages` (name, slug, type, aliases, address, directions, aiContext JSONB, generatedBody, seoTitle, metaDescription, photos, status, etc.) and `entity_page_articles` (junction table linking articles to entity pages)
+- Run DB migration
+- New admin API routes: list entity pages, create, update, delete, publish/unpublish, generate page content via AI (takes all the admin-entered fields and calls GPT-4o to write the public-facing 400–600 word page body)
+- New admin dashboard section "Entity Pages":
+  - List view: table of all entity pages, name, type, status, article count, last updated, link to public page
+  - Create/Edit form: name, type selector (sports club / venue / place / business / organisation / event series), aliases field, address, directions, website, phone, opening hours, short description, type-specific fields (kit colours for sports clubs, capacity for venues, etc.), the `aiContext` fields including `dalleStyle`, photo uploader, "Generate Page" button, rich text editor for generated content, SEO title + meta description fields, status toggle
+- Entity pages added to sitemap when published (one extra DB query, no other changes needed)
+
+**What admin needs to do after Phase 2:** Start building entity pages. Shamrock Rovers, Tallaght Stadium, Tallaght Library, TUH — each one takes 10–15 minutes to fill in and generate. These sit as drafts until Phase 3 goes live.
+
+---
+
+### Phase 3 — Public Pages + AI Pipeline Integration
+**Fixes covered:** Fix 7 (entity pages — public site + pipeline), Fix 5 (internal linking), Fix 6 (thin content — directions injection)
+**Blocked by:** Phase 2 must be complete first (needs entity pages in DB)
+**Effort:** Medium-high — new public page component, significant AI pipeline changes
+**Deployable standalone:** Yes — ship after Phase 2. All draft entity pages from Phase 2 go live the moment this deploys.
+
+This is the phase where everything connects. Entity pages go public, and the AI pipeline starts using them automatically for every new article.
+
+**What gets built:**
+- Public `/entity/:slug` page on the community website:
+  - Hero section with entity name as H1, first uploaded photo, type badge
+  - AI-generated About section (3–5 paragraphs)
+  - Quick Info sidebar (address, directions, opening hours, website, phone; for sports clubs: kit colour chip, home ground, league)
+  - Photo gallery of admin-uploaded images
+  - Latest News section — live feed of all articles linked to this entity, newest first, shown as article cards
+  - Related Entities section — other entity pages in the same category
+  - Full `<Helmet>` block: unique title, meta description, og:image from first photo, JSON-LD schema (LocalBusiness / SportsOrganization / SportsActivityLocation as appropriate)
+- AI pipeline changes (in `ai-pipeline.ts`):
+  - New `matchEntityPage` function: after `extractInfo` runs, check the article headline and key facts text against all published entity names and aliases (case-insensitive, cached per process). Returns the matched entity page + its `aiContext`, or null
+  - If matched: use `aiContext.dalleStyle` as the entity visual context for the DALL-E prompt — replaces the current live web search (`researchEntityContext`) for known entities, saving ~€0.03 per article and getting more accurate results
+  - If matched and entity has `directions`: for event articles, append a "Getting there:" paragraph to the article body using the admin-written directions — adds genuine verifiable content to thin event articles
+  - After article is saved: insert a row into `entity_page_articles`, append "More about [Entity Name] →" link to the article body — this is the internal link that feeds Google and feeds the Latest News section on the entity page
+  - If no match: fall through to the existing `researchEntityContext` web search as before — no regression for unmatched articles
+
+**What admin needs to do after Phase 3:** Nothing ongoing — it's automatic. Any new article from WhatsApp or RSS that mentions Shamrock Rovers, Tallaght Library, etc. will automatically link to the entity page and appear in its Latest News section. Admin should publish any draft entity pages from Phase 2 so they go live immediately.
+
+---
+
+### Phase 4 — Google Trends CSV Upload
+**Fixes covered:** Fix 7 enhancement (search trend data for AI)
+**Blocked by:** Phase 2 must be complete (needs the entity page admin form to exist)
+**Effort:** Small-medium — CSV parser, one new DB column, admin UI section, pipeline injection
+**Deployable standalone:** Yes — adds to existing entity pages, no breaking changes
+
+This phase adds the Google Trends data layer on top of entity pages. It extends the admin form, the DB, and the pipeline prompt — but changes nothing about the public page or the core pipeline matching logic.
+
+**What gets built:**
+- New `trendsData` JSONB column on `entity_pages`
+- CSV upload endpoint on the entity pages API route — accepts a Google Trends CSV file, parses it (handling the multi-section format: interest over time, related topics, related queries), extracts rising queries + top queries + peak months, merges with any existing trend data, saves to `trendsData`
+- Admin "Search Trends" section on the Entity Page Edit form:
+  - Instructions telling admin how to download the CSV from Google Trends (region: Ireland, past 12 months)
+  - File upload field (accepts `.csv`)
+  - After upload: preview card showing top 5 rising queries with % change, top 5 established queries, peak interest months — admin can see exactly what the AI will use before saving
+- AI pipeline: when a matched entity has `trendsData`, inject rising and top queries into both the headline prompt and the article writing prompt. Instruction to AI: use these terms where they fit naturally — not forced
+
+**What admin needs to do after Phase 4:** For each entity page that matters most (Shamrock Rovers, Tallaght Stadium, Tallaght Library), go to Google Trends, search the entity name, set Ireland + past 12 months, download CSV, upload it in the admin. Takes about 5 minutes per entity. Repeat roughly every 3–6 months or before a new season starts.
+
+---
+
+### Summary Table
+
+| Phase | What It Builds | Effort | Google Impact | When to Ship |
+|-------|---------------|--------|---------------|--------------|
+| 1 | Meta tags, robots.txt, sitemap, AI prompts | Small | 🔴 Immediate — fixes critical SEO gaps | First, standalone |
+| 2 | Entity pages: DB + admin UI | Medium | None yet (admin only) | After Phase 1 |
+| 3 | Entity pages: public site + AI pipeline | Medium-high | 🟠 High — new rankable pages + smarter articles | After Phase 2 |
+| 4 | Google Trends CSV upload | Small-medium | 🟡 Medium — better keyword alignment over time | After Phase 2 |
+
+Phases 3 and 4 are independent of each other once Phase 2 is done — they can be built in parallel or in either order.
