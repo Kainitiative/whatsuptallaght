@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useRoute } from "wouter";
+import { Helmet } from "react-helmet-async";
 import { 
   useListPosts, 
   getListPostsQueryKey, 
@@ -54,7 +55,22 @@ export default function Category() {
 
   const posts = postsData?.posts || [];
 
+  const categoryTitle = categoryData?.name
+    ? `${categoryData.name} News Tallaght | What's Up Tallaght`
+    : "Tallaght News | What's Up Tallaght";
+  const categoryDescription = categoryData?.description
+    ? categoryData.description
+    : `The latest ${categoryData?.name ?? "community"} news and stories from Tallaght, Dublin.`;
+
   return (
+    <>
+    <Helmet>
+      <title>{categoryTitle}</title>
+      <meta name="description" content={categoryDescription} />
+      <meta property="og:title" content={categoryTitle} />
+      <meta property="og:description" content={categoryDescription} />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+    </Helmet>
     <div className="w-full flex flex-col pb-20">
       <CategoryFilter />
 
@@ -139,5 +155,6 @@ export default function Category() {
         )}
       </section>
     </div>
+    </>
   );
 }
