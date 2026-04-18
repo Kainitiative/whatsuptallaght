@@ -14,8 +14,9 @@ import {
   aiUsageLogTable,
   eventsTable,
   headerImageAssetsTable,
+  entityPagesTable,
 } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNotNull } from "drizzle-orm";
 import { getSettingValue } from "../routes/settings";
 import { downloadMedia } from "./whatsapp-client";
 import { sendTextMessage } from "./whatsapp-client";
@@ -801,6 +802,57 @@ async function findOrCreateHeaderAsset(
 }
 
 // ---------------------------------------------------------------------------
+// Phase 4B — Entity trends lookup (pre-write SEO context)
+// Finds any published entity pages mentioned in the submission text that have
+// a reviewed trendsSummary, so the summary can be fed into the article writer
+// as optional background context.
+// ---------------------------------------------------------------------------
+
+interface EntityTrendsContext {
+  entityName: string;
+  summary: string;
+}
+
+function escapeRegexChars(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function fetchEntityTrendsSummaries(text: string): Promise<EntityTrendsContext[]> {
+  try {
+    const pages = await db
+      .select({
+        name: entityPagesTable.name,
+        aliases: entityPagesTable.aliases,
+        trendsSummary: entityPagesTable.trendsSummary,
+      })
+      .from(entityPagesTable)
+      .where(isNotNull(entityPagesTable.trendsSummary));
+
+    const normalised = text.toLowerCase();
+    const results: EntityTrendsContext[] = [];
+
+    for (const page of pages) {
+      if (!page.trendsSummary?.trim()) continue;
+      const terms = [page.name, ...(page.aliases ?? [])];
+      const hit = terms.some((term) => {
+        if (!term?.trim()) return false;
+        const pattern = new RegExp(`\\b${escapeRegexChars(term.toLowerCase())}\\b`);
+        return pattern.test(normalised);
+      });
+      if (hit) {
+        results.push({ entityName: page.name, summary: page.trendsSummary });
+        logger.debug({ entityName: page.name }, "AI pipeline: entity trends context found");
+      }
+    }
+
+    return results;
+  } catch (err) {
+    logger.warn({ err }, "AI pipeline: entity trends lookup failed (non-fatal)");
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stage 6 — Article writing (GPT-4o)
 // ---------------------------------------------------------------------------
 
@@ -812,6 +864,7 @@ async function writeArticle(
   goldenExamples: { inputText: string; outputText: string }[],
   ctx: UsageCtx,
   minimalMode = false,
+  entityTrends: EntityTrendsContext[] = [],
 ): Promise<string> {
   const examplesBlock =
     goldenExamples.length > 0
@@ -903,6 +956,19 @@ async function writeArticle(
           "Write in a similar way, but do NOT copy phrases or sentences directly.",
           "",
           examplesBlock,
+        ]
+      : []),
+    ...(entityTrends.length > 0
+      ? [
+          "",
+          "SEARCH CONTEXT (background awareness only):",
+          "The following SEO notes describe how people in Ireland search for the entities in this article.",
+          "Use this as background awareness when choosing words and phrases — do not repeat terms verbatim,",
+          "do not force keywords in, and never let this override factual accuracy. Write naturally.",
+          "",
+          ...entityTrends.map(
+            (e) => `SEARCH CONTEXT for ${e.entityName}:\n${e.summary}`,
+          ),
         ]
       : []),
   ].join("\n");
@@ -1197,6 +1263,18 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     .orderBy(desc(goldenExamplesTable.createdAt))
     .limit(3);
 
+  // --- Phase 4B: Entity trends context (pre-write SEO lookup) ---
+  // Find any entity pages mentioned in the submission text that have a reviewed
+  // trendsSummary. These are passed to writeArticle as optional background context
+  // so the AI can phrase things in a way that aligns with how people actually search.
+  const entityTrends = await fetchEntityTrendsSummaries(combinedText);
+  if (entityTrends.length > 0) {
+    logger.info(
+      { submissionId, entities: entityTrends.map((e) => e.entityName) },
+      "AI pipeline: injecting entity trends context into article writer",
+    );
+  }
+
   // --- Stage 7: Write article ---
   // Minimal mode activates when both the completeness score is low AND the raw submission
   // is thin. A long submission (opinion pieces, detailed community messages) should always
@@ -1205,7 +1283,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   const submissionWordCount = combinedText.trim().split(/\s+/).filter(Boolean).length;
   const minimalMode = infoResult.completenessScore <= 0.75 && submissionWordCount < 50;
   logger.info({ submissionId, minimalMode }, "AI pipeline: writing article");
-  const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode);
+  const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode, entityTrends);
 
   // --- Stage 7b: Fact-check ---
   logger.info({ submissionId }, "AI pipeline: fact-checking article");

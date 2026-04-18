@@ -749,7 +749,9 @@ export default function EntityPageEdit() {
                         {trendsData.risingQueries.slice(0, 5).map((q, i) => (
                           <li key={i} className="flex items-center justify-between">
                             <span className="text-xs text-foreground">{q.query}</span>
-                            <span className="text-xs font-medium text-green-700">+{q.changePercent}%</span>
+                            <span className={`text-xs font-semibold ${q.changePercent >= 5000 ? "text-orange-600" : "text-green-700"}`}>
+                              {q.changePercent >= 5000 ? "Breakout" : `+${q.changePercent}%`}
+                            </span>
                           </li>
                         ))}
                       </ul>
