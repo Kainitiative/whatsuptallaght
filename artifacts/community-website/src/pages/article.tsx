@@ -1,5 +1,6 @@
 import { useRoute } from "wouter";
 import { format } from "date-fns";
+import { Helmet } from "react-helmet-async";
 import { 
   useGetPostBySlug, 
   getGetPostBySlugQueryKey,
@@ -135,7 +136,47 @@ export default function Article() {
 
   const relatedPosts = relatedData?.posts?.filter(p => p.id !== post.id).slice(0, 3) || [];
 
+  const metaDescription = post.excerpt
+    ? post.excerpt.slice(0, 160)
+    : post.body.replace(/<[^>]+>/g, "").slice(0, 160);
+
+  const canonicalUrl = `https://whatsuptallaght.ie/article/${post.slug}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    "headline": post.title,
+    "description": metaDescription,
+    "image": headerImageUrl,
+    "datePublished": post.publishedAt ?? post.createdAt,
+    "dateModified": post.updatedAt ?? post.publishedAt ?? post.createdAt,
+    "author": { "@type": "Organization", "name": "What's Up Tallaght" },
+    "publisher": {
+      "@type": "Organization",
+      "name": "What's Up Tallaght",
+      "url": "https://whatsuptallaght.ie"
+    },
+    "url": canonicalUrl,
+  };
+
   return (
+    <>
+    <Helmet>
+      <title>{post.title} | What's Up Tallaght</title>
+      <meta name="description" content={metaDescription} />
+      <link rel="canonical" href={canonicalUrl} />
+      <meta property="og:type" content="article" />
+      <meta property="og:title" content={post.title} />
+      <meta property="og:description" content={metaDescription} />
+      <meta property="og:image" content={headerImageUrl} />
+      <meta property="og:url" content={canonicalUrl} />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={post.title} />
+      <meta name="twitter:description" content={metaDescription} />
+      <meta name="twitter:image" content={headerImageUrl} />
+      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+    </Helmet>
     <article className="w-full pb-20 bg-white">
       {/* Header Image — wide cinematic banner.
            Blurred backdrop fills the 21:7 frame for any image shape (square logos,
@@ -285,5 +326,6 @@ export default function Article() {
         </div>
       )}
     </article>
+    </>
   );
 }
