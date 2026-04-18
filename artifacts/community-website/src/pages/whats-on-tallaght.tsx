@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { Helmet } from "react-helmet-async";
 import {
   useListPosts,
   getListPostsQueryKey,
@@ -147,6 +148,14 @@ export default function WhatsOnTallaghtPage() {
   }, [BASE]);
 
   return (
+    <>
+    <Helmet>
+      <title>What's On in Tallaght – Events & Activities | What's Up Tallaght</title>
+      <meta name="description" content="Find out what's on in Tallaght, Dublin. Upcoming events, activities, classes, and things to do near you — updated daily from the local community." />
+      <meta property="og:title" content="What's On in Tallaght – Events & Activities | What's Up Tallaght" />
+      <meta property="og:description" content="Find out what's on in Tallaght — events, activities and things to do updated daily." />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+    </Helmet>
     <div className="w-full flex flex-col bg-background pb-20">
       <CategoryFilter />
 
@@ -393,5 +402,6 @@ export default function WhatsOnTallaghtPage() {
         </div>
       </section>
     </div>
+    </>
   );
 }
