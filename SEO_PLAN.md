@@ -680,6 +680,10 @@ In addition to the existing Fix 7 file list:
 - `artifacts/api-server/src/routes/entity-pages.ts` — add CSV upload endpoint + Google Trends CSV parser
 - `artifacts/admin-dashboard/src/pages/EntityPageEdit.tsx` — add "Search Trends" section: CSV upload + parsed preview card
 
+### Phase 4C files (bidirectional photo flow)
+- `artifacts/api-server/src/lib/entity-page-linker.ts` — after recording the link, append new article photos to entity page gallery (deduped); return entity page photos array to caller
+- `artifacts/api-server/src/lib/ai-pipeline.ts` — WhatsApp and RSS paths: after entity match, check entity page photos array; use first photo as header image instead of DALL-E if available (priority: RSS photo > entity page photo > DALL-E)
+
 ---
 
 ## Build Phases
@@ -828,6 +832,51 @@ This phase wires the `trendsSummary` into the article writing pipeline. The reas
 
 ---
 
+### Phase 4C — Bidirectional Photo Flow
+**Fixes covered:** Entity page photo library self-populates; articles get real photos instead of DALL-E images
+**Blocked by:** Phase 3 must be complete (entity page matching must be running in the pipeline)
+**Effort:** Small — no new DB tables, no new routes, no frontend changes; purely pipeline logic
+**Deployable standalone:** Yes — purely additive, no breaking changes to existing behaviour
+
+Right now photos only flow one way: admin manually uploads them to an entity page. This phase makes them flow in both directions automatically.
+
+**The two flows:**
+
+*Entity page → Article header:*
+
+When the pipeline matches an article to an entity page, it now checks whether that entity page has any photos before calling DALL-E. If photos exist, the first one in the array is used as the article header image — no API call, no cost, and a real authentic photo rather than an AI illustration. The first photo in the array is always the primary one; admin controls this by reordering photos in the entity page editor (e.g. for Shamrock Rovers, the team photo goes first, the crest goes second).
+
+Priority order for header images remains:
+1. RSS feed provided a real photo → use it (already implemented, unchanged)
+2. Entity page has photos → use the first one (new)
+3. No entity photo available → run DALL-E as before (unchanged)
+
+This means once an admin has set up a good entity page with photos, every future article about that entity gets a real header photo automatically. DALL-E is only called for entities that don't have a page yet.
+
+*Article photos → Entity page gallery:*
+
+When a WhatsApp submission includes photos, or an RSS article has an image, and the pipeline matches that article to an entity page, those photos are appended to the entity page's `photos` array. This happens after the article is saved, as part of the same step that records the link in `entity_page_articles`.
+
+Before appending, the pipeline checks whether each URL already exists in the `photos` array — no duplicates are added. The photos appear immediately in the entity page gallery on the public site. Admin can delete unwanted ones from the entity page editor at any time — there is no approval gate, but the delete is always available.
+
+**What this looks like in practice over time:**
+
+1. Admin creates Shamrock Rovers entity page, uploads a team celebration photo (first) and a stadium shot (second).
+2. Community member sends "Rovers won 2-1 last night!" with two match photos via WhatsApp.
+3. Pipeline matches Rovers → uses the team celebration photo as the article header (no DALL-E call) → saves the two WhatsApp photos as body images in the article → appends those two photos to the Rovers entity page gallery.
+4. Next Rovers article: three photos now available on the entity page — the two match photos and the original team shot. The team shot is still first and still becomes the header.
+5. Admin can reorder in the entity page editor at any time — e.g. if a spectacular match photo comes in, drag it to position one and all future articles use that one instead.
+
+**What gets built:**
+
+- `entity-page-linker.ts` — extend the existing link-recording step: after writing to `entity_page_articles`, collect all new photo URLs from the article (body images from WhatsApp, image URL from RSS), filter out any already in the entity page's `photos` array, and run `UPDATE entity_pages SET photos = array_cat(photos, $new_photos) WHERE id = $id` if there are any new ones. Return the entity page's full `photos` array to the caller.
+- `ai-pipeline.ts` (WhatsApp path) — after `matchEntityPage` returns a match, check `entityPage.photos.length > 0`. If true, set `headerImagePath = entityPage.photos[0]` and skip the DALL-E generation block. If false, proceed with DALL-E as before.
+- `ai-pipeline.ts` (RSS path) — same logic: after entity match, check entity page photos first; RSS feed's own image still takes priority over entity page photos (stays at top of priority chain).
+
+**What admin needs to do after Phase 4C:** For the highest-traffic entities (Rovers, Tallaght Library, TUH, etc.), make sure the entity page has at least one good photo in position one. After that, the gallery will grow itself with every new article. Admin should periodically review the gallery and delete any blurry or irrelevant photos that come in through WhatsApp.
+
+---
+
 ### Summary Table
 
 | Phase | What It Builds | Effort | Google Impact | When to Ship |
@@ -837,5 +886,6 @@ This phase wires the `trendsSummary` into the article writing pipeline. The reas
 | 3 | Entity pages: public site + AI pipeline | Medium-high | High — new rankable pages + smarter articles | After Phase 2 |
 | 4A | Trends ingestion: CSV upload + AI summary | Small-medium | None yet — data collection and review only | After Phase 2 |
 | 4B | Trends influence: summary into pipeline | Small | Medium — better keyword alignment, safely gated | After 4A reviewed |
+| 4C | Bidirectional photo flow | Small | Indirect — richer entity pages, authentic article images | After Phase 3 |
 
-Phases 3 and 4A are independent of each other once Phase 2 is done and can run in parallel. Phase 4B should only ship after Phase 4A summaries have been reviewed and trusted.
+Phases 3, 4A, and 4C are all independent of each other once Phase 2 is done and can run in parallel. Phase 4B should only ship after Phase 4A summaries have been reviewed and trusted. Phase 4C has no dependencies beyond Phase 3 being live.
