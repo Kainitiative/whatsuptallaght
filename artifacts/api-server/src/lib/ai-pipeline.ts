@@ -3,6 +3,7 @@ import { applyWatermark } from "./watermark";
 import { postToFacebookPage } from "./facebook-poster";
 import { generateAndStoreSocialCaptions, getSocialCaptionsForPost } from "./social-caption-agent";
 import { matchEntityInArticle } from "./entity-matcher";
+import { linkEntityPagesToPost } from "./entity-page-linker";
 import { db } from "@workspace/db";
 import {
   submissionsTable,
@@ -1318,6 +1319,11 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     infoResult.hasDateTime,
   ).catch((err) => logger.warn({ err, postId: newPost.id }, "AI pipeline: event record creation failed (non-fatal)"));
 
+  // --- Link entity pages (non-fatal) ---
+  linkEntityPagesToPost(newPost.id, articleBody).catch((err) =>
+    logger.warn({ err, postId: newPost.id }, "AI pipeline: entity page linking failed (non-fatal)"),
+  );
+
   logger.info({ submissionId, postId: newPost.id, status: postStatus }, "AI pipeline: complete");
 
   // --- Generate social captions + post to Facebook (auto-published WhatsApp) ---
@@ -1562,6 +1568,11 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
     .update(rssItemsTable)
     .set({ postId: newPost.id })
     .where(eq(rssItemsTable.id, rssItemId));
+
+  // --- Link entity pages (non-fatal) ---
+  linkEntityPagesToPost(newPost.id, articleBody).catch((err) =>
+    logger.warn({ err, postId: newPost.id }, "RSS pipeline: entity page linking failed (non-fatal)"),
+  );
 
   // --- Create event record if tone === "event" ---
   await maybeCreateEventRecord(
