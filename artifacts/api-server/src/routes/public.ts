@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, categoriesTable } from "@workspace/db/schema";
-import { eq, and, sql, count } from "drizzle-orm";
+import { postsTable, categoriesTable, entityPagesTable, entityPageArticlesTable } from "@workspace/db/schema";
+import { eq, and, sql, count, desc } from "drizzle-orm";
 import { getSettingValue } from "./settings";
 
 const router = Router();
@@ -51,6 +51,46 @@ router.get("/public/search", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "internal_error", message: "Search failed" });
+  }
+});
+
+// GET /public/entity-pages/:slug — public entity page by slug
+router.get("/public/entity-pages/:slug", async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    const [page] = await db
+      .select()
+      .from(entityPagesTable)
+      .where(and(eq(entityPagesTable.slug, slug), eq(entityPagesTable.status, "published")));
+
+    if (!page) {
+      return res.status(404).json({ error: "not_found", message: "Entity page not found" });
+    }
+
+    const linkedArticles = await db
+      .select({
+        postId: entityPageArticlesTable.postId,
+        title: postsTable.title,
+        slug: postsTable.slug,
+        excerpt: postsTable.excerpt,
+        headerImageUrl: postsTable.headerImageUrl,
+        primaryCategoryId: postsTable.primaryCategoryId,
+        publishedAt: postsTable.publishedAt,
+      })
+      .from(entityPageArticlesTable)
+      .innerJoin(postsTable, eq(entityPageArticlesTable.postId, postsTable.id))
+      .where(
+        and(
+          eq(entityPageArticlesTable.entityPageId, page.id),
+          eq(postsTable.status, "published"),
+        ),
+      )
+      .orderBy(desc(postsTable.publishedAt))
+      .limit(6);
+
+    res.json({ ...page, linkedArticles });
+  } catch (err) {
+    res.status(500).json({ error: "internal_error", message: "Failed to fetch entity page" });
   }
 });
 
