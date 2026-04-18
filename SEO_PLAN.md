@@ -539,8 +539,86 @@ If the trend data shows peak months (e.g. March–October for football), the pip
 #### What This Does Not Do
 
 - It does not automatically update trend data — admin needs to re-download and re-upload periodically (e.g. every 3–6 months or before a new season)
-- It does not use the Google Trends API (which requires a commercial arrangement) — CSV upload keeps it free and human-curated
+- It does not use the Google Trends API directly — see the automated fetching section below for options
 - It does not guarantee ranking — it improves keyword alignment, which is one of several ranking factors
+
+---
+
+#### Can the System Fetch Google Trends Data Automatically?
+
+**Short answer: yes, but not for free and not officially.**
+
+Here is the honest breakdown of what is possible:
+
+**Option A — Google has no official Trends API**
+
+Google does not offer a public Google Trends API. The data on [trends.google.com](https://trends.google.com) is served through internal undocumented endpoints that are not available for third-party programmatic access. Any automated solution either wraps those endpoints (unofficial, fragile) or uses a paid intermediary service.
+
+---
+
+**Option B — SerpApi (recommended paid option)**
+
+[SerpApi](https://serpapi.com/google-trends-api) is a third-party service that scrapes Google Trends and returns structured JSON. It has an official Google Trends endpoint.
+
+- **Free tier:** 100 searches per month — enough for WUT's scale if there are ~50 entity pages refreshed monthly
+- **Paid:** $50/month for 5,000 searches — far more than needed
+- **What it returns:** interest over time, rising queries, top queries, related topics — everything from the CSV, but as clean JSON
+- **How it would work:** when admin publishes an entity page, the server calls SerpApi with the entity's name and aliases as search terms (region: IE, time: past 12 months). The response is parsed and saved to `trendsData` exactly as the CSV upload does — same DB structure, same pipeline injection
+- **Refresh:** a scheduled job (e.g. first of every month, or start of football season) re-fetches for all published entity pages automatically
+
+This is the cleanest automated approach. The free tier covers WUT's needs now. It can be wired up using just the existing `OPENAI_API_KEY` budget — SerpApi uses its own key (a new secret: `SERPAPI_KEY`).
+
+**SerpApi call for Shamrock Rovers would look like:**
+```
+GET https://serpapi.com/search.json?engine=google_trends
+  &q=shamrock rovers,tallaght stadium
+  &geo=IE
+  &date=today 12-m
+  &data_type=RELATED_QUERIES
+  &api_key=SERPAPI_KEY
+```
+
+Returns rising queries and top queries as structured JSON — no CSV parsing needed.
+
+---
+
+**Option C — DataForSEO**
+
+[DataForSEO](https://dataforseo.com/apis/google-trends-api/) is a professional data API used by SEO agencies. It provides Google Trends data on a pay-per-request basis.
+
+- **Cost:** approximately €0.002 per request — fetching trends for 50 entities once a month = ~€0.10/month
+- **More reliable** than SerpApi for production use
+- **Requires credit top-up** rather than a monthly subscription
+- Slightly more complex setup but same outcome
+
+---
+
+**Option D — Pytrends (unofficial Python library — not recommended)**
+
+`pytrends` is an open-source Python library that reverse-engineers the Google Trends internal API. It is commonly used for personal projects and research.
+
+- **Free** — no API key needed
+- **Fragile** — Google regularly blocks it via rate limiting and CAPTCHAs; it breaks without warning when Google changes their internal endpoints
+- **Not suitable for production** — it would work during development but would intermittently fail in production, breaking trend refreshes silently
+- Not recommended for WUT
+
+---
+
+**Recommendation for WUT**
+
+Start with the **manual CSV upload** (already planned above) — it works today, costs nothing, and the admin only needs to do it once per entity when they set it up. Then, if automated refresh becomes a priority, **add SerpApi** — the free tier covers the volume needed for the foreseeable future, and it is a straightforward addition to the existing entity page API route. The `trendsData` DB structure is identical whether the data came from a CSV upload or a SerpApi call, so no other code changes are needed.
+
+**Automated fetch trigger points (when building):**
+1. When an entity page is first published (fetch immediately)
+2. A monthly scheduled job re-fetches for all published entity pages (keeps data current)
+3. Admin can also click a "Refresh Trends" button on the entity page at any time
+
+**Additional file needed (vs CSV-only plan):**
+- `artifacts/api-server/src/lib/trends-fetcher.ts` — SerpApi client; accepts entity name + aliases; returns `trendsData` object
+- `artifacts/api-server/src/routes/entity-pages.ts` — call `trends-fetcher` on publish; add manual "refresh" endpoint
+- A scheduled job (cron or similar) — monthly refresh for all published entity pages
+
+---
 
 #### Files That Would Need Changing (when building)
 
