@@ -10,10 +10,12 @@ import {
   deleteEntityPage,
   requestUploadUrl,
   uploadEntityPageTrends,
+  rescanEntityPagePosts,
   type EntityPageType,
   type EntityPageAiContext,
   type CreateEntityPageInput,
   type TrendsData,
+  type RescanPostsResult,
 } from "@/lib/api";
 
 const ENTITY_TYPES: { value: EntityPageType; label: string }[] = [
@@ -110,6 +112,8 @@ export default function EntityPageEdit() {
   const [trendsUploadError, setTrendsUploadError] = useState<string | null>(null);
   const [trendsData, setTrendsData] = useState<TrendsData | null>(null);
   const [trendsSummary, setTrendsSummary] = useState<string>("");
+  const [isRescanning, setIsRescanning] = useState(false);
+  const [rescanResult, setRescanResult] = useState<RescanPostsResult | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -789,27 +793,63 @@ export default function EntityPageEdit() {
         )}
 
         {/* Linked articles */}
-        {!isNew && existing?.linkedArticles && existing.linkedArticles.length > 0 && (
+        {!isNew && (
           <Section title="Linked Articles">
-            <p className="text-xs text-muted-foreground mb-3">
-              Articles automatically linked to this entity page (populated in Phase 3).
-            </p>
-            <div className="divide-y divide-border">
-              {existing.linkedArticles.map((a) => (
-                <div key={a.postId} className="py-2.5 flex items-center justify-between">
-                  <span className="text-sm text-foreground">{a.title}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {a.publishedAt
-                      ? new Date(a.publishedAt).toLocaleDateString("en-IE", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "—"}
-                  </span>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-muted-foreground">
+                Articles that mention this entity appear in "Recent Coverage" on the public page.
+                New articles are linked automatically. Use the button to backfill older articles.
+              </p>
+              <button
+                type="button"
+                disabled={isRescanning}
+                onClick={async () => {
+                  if (!pageId) return;
+                  setIsRescanning(true);
+                  setRescanResult(null);
+                  try {
+                    const result = await rescanEntityPagePosts(pageId);
+                    setRescanResult(result);
+                    qc.invalidateQueries({ queryKey: ["entity-page", pageId] });
+                  } catch {
+                    setRescanResult(null);
+                  } finally {
+                    setIsRescanning(false);
+                  }
+                }}
+                className="ml-4 flex-shrink-0 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {isRescanning ? "Scanning…" : "Find Related Articles"}
+              </button>
             </div>
+            {rescanResult && (
+              <div className="mb-3 text-xs rounded-lg px-3 py-2 bg-green-50 text-green-700 border border-green-200">
+                Scan complete — {rescanResult.linked} new article{rescanResult.linked !== 1 ? "s" : ""} linked
+                {rescanResult.skipped > 0 ? `, ${rescanResult.skipped} already linked` : ""}.
+              </div>
+            )}
+            {existing?.linkedArticles && existing.linkedArticles.length > 0 ? (
+              <div className="divide-y divide-border">
+                {existing.linkedArticles.map((a) => (
+                  <div key={a.postId} className="py-2.5 flex items-center justify-between gap-4">
+                    <span className="text-sm text-foreground">{a.title}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                      {a.publishedAt
+                        ? new Date(a.publishedAt).toLocaleDateString("en-IE", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No articles linked yet. Click "Find Related Articles" to scan all published posts.
+              </p>
+            )}
           </Section>
         )}
 
