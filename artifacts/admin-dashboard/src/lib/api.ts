@@ -599,6 +599,25 @@ export interface EntityPageAiContext {
   additionalContext?: string;
 }
 
+export interface TrendsRisingQuery {
+  query: string;
+  changePercent: number;
+}
+
+export interface TrendsData {
+  lastUploadedAt: string;
+  searchTerms: string[];
+  risingQueries: TrendsRisingQuery[];
+  topQueries: string[];
+  peakMonths: string[];
+}
+
+export interface UploadTrendsResult {
+  trendsData: TrendsData;
+  trendsSummary: string;
+  page: EntityPageDetail;
+}
+
 export interface EntityPageDetail extends EntityPageSummary {
   aliases: string[];
   generatedBody: string | null;
@@ -611,6 +630,8 @@ export interface EntityPageDetail extends EntityPageSummary {
   aiContext: EntityPageAiContext | null;
   metaDescription: string | null;
   primaryCategoryId: number | null;
+  trendsData: TrendsData | null;
+  trendsSummary: string | null;
   linkedArticles: LinkedArticle[];
 }
 
@@ -630,6 +651,7 @@ export interface CreateEntityPageInput {
   generatedBody?: string | null;
   seoTitle?: string | null;
   metaDescription?: string | null;
+  trendsSummary?: string | null;
   status?: EntityPageStatus;
   primaryCategoryId?: number | null;
 }
@@ -678,4 +700,14 @@ export async function generateEntityPage(id: number): Promise<GenerateEntityPage
 
 export async function deleteEntityPage(id: number): Promise<void> {
   return request<void>(`/admin/entity-pages/${id}`, { method: "DELETE" });
+}
+
+export async function uploadEntityPageTrends(
+  id: number,
+  csvContent: string
+): Promise<UploadTrendsResult> {
+  return request<UploadTrendsResult>(`/admin/entity-pages/${id}/upload-trends`, {
+    method: "POST",
+    body: JSON.stringify({ csvContent }),
+  });
 }
