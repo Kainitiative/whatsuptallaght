@@ -8,9 +8,15 @@ import {
 } from "@workspace/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import OpenAI from "openai";
+import { getSettingValue } from "./settings";
 
 const router = Router();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+async function getOpenAI(): Promise<OpenAI> {
+  const apiKey = (await getSettingValue("openai_api_key")) ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OpenAI API key is not configured");
+  return new OpenAI({ apiKey });
+}
 
 function slugify(name: string): string {
   return name
@@ -201,6 +207,7 @@ Then on a new line after the body, output exactly:
 SEO_TITLE: [60-char max title for Google]
 META_DESCRIPTION: [155-char max description for Google]`;
 
+    const openai = await getOpenAI();
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
