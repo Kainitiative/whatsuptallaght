@@ -14,3 +14,4 @@ export * from "./social";
 export * from "./entities";
 export * from "./header-image-assets";
 export * from "./competitions";
+export * from "./entity-pages";
