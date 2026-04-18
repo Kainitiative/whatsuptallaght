@@ -711,3 +711,13 @@ export async function uploadEntityPageTrends(
     body: JSON.stringify({ csvContent }),
   });
 }
+
+export interface RescanPostsResult {
+  linked: number;
+  skipped: number;
+  total: number;
+}
+
+export async function rescanEntityPagePosts(id: number): Promise<RescanPostsResult> {
+  return request<RescanPostsResult>(`/admin/entity-pages/${id}/rescan-posts`, { method: "POST" });
+}
