@@ -549,3 +549,133 @@ export async function drawCompetitionWinner(id: number): Promise<{ competition: 
 export async function deleteCompetition(id: number): Promise<void> {
   return request<void>(`/admin/competitions/${id}`, { method: "DELETE" });
 }
+
+// ---------------------------------------------------------------------------
+// Entity Pages
+// ---------------------------------------------------------------------------
+
+export type EntityPageType =
+  | "sports_club"
+  | "venue"
+  | "place"
+  | "business"
+  | "organisation"
+  | "event_series";
+
+export type EntityPageStatus = "draft" | "published";
+
+export interface EntityPageSummary {
+  id: number;
+  name: string;
+  slug: string;
+  entityType: EntityPageType;
+  status: EntityPageStatus;
+  shortDescription: string | null;
+  seoTitle: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  articleCount: number;
+}
+
+export interface LinkedArticle {
+  postId: number;
+  linkedAt: string;
+  title: string;
+  slug: string;
+  publishedAt: string | null;
+}
+
+export interface EntityPageAiContext {
+  dalleStyle?: string;
+  homeGround?: string;
+  homeKit?: string;
+  awayKit?: string;
+  founded?: string;
+  league?: string;
+  capacity?: string;
+  surface?: string;
+  departments?: string;
+  additionalContext?: string;
+}
+
+export interface EntityPageDetail extends EntityPageSummary {
+  aliases: string[];
+  generatedBody: string | null;
+  address: string | null;
+  directions: string | null;
+  website: string | null;
+  phone: string | null;
+  openingHours: string | null;
+  photos: string[];
+  aiContext: EntityPageAiContext | null;
+  metaDescription: string | null;
+  primaryCategoryId: number | null;
+  linkedArticles: LinkedArticle[];
+}
+
+export interface CreateEntityPageInput {
+  name: string;
+  slug?: string;
+  entityType: EntityPageType;
+  aliases?: string[];
+  shortDescription?: string | null;
+  address?: string | null;
+  directions?: string | null;
+  website?: string | null;
+  phone?: string | null;
+  openingHours?: string | null;
+  photos?: string[];
+  aiContext?: EntityPageAiContext | null;
+  generatedBody?: string | null;
+  seoTitle?: string | null;
+  metaDescription?: string | null;
+  status?: EntityPageStatus;
+  primaryCategoryId?: number | null;
+}
+
+export interface GenerateEntityPageResult {
+  generatedBody: string;
+  generatedSeoTitle: string | null;
+  generatedMetaDescription: string | null;
+  page: EntityPageDetail;
+}
+
+export async function getEntityPages(): Promise<EntityPageSummary[]> {
+  return request<EntityPageSummary[]>("/admin/entity-pages");
+}
+
+export async function getEntityPage(id: number): Promise<EntityPageDetail> {
+  return request<EntityPageDetail>(`/admin/entity-pages/${id}`);
+}
+
+export async function createEntityPage(data: CreateEntityPageInput): Promise<EntityPageDetail> {
+  return request<EntityPageDetail>("/admin/entity-pages", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateEntityPage(
+  id: number,
+  data: Partial<CreateEntityPageInput>
+): Promise<EntityPageDetail> {
+  return request<EntityPageDetail>(`/admin/entity-pages/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function publishEntityPage(id: number): Promise<EntityPageDetail> {
+  return request<EntityPageDetail>(`/admin/entity-pages/${id}/publish`, { method: "POST" });
+}
+
+export async function generateEntityPage(id: number): Promise<GenerateEntityPageResult> {
+  return request<GenerateEntityPageResult>(`/admin/entity-pages/${id}/generate`, {
+    method: "POST",
+  });
+}
+
+export async function deleteEntityPage(id: number): Promise<void> {
+  return request<void>(`/admin/entity-pages/${id}`, { method: "DELETE" });
+}

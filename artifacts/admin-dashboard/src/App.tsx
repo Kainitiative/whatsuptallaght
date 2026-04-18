@@ -17,6 +17,8 @@ import Social from "@/pages/Social";
 import Entities from "@/pages/Entities";
 import ImageAssets from "@/pages/ImageAssets";
 import Competitions from "@/pages/Competitions";
+import EntityPages from "@/pages/EntityPages";
+import EntityPageEdit from "@/pages/EntityPageEdit";
 import { Menu } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -32,6 +34,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/events": "Events",
   "/social": "Social Media",
   "/entities": "Entity Library",
+  "/entity-pages": "Entity Pages",
   "/competitions": "Competitions",
   "/image-assets": "Image Library",
   "/golden": "Golden Examples",
@@ -80,6 +83,9 @@ function ProtectedLayout() {
             <Route path="/events" component={Events} />
             <Route path="/social" component={Social} />
             <Route path="/entities" component={Entities} />
+            <Route path="/entity-pages/new" component={EntityPageEdit} />
+            <Route path="/entity-pages/:id" component={EntityPageEdit} />
+            <Route path="/entity-pages" component={EntityPages} />
             <Route path="/competitions" component={Competitions} />
             <Route path="/image-assets" component={ImageAssets} />
             <Route path="/usage" component={Usage} />

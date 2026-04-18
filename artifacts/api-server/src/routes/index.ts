@@ -18,6 +18,7 @@ import eventsRouter from "./events";
 import socialRouter from "./social";
 import entitiesRouter from "./entities";
 import competitionsRouter from "./competitions";
+import entityPagesRouter from "./entity-pages";
 import facebookWebhookRouter from "./webhook-facebook";
 import { adminAuth } from "../lib/admin-auth";
 
@@ -46,6 +47,7 @@ router.use(goldenExamplesRouter);
 router.use(socialRouter);
 router.use(entitiesRouter);
 router.use(competitionsRouter);
+router.use(entityPagesRouter);
 router.use("/admin/usage", usageRouter);
 
 export default router;
