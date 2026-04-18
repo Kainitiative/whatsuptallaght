@@ -270,7 +270,12 @@ router.post("/admin/entity-pages/:id/upload-trends", async (req, res) => {
     // ── AI summary ──────────────────────────────────────────────────────────
     const openai = await getOpenAI();
 
+    const breakoutQueries = trendsData.risingQueries
+      .filter((q) => q.changePercent >= 5000)
+      .map((q) => `"${q.query}"`)
+      .join(", ");
     const risingList = trendsData.risingQueries
+      .filter((q) => q.changePercent < 5000)
       .slice(0, 8)
       .map((q) => `"${q.query}" (+${q.changePercent}%)`)
       .join(", ");
@@ -282,21 +287,23 @@ router.post("/admin/entity-pages/:id/upload-trends", async (req, res) => {
       messages: [
         {
           role: "system",
-          content: `You write concise, practical SEO briefings for community news journalists. Be specific and actionable. Write in plain prose, 3–5 sentences max. Focus on what phrases people are actually searching and when interest peaks.`,
+          content: `You write concise, practical SEO briefings for community news journalists. Be specific and actionable. Write in plain prose, 3–5 sentences max. Focus on the actual search phrases listed — quote them directly. Do not invent phrases that are not in the data. If there are breakout or rising queries, lead with those.`,
         },
         {
           role: "user",
-          content: `Write a short SEO briefing for "${page.name}" based on this Google Trends data (Ireland, past 12 months):
+          content: `Write a short SEO briefing for "${page.name}" based on this Google Trends data from Ireland (past 12 months).
 
-Rising searches: ${risingList || "none"}
+"Breakout" means the search term grew by more than 5000% — these are the most important trending phrases.
+
+Breakout searches (highest priority): ${breakoutQueries || "none"}
+Rising searches (with % increase): ${risingList || "none"}
 Top established searches: ${topList || "none"}
-Peak interest months: ${peakList || "none"}
-Search terms tracked: ${trendsData.searchTerms.join(", ")}
+Peak interest months: ${peakList || "none"}${trendsData.searchTerms.length ? `\nSearch terms tracked: ${trendsData.searchTerms.join(", ")}` : ""}
 
-The briefing is for a journalist who will write articles about ${page.name}. Explain which phrases to include naturally in headlines and article text, and when interest peaks. Do not use bullet points — write as flowing prose.`,
+The briefing is for a journalist writing articles about ${page.name}. Tell them specifically which of the above phrases to weave into headlines and body text — use the exact phrases from the data. Explain what the trends reveal about audience intent. Do not use bullet points — write as flowing prose. Do not say "there are no rising searches" — there clearly are.`,
         },
       ],
-      temperature: 0.5,
+      temperature: 0.4,
     });
 
     const trendsSummary = summaryCompletion.choices[0]?.message?.content?.trim() ?? "";
@@ -336,10 +343,64 @@ function parseTrendsCSV(raw: string): TrendsData {
   const searchTerms: string[] = [];
   const risingQueries: { query: string; changePercent: number }[] = [];
   const topQueries: string[] = [];
-
-  // Month → interest score (for peak month detection)
   const monthScores: Record<string, number> = {};
 
+  // ── Detect flat "searched with / rising queries" export format ─────────────
+  // Header: "query","search interest","increase percent"
+  const firstDataLine = lines.find((l) => l.trim() && !l.trim().startsWith("#"));
+  const firstCols = firstDataLine ? parseCSVLine(firstDataLine.trim()) : [];
+  const isFlatFormat =
+    firstCols.length >= 3 &&
+    firstCols[0].toLowerCase().includes("query") &&
+    firstCols[1].toLowerCase().includes("search") &&
+    firstCols[2].toLowerCase().includes("increase");
+
+  if (isFlatFormat) {
+    // Flat export: each row is a related query with a search interest score and change %
+    let headerSkipped = false;
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const cols = parseCSVLine(line);
+      if (!headerSkipped) { headerSkipped = true; continue; } // skip header row
+      if (cols.length < 3) continue;
+
+      const query = cols[0].trim();
+      const changeRaw = cols[2].trim(); // "Breakout", "4,100%", "350%", "-20%"
+
+      if (!query || query.toLowerCase() === "query") continue;
+
+      // Parse changePercent — handle commas in numbers like "4,100%"
+      const changeClean = changeRaw.replace(/,/g, "");
+      const numMatch = changeClean.match(/-?\d+/);
+      const changePercent = changeRaw.toLowerCase() === "breakout"
+        ? 5000
+        : numMatch ? parseInt(numMatch[0], 10) : 0;
+
+      if (changePercent > 0) {
+        // Positive change → rising query
+        if (!risingQueries.find((r) => r.query === query)) {
+          risingQueries.push({ query, changePercent });
+        }
+      } else if (changePercent === 0) {
+        // Neutral — treat as a top established query
+        if (!topQueries.includes(query)) topQueries.push(query);
+      }
+      // Negative change → declining, skip
+    }
+
+    risingQueries.sort((a, b) => b.changePercent - a.changePercent);
+
+    return {
+      lastUploadedAt: new Date().toISOString(),
+      searchTerms,
+      risingQueries: risingQueries.slice(0, 15),
+      topQueries: topQueries.slice(0, 10),
+      peakMonths: [],
+    };
+  }
+
+  // ── Standard multi-section Google Trends export ───────────────────────────
   let section = "";
   let subsection = "";
   let headerParsed = false;
@@ -348,13 +409,11 @@ function parseTrendsCSV(raw: string): TrendsData {
     const line = rawLine.trim();
 
     if (!line) {
-      // Blank line resets subsection but not section
       subsection = "";
       headerParsed = false;
       continue;
     }
 
-    // Section headings (no commas, not data)
     if (line === "Interest over time") { section = "interest"; subsection = ""; headerParsed = false; continue; }
     if (line === "Related topics") { section = "topics"; subsection = ""; headerParsed = false; continue; }
     if (line === "Related queries") { section = "queries"; subsection = ""; headerParsed = false; continue; }
@@ -365,7 +424,6 @@ function parseTrendsCSV(raw: string): TrendsData {
 
     if (section === "interest") {
       if (!headerParsed) {
-        // Header row: "Week","term1: (Country)","term2: (Country)"
         for (let i = 1; i < cols.length; i++) {
           const term = cols[i].replace(/:\s*\([^)]+\)/, "").trim();
           if (term && !searchTerms.includes(term)) searchTerms.push(term);
@@ -373,8 +431,7 @@ function parseTrendsCSV(raw: string): TrendsData {
         headerParsed = true;
         continue;
       }
-      // Data rows: date range + scores
-      const dateCell = cols[0]; // "2025-04-13 - 2025-04-19"
+      const dateCell = cols[0];
       const scores = cols.slice(1).map((v) => parseInt(v.replace(/[^0-9]/g, ""), 10)).filter((n) => !isNaN(n));
       const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
       const dateMatch = dateCell.match(/(\d{4}-\d{2})/);
@@ -386,16 +443,15 @@ function parseTrendsCSV(raw: string): TrendsData {
     }
 
     if (section === "queries") {
-      if (!headerParsed) { headerParsed = true; continue; } // skip "Value,Query" header
+      if (!headerParsed) { headerParsed = true; continue; }
       if (cols.length < 2) continue;
       const valueRaw = cols[0].trim();
       const query = cols[1].trim();
       if (!query || query.toLowerCase() === "query") continue;
 
       if (subsection === "rising") {
-        // Value is like "+400%" or "Breakout"
-        const numMatch = valueRaw.match(/\+?(\d+)/);
-        const changePercent = numMatch ? parseInt(numMatch[1], 10) : 5000; // "Breakout" → treat as very high
+        const numMatch = valueRaw.replace(/,/g, "").match(/\+?(\d+)/);
+        const changePercent = numMatch ? parseInt(numMatch[1], 10) : 5000;
         if (query && !risingQueries.find((r) => r.query === query)) {
           risingQueries.push({ query, changePercent });
         }
@@ -405,10 +461,8 @@ function parseTrendsCSV(raw: string): TrendsData {
     }
   }
 
-  // Sort rising by changePercent desc
   risingQueries.sort((a, b) => b.changePercent - a.changePercent);
 
-  // Peak months: top 4 by accumulated score
   const peakMonths = Object.entries(monthScores)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4)
