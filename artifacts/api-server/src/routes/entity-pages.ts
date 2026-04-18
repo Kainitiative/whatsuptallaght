@@ -528,6 +528,65 @@ function getMonthName(yearMonth: string): string {
   return d.toLocaleString("en-IE", { month: "long" });
 }
 
+// POST /admin/entity-pages/:id/rescan-posts — link all matching published posts
+router.post("/admin/entity-pages/:id/rescan-posts", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [page] = await db.select().from(entityPagesTable).where(eq(entityPagesTable.id, id));
+    if (!page) return res.status(404).json({ error: "Entity page not found" });
+
+    // Build match terms: primary name + all aliases
+    const matchTerms = [page.name, ...(page.aliases ?? [])].filter(Boolean);
+
+    function escapeRx(str: string) { return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+    function wholeWord(text: string, term: string) {
+      return new RegExp(`\\b${escapeRx(term.toLowerCase())}\\b`).test(text);
+    }
+
+    // Fetch all published posts
+    const posts = await db
+      .select({ id: postsTable.id, title: postsTable.title, body: postsTable.body })
+      .from(postsTable)
+      .where(eq(postsTable.status, "published"));
+
+    let linked = 0;
+    let skipped = 0;
+
+    for (const post of posts) {
+      const haystack = `${post.title} ${post.body}`.toLowerCase();
+      const hit = matchTerms.some((term) => wholeWord(haystack, term));
+      if (!hit) continue;
+
+      // Check if already linked
+      const existing = await db
+        .select({ entityPageId: entityPageArticlesTable.entityPageId })
+        .from(entityPageArticlesTable)
+        .where(
+          and(
+            eq(entityPageArticlesTable.entityPageId, id),
+            eq(entityPageArticlesTable.postId, post.id),
+          ),
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        await db.insert(entityPageArticlesTable).values({ entityPageId: id, postId: post.id });
+        linked++;
+      } else {
+        skipped++;
+      }
+    }
+
+    req.log.info({ entityPageId: id, linked, skipped }, "Rescan posts complete");
+    res.json({ linked, skipped, total: posts.length });
+  } catch (err) {
+    req.log.error(err, "Failed to rescan posts");
+    res.status(500).json({ error: "Failed to rescan posts" });
+  }
+});
+
 // DELETE /admin/entity-pages/:id — delete
 router.delete("/admin/entity-pages/:id", async (req, res) => {
   try {
