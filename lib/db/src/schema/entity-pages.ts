@@ -20,6 +20,8 @@ export const entityPagesTable = pgTable("entity_pages", {
   aiContext: jsonb("ai_context"),
   seoTitle: text("seo_title"),
   metaDescription: text("meta_description"),
+  trendsData: jsonb("trends_data"),
+  trendsSummary: text("trends_summary"),
   status: text("status").notNull().default("draft"),
   primaryCategoryId: integer("primary_category_id"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
