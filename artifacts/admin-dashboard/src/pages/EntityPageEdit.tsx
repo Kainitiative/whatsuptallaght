@@ -9,9 +9,11 @@ import {
   generateEntityPage,
   deleteEntityPage,
   requestUploadUrl,
+  uploadEntityPageTrends,
   type EntityPageType,
   type EntityPageAiContext,
   type CreateEntityPageInput,
+  type TrendsData,
 } from "@/lib/api";
 
 const ENTITY_TYPES: { value: EntityPageType; label: string }[] = [
@@ -104,7 +106,12 @@ export default function EntityPageEdit() {
   const [isUploading, setIsUploading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTrendsUploading, setIsTrendsUploading] = useState(false);
+  const [trendsUploadError, setTrendsUploadError] = useState<string | null>(null);
+  const [trendsData, setTrendsData] = useState<TrendsData | null>(null);
+  const [trendsSummary, setTrendsSummary] = useState<string>("");
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (existing) {
@@ -129,6 +136,8 @@ export default function EntityPageEdit() {
       });
       setAliasInput((existing.aliases ?? []).join(", "));
       setSlugManual(true);
+      if (existing.trendsData) setTrendsData(existing.trendsData);
+      if (existing.trendsSummary) setTrendsSummary(existing.trendsSummary);
     }
   }, [existing]);
 
@@ -180,6 +189,24 @@ export default function EntityPageEdit() {
 
   function removePhoto(url: string) {
     set("photos", (form.photos ?? []).filter((p) => p !== url));
+  }
+
+  async function handleCsvUpload(file: File | null) {
+    if (!file || isNew || !pageId) return;
+    setIsTrendsUploading(true);
+    setTrendsUploadError(null);
+    try {
+      const csvContent = await file.text();
+      const result = await uploadEntityPageTrends(pageId, csvContent);
+      setTrendsData(result.trendsData);
+      setTrendsSummary(result.trendsSummary);
+      qc.invalidateQueries({ queryKey: ["entity-page", pageId] });
+    } catch (err: any) {
+      setTrendsUploadError(err.message ?? "Upload failed");
+    } finally {
+      setIsTrendsUploading(false);
+      if (csvInputRef.current) csvInputRef.current.value = "";
+    }
   }
 
   async function handleSave() {
@@ -623,6 +650,141 @@ export default function EntityPageEdit() {
             </p>
           </Field>
         </Section>
+
+        {/* Search Trends */}
+        {!isNew && (
+          <Section title="Search Trends">
+            <p className="text-xs text-muted-foreground mb-4">
+              Upload a Google Trends CSV to help the AI use the phrases people actually search. Go to{" "}
+              <a
+                href="https://trends.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-foreground"
+              >
+                trends.google.com
+              </a>
+              , search this entity's name, set region to <strong>Ireland</strong> and time to{" "}
+              <strong>Past 12 months</strong>, then download the CSV (⬇ button top-right of the page).
+            </p>
+
+            <div className="flex items-center gap-3 mb-4">
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => handleCsvUpload(e.target.files?.[0] ?? null)}
+              />
+              <button
+                onClick={() => csvInputRef.current?.click()}
+                disabled={isTrendsUploading}
+                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isTrendsUploading ? (
+                  <>
+                    <span className="animate-spin inline-block">⟳</span> Analysing…
+                  </>
+                ) : (
+                  "↑ Upload Trends CSV"
+                )}
+              </button>
+              {trendsData && (
+                <span className="text-xs text-muted-foreground">
+                  Last updated:{" "}
+                  {new Date(trendsData.lastUploadedAt).toLocaleDateString("en-IE", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              )}
+            </div>
+
+            {trendsUploadError && (
+              <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded text-xs">
+                {trendsUploadError}
+              </div>
+            )}
+
+            {trendsData && (
+              <div className="space-y-4">
+                {/* AI Summary — editable */}
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    AI SEO Briefing
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-1.5">
+                    Review and edit this before saving — it will influence how the AI writes articles about this entity.
+                  </p>
+                  <textarea
+                    className={TEXTAREA}
+                    style={{ minHeight: 100 }}
+                    value={trendsSummary}
+                    onChange={(e) => setTrendsSummary(e.target.value)}
+                    placeholder="AI-generated SEO briefing will appear here after upload."
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!pageId) return;
+                      try {
+                        await updateEntityPage(pageId, { trendsSummary });
+                        qc.invalidateQueries({ queryKey: ["entity-page", pageId] });
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    className="mt-2 px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-muted transition-colors"
+                  >
+                    Save briefing edits
+                  </button>
+                </div>
+
+                {/* Query preview cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {trendsData.risingQueries.length > 0 && (
+                    <div className="bg-muted/40 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-foreground mb-2">📈 Rising Searches</p>
+                      <ul className="space-y-1">
+                        {trendsData.risingQueries.slice(0, 5).map((q, i) => (
+                          <li key={i} className="flex items-center justify-between">
+                            <span className="text-xs text-foreground">{q.query}</span>
+                            <span className="text-xs font-medium text-green-700">+{q.changePercent}%</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {trendsData.topQueries.length > 0 && (
+                    <div className="bg-muted/40 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-foreground mb-2">🔍 Top Searches</p>
+                      <ul className="space-y-1">
+                        {trendsData.topQueries.slice(0, 5).map((q, i) => (
+                          <li key={i} className="text-xs text-foreground">{q}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {trendsData.peakMonths.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-muted-foreground">Peak months:</span>
+                    {trendsData.peakMonths.map((m) => (
+                      <span
+                        key={m}
+                        className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium"
+                      >
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Section>
+        )}
 
         {/* Linked articles */}
         {!isNew && existing?.linkedArticles && existing.linkedArticles.length > 0 && (
