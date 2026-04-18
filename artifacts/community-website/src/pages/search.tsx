@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { Helmet } from "react-helmet-async";
 import { Search, MessageCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -75,6 +76,14 @@ export default function SearchPage() {
   }
 
   return (
+    <>
+    <Helmet>
+      <title>Search Tallaght News | What's Up Tallaght</title>
+      <meta name="description" content="Search all local news and community stories from Tallaght, Dublin. Find articles about your area, local organisations, events and more." />
+      <meta property="og:title" content="Search Tallaght News | What's Up Tallaght" />
+      <meta property="og:description" content="Search all local news and community stories from Tallaght, Dublin." />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+    </Helmet>
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold mb-6">Search</h1>
 
@@ -161,5 +170,6 @@ export default function SearchPage() {
         </p>
       )}
     </div>
+    </>
   );
 }

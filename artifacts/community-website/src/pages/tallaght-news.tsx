@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { Helmet } from "react-helmet-async";
 import { useQuery } from "@tanstack/react-query";
 import { useListPosts, getListPostsQueryKey } from "@workspace/api-client-react";
 import { ArticleCard } from "@/components/article-card";
@@ -95,6 +96,14 @@ export default function TallaghtNewsPage() {
   );
 
   return (
+    <>
+    <Helmet>
+      <title>Tallaght News – Latest Local Stories | What's Up Tallaght</title>
+      <meta name="description" content="The latest news from Tallaght, Dublin — community updates, local stories, and breaking news submitted by residents and sourced from local organisations." />
+      <meta property="og:title" content="Tallaght News – Latest Local Stories | What's Up Tallaght" />
+      <meta property="og:description" content="The latest news from Tallaght, Dublin — community updates and local stories." />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+    </Helmet>
     <div className="w-full flex flex-col bg-background pb-20">
       <CategoryFilter />
 
@@ -300,5 +309,6 @@ export default function TallaghtNewsPage() {
         </Link>
       </section>
     </div>
+    </>
   );
 }

@@ -29,6 +29,18 @@ function urlEntry(loc: string, lastmod?: string, changefreq?: string, priority?:
     .join("\n");
 }
 
+router.get("/robots.txt", (_req, res) => {
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.send(
+    [
+      "User-agent: *",
+      "Allow: /",
+      "",
+      `Sitemap: ${BASE_URL}/sitemap.xml`,
+    ].join("\n")
+  );
+});
+
 router.get("/sitemap.xml", async (_req, res) => {
   try {
     const [articles, categories] = await Promise.all([
@@ -45,6 +57,14 @@ router.get("/sitemap.xml", async (_req, res) => {
     const staticPages = [
       urlEntry(`${BASE_URL}/`, today, "daily", "1.0"),
       urlEntry(`${BASE_URL}/about`, today, "monthly", "0.5"),
+    ];
+
+    const pillarPages = [
+      urlEntry(`${BASE_URL}/tallaght-news`, today, "daily", "0.8"),
+      urlEntry(`${BASE_URL}/tallaght-community`, today, "daily", "0.8"),
+      urlEntry(`${BASE_URL}/whats-on-tallaght`, today, "daily", "0.8"),
+      urlEntry(`${BASE_URL}/events`, today, "daily", "0.8"),
+      urlEntry(`${BASE_URL}/search`, today, "monthly", "0.6"),
     ];
 
     const categoryPages = categories.map((cat) => {
@@ -65,6 +85,7 @@ router.get("/sitemap.xml", async (_req, res) => {
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
       ...staticPages,
+      ...pillarPages,
       ...categoryPages,
       ...articlePages,
       "</urlset>",

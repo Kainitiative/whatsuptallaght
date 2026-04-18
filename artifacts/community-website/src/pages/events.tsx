@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { Helmet } from "react-helmet-async";
 import { Calendar, MapPin, Clock, Tag, ExternalLink, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -94,6 +95,14 @@ export default function EventsPage() {
   }[filter];
 
   return (
+    <>
+    <Helmet>
+      <title>Tallaght Events – What's On Near You | What's Up Tallaght</title>
+      <meta name="description" content="Browse upcoming events in Tallaght, Dublin. Community events, sports, arts, family activities and more — submitted by local residents." />
+      <meta property="og:title" content="Tallaght Events – What's On Near You | What's Up Tallaght" />
+      <meta property="og:description" content="Browse upcoming events in Tallaght, Dublin. Community events, sports, arts, family activities and more." />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+    </Helmet>
     <div className="container mx-auto px-4 py-8 max-w-3xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-foreground mb-1">Events</h1>
@@ -251,5 +260,6 @@ export default function EventsPage() {
         </a>
       </div>
     </div>
+    </>
   );
 }
