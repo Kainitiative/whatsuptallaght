@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, categoriesTable } from "@workspace/db/schema";
+import { postsTable, categoriesTable, entityPagesTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 const router = Router();
@@ -43,13 +43,17 @@ router.get("/robots.txt", (_req, res) => {
 
 router.get("/sitemap.xml", async (_req, res) => {
   try {
-    const [articles, categories] = await Promise.all([
+    const [articles, categories, entityPages] = await Promise.all([
       db
         .select({ slug: postsTable.slug, publishedAt: postsTable.publishedAt, updatedAt: postsTable.updatedAt })
         .from(postsTable)
         .where(eq(postsTable.status, "published"))
         .orderBy(desc(postsTable.publishedAt)),
       db.select({ slug: categoriesTable.slug, createdAt: categoriesTable.createdAt }).from(categoriesTable),
+      db
+        .select({ slug: entityPagesTable.slug, updatedAt: entityPagesTable.updatedAt, publishedAt: entityPagesTable.publishedAt })
+        .from(entityPagesTable)
+        .where(eq(entityPagesTable.status, "published")),
     ]);
 
     const today = new Date().toISOString().slice(0, 10);
@@ -72,6 +76,15 @@ router.get("/sitemap.xml", async (_req, res) => {
       return urlEntry(`${BASE_URL}/category/${cat.slug}`, lastmod, "daily", "0.8");
     });
 
+    const entityPageEntries = entityPages.map((ep) => {
+      const lastmod = ep.updatedAt
+        ? new Date(ep.updatedAt).toISOString().slice(0, 10)
+        : ep.publishedAt
+        ? new Date(ep.publishedAt).toISOString().slice(0, 10)
+        : today;
+      return urlEntry(`${BASE_URL}/place/${ep.slug}`, lastmod, "weekly", "0.8");
+    });
+
     const articlePages = articles.map((art) => {
       const lastmod = art.updatedAt
         ? new Date(art.updatedAt).toISOString().slice(0, 10)
@@ -87,6 +100,7 @@ router.get("/sitemap.xml", async (_req, res) => {
       ...staticPages,
       ...pillarPages,
       ...categoryPages,
+      ...entityPageEntries,
       ...articlePages,
       "</urlset>",
     ].join("\n");
