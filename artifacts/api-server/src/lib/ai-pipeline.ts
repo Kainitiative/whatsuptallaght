@@ -329,7 +329,7 @@ async function extractInfo(openai: OpenAI, combinedText: string, ctx: UsageCtx):
 
 Respond in JSON:
 {
-  "headline": "Suggested article headline (max 12 words, factual, no clickbait)",
+  "headline": "Article headline for search. Up to 16 words. Must include the specific venue or place name if mentioned (e.g. 'Tallaght Library', 'Tallaght Stadium', 'Civic Theatre Tallaght' — not just 'the library'). For events, include month and year (e.g. 'Free Kids Workshop at Tallaght Library – April 2026'). Write how someone would search, not how a journalist would write a headline. Factual only — no invented details.",
   "location": "Specific area in Tallaght/Dublin or null",
   "eventDate": "ISO date string if an event date is mentioned, or null",
   "keyFacts": ["Array of up to 5 key facts from the submission"],
@@ -881,7 +881,14 @@ async function writeArticle(
     "   - Keep language simple and grounded.",
     "4. Credit the source as 'a local resident', 'a community member', or by name if given.",
     "   - Do not introduce unnamed sources such as 'a community member said' unless it is explicitly included in the submission.",
-    "5. Output the article body only — no headline, no byline, no category label.",
+    "5. VENUE AND PLACE NAMES — always use the full specific name on first mention:",
+    "   - 'Tallaght Library' not 'the library'",
+    "   - 'Tallaght Stadium' not 'the ground' or 'the stadium'",
+    "   - 'The Square, Tallaght' not 'the shopping centre'",
+    "   - 'Civic Theatre, Tallaght' not 'the theatre'",
+    "   - 'Brookfield Community Centre' not 'the centre'",
+    "   - Only use the full name if it is mentioned in the submission. Do not add place names that are not there.",
+    "6. Output the article body only — no headline, no byline, no category label.",
     "",
     "SOURCE PRIORITY:",
     "- If the submission contains a [COMMUNITY MEMBER'S MESSAGE], that text is the story. The photo provides visual context only — do not let it override the text.",
