@@ -7,8 +7,7 @@ import {
   jobQueueTable,
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
-import { isRelevantToTallaght, getFeedTrustLevel } from "./geo-filter";
-import { getSettingValue } from "../routes/settings";
+import { getFeedTrustLevel } from "./geo-filter";
 import { logger } from "./logger";
 
 // ---------------------------------------------------------------------------
@@ -334,13 +333,6 @@ async function fetchEventbritePage(url: string): Promise<NormalisedFeedItem[]> {
 async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void> {
   logger.info({ feedId: feed.id, name: feed.name, feedType: (feed as any).feedType ?? "rss" }, "RSS: fetching feed");
 
-  // Load admin-configured extra geo keywords once per run (cached in settings table)
-  let customGeoKeywords: string[] = [];
-  try {
-    const raw = await getSettingValue("geo_custom_keywords");
-    if (raw) customGeoKeywords = JSON.parse(raw);
-  } catch { /* ignore — fall back to built-in keywords only */ }
-
   const feedType: string = (feed as any).feedType ?? "rss";
   let normalisedItems: NormalisedFeedItem[] = [];
 
@@ -397,14 +389,21 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
     if (existing) continue;
     newCount++;
 
-    // --- Geo-filter ---
-    const geoRelevant = isRelevantToTallaght(feed.url, title, content, customGeoKeywords);
+    // --- Keyword filter (per-feed, optional) ---
+    const keywordFilters: string[] | null | undefined = (feed as any).keywordFilters;
+    const hasKeywords = Array.isArray(keywordFilters) && keywordFilters.length > 0;
+    const keywordMatch = !hasKeywords || (() => {
+      const combined = `${title} ${content}`.toLowerCase();
+      return keywordFilters!.some((kw) => combined.includes(kw.toLowerCase()));
+    })();
 
     // --- Events-only filter (per-feed opt-in) ---
     const eventsOnly = (feed as any).filterMode === "events_only";
-    const relevant = geoRelevant && (!eventsOnly || isEventContent(title, content));
+    const relevant = keywordMatch && (!eventsOnly || isEventContent(title, content));
 
-    if (eventsOnly && geoRelevant && !relevant) {
+    if (!keywordMatch) {
+      logger.debug({ title, feedName: feed.name }, "RSS: skipping — no keyword match");
+    } else if (eventsOnly && !relevant) {
       logger.debug({ title, feedName: feed.name }, "RSS: skipping — events-only filter: no date+event signal found");
     }
 

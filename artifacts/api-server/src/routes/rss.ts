@@ -28,7 +28,7 @@ router.get("/rss/feeds/:id", async (req, res) => {
 });
 
 router.post("/rss/feeds", async (req, res) => {
-  const { name, url, checkIntervalMinutes, filterMode, feedType } = req.body;
+  const { name, url, checkIntervalMinutes, filterMode, feedType, keywordFilters } = req.body;
   if (!name || !url) {
     return res.status(400).json({ error: "validation_error", message: "name and url are required" });
   }
@@ -42,6 +42,7 @@ router.post("/rss/feeds", async (req, res) => {
         checkIntervalMinutes: checkIntervalMinutes ?? 60,
         filterMode: filterMode ?? null,
         feedType: feedType ?? "rss",
+        keywordFilters: Array.isArray(keywordFilters) && keywordFilters.length > 0 ? keywordFilters : null,
       })
       .returning();
     res.status(201).json(feed);
@@ -57,7 +58,7 @@ router.patch("/rss/feeds/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid feed ID" });
 
-  const { name, url, isActive, checkIntervalMinutes, filterMode, feedType } = req.body;
+  const { name, url, isActive, checkIntervalMinutes, filterMode, feedType, keywordFilters } = req.body;
   const updates: Partial<typeof rssFeedsTable.$inferInsert> = {};
 
   if (name !== undefined) updates.name = name;
@@ -66,6 +67,7 @@ router.patch("/rss/feeds/:id", async (req, res) => {
   if (checkIntervalMinutes !== undefined) updates.checkIntervalMinutes = checkIntervalMinutes;
   if (filterMode !== undefined) updates.filterMode = filterMode || null;
   if (feedType !== undefined) updates.feedType = feedType ?? "rss";
+  if (keywordFilters !== undefined) updates.keywordFilters = Array.isArray(keywordFilters) && keywordFilters.length > 0 ? keywordFilters : null;
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: "validation_error", message: "No valid fields provided to update" });

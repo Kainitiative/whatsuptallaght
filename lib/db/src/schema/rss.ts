@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,8 +12,10 @@ export const rssFeedsTable = pgTable("rss_feeds", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   // "events_only" = skip items that don't describe a real upcoming event with a date
   filterMode: text("filter_mode"),
-  // "rss" (default) | "eventbrite" — controls which fetcher strategy is used
+  // "rss" (default) | "eventbrite" | "sdcc" — controls which fetcher strategy is used
   feedType: text("feed_type").notNull().default("rss"),
+  // Optional per-feed keyword filter. If null/empty, all items pass. If set, at least one keyword must appear in title+content.
+  keywordFilters: json("keyword_filters").$type<string[]>(),
 });
 
 export const rssItemsTable = pgTable("rss_items", {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getRssFeeds, createRssFeed, updateRssFeed, deleteRssFeed, type RssFeed } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 
@@ -30,6 +30,73 @@ function formatInterval(mins: number) {
   return `${mins / 1440}d`;
 }
 
+function KeywordInput({
+  keywords,
+  onChange,
+  inputClass,
+}: {
+  keywords: string[];
+  onChange: (kws: string[]) => void;
+  inputClass: string;
+}) {
+  const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function add(raw: string) {
+    const trimmed = raw.trim().toLowerCase();
+    if (trimmed && !keywords.includes(trimmed)) {
+      onChange([...keywords, trimmed]);
+    }
+    setInput("");
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      add(input);
+    } else if (e.key === "Backspace" && input === "" && keywords.length > 0) {
+      onChange(keywords.slice(0, -1));
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div
+        className="flex flex-wrap gap-1.5 min-h-[38px] w-full border border-border rounded-lg px-2 py-1.5 bg-background cursor-text"
+        onClick={() => inputRef.current?.focus()}
+      >
+        {keywords.map((kw) => (
+          <span
+            key={kw}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium"
+          >
+            {kw}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange(keywords.filter((k) => k !== kw)); }}
+              className="hover:text-destructive transition-colors leading-none"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          className="flex-1 min-w-[120px] bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none py-0.5"
+          placeholder={keywords.length === 0 ? "Type a keyword and press Enter (e.g. galway, salthill)…" : "Add keyword…"}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={() => { if (input.trim()) add(input); }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Leave empty to accept all items from this feed. Add keywords to only accept items that mention at least one of them.
+      </p>
+    </div>
+  );
+}
+
 export default function RssFeeds() {
   const [feeds, setFeeds] = useState<RssFeed[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +109,7 @@ export default function RssFeeds() {
   const [newInterval, setNewInterval] = useState(60);
   const [newFilterMode, setNewFilterMode] = useState<string>("");
   const [newFeedType, setNewFeedType] = useState<string>("rss");
+  const [newKeywords, setNewKeywords] = useState<string[]>([]);
 
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
@@ -49,6 +117,7 @@ export default function RssFeeds() {
   const [editInterval, setEditInterval] = useState(60);
   const [editFilterMode, setEditFilterMode] = useState<string>("");
   const [editFeedType, setEditFeedType] = useState<string>("rss");
+  const [editKeywords, setEditKeywords] = useState<string[]>([]);
 
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
@@ -71,8 +140,15 @@ export default function RssFeeds() {
     if (!newName.trim() || !newUrl.trim()) return;
     setWorking("new");
     try {
-      await createRssFeed({ name: newName.trim(), url: newUrl.trim(), checkIntervalMinutes: newInterval, filterMode: newFilterMode || null, feedType: newFeedType });
-      setNewName(""); setNewUrl(""); setNewInterval(60); setNewFilterMode(""); setNewFeedType("rss"); setShowAdd(false);
+      await createRssFeed({
+        name: newName.trim(),
+        url: newUrl.trim(),
+        checkIntervalMinutes: newInterval,
+        filterMode: newFilterMode || null,
+        feedType: newFeedType,
+        keywordFilters: newKeywords.length > 0 ? newKeywords : undefined,
+      });
+      setNewName(""); setNewUrl(""); setNewInterval(60); setNewFilterMode(""); setNewFeedType("rss"); setNewKeywords([]); setShowAdd(false);
       showToast("Feed added");
       load();
     } catch (err: any) {
@@ -89,6 +165,7 @@ export default function RssFeeds() {
     setEditInterval(feed.checkIntervalMinutes);
     setEditFilterMode(feed.filterMode ?? "");
     setEditFeedType(feed.feedType ?? "rss");
+    setEditKeywords(feed.keywordFilters ?? []);
   }
 
   async function handleEdit(e: React.FormEvent) {
@@ -96,7 +173,14 @@ export default function RssFeeds() {
     if (!editId || !editName.trim() || !editUrl.trim()) return;
     setWorking(editId);
     try {
-      await updateRssFeed(editId, { name: editName.trim(), url: editUrl.trim(), checkIntervalMinutes: editInterval, filterMode: editFilterMode || null, feedType: editFeedType });
+      await updateRssFeed(editId, {
+        name: editName.trim(),
+        url: editUrl.trim(),
+        checkIntervalMinutes: editInterval,
+        filterMode: editFilterMode || null,
+        feedType: editFeedType,
+        keywordFilters: editKeywords.length > 0 ? editKeywords : null,
+      });
       setEditId(null);
       showToast("Feed updated");
       load();
@@ -155,9 +239,9 @@ export default function RssFeeds() {
       </div>
 
       {showAdd && (
-        <form onSubmit={handleAdd} className="mb-8 bg-muted/40 border border-border rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">New Feed</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <form onSubmit={handleAdd} className="mb-8 bg-muted/40 border border-border rounded-xl p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-foreground">New Feed</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
               className={inputClass}
               placeholder="Feed name (e.g. Eventbrite Tallaght)"
@@ -167,7 +251,7 @@ export default function RssFeeds() {
             />
             <input
               className={inputClass}
-              placeholder={newFeedType === "eventbrite" ? "Eventbrite page URL (e.g. eventbrite.ie/d/ireland--dublin/tallaght-library/)" : "RSS / Atom feed URL"}
+              placeholder={newFeedType === "eventbrite" ? "Eventbrite page URL" : "RSS / Atom feed URL"}
               value={newUrl}
               onChange={e => setNewUrl(e.target.value)}
               type="url"
@@ -178,6 +262,7 @@ export default function RssFeeds() {
             <select className={selectClass} value={newFeedType} onChange={e => setNewFeedType(e.target.value)} title="Feed type">
               <option value="rss">RSS / Atom feed</option>
               <option value="eventbrite">Eventbrite page</option>
+              <option value="sdcc">SDCC scraper</option>
             </select>
             <select className={selectClass} value={newInterval} onChange={e => setNewInterval(Number(e.target.value))}>
               {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
@@ -186,12 +271,18 @@ export default function RssFeeds() {
               <option value="">All content</option>
               <option value="events_only">Events only (requires date + event)</option>
             </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">Keyword filters</label>
+            <KeywordInput keywords={newKeywords} onChange={setNewKeywords} inputClass={inputClass} />
+          </div>
+          <div className="flex justify-end">
             <button
               type="submit"
               disabled={working === "new"}
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
             >
-              {working === "new" ? "Adding…" : "Add"}
+              {working === "new" ? "Adding…" : "Add feed"}
             </button>
           </div>
         </form>
@@ -213,7 +304,7 @@ export default function RssFeeds() {
           {feeds.map(feed => (
             <div key={feed.id} className={`border border-border rounded-xl bg-card transition-all ${!feed.isActive ? "opacity-60" : ""}`}>
               {editId === feed.id ? (
-                <form onSubmit={handleEdit} className="p-4 space-y-3">
+                <form onSubmit={handleEdit} className="p-4 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input className={inputClass} value={editName} onChange={e => setEditName(e.target.value)} required />
                     <input className={inputClass} value={editUrl} onChange={e => setEditUrl(e.target.value)} type="url" required />
@@ -222,6 +313,7 @@ export default function RssFeeds() {
                     <select className={selectClass} value={editFeedType} onChange={e => setEditFeedType(e.target.value)}>
                       <option value="rss">RSS / Atom feed</option>
                       <option value="eventbrite">Eventbrite page</option>
+                      <option value="sdcc">SDCC scraper</option>
                     </select>
                     <select className={selectClass} value={editInterval} onChange={e => setEditInterval(Number(e.target.value))}>
                       {INTERVALS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
@@ -230,11 +322,17 @@ export default function RssFeeds() {
                       <option value="">All content</option>
                       <option value="events_only">Events only (requires date + event)</option>
                     </select>
-                    <button type="submit" disabled={working === feed.id} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
-                      {working === feed.id ? "…" : "Save"}
-                    </button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground mb-1.5 block">Keyword filters</label>
+                    <KeywordInput keywords={editKeywords} onChange={setEditKeywords} inputClass={inputClass} />
+                  </div>
+                  <div className="flex gap-2 justify-end">
                     <button type="button" onClick={() => setEditId(null)} className="px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted">
                       Cancel
+                    </button>
+                    <button type="submit" disabled={working === feed.id} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                      {working === feed.id ? "Saving…" : "Save"}
                     </button>
                   </div>
                 </form>
@@ -250,11 +348,17 @@ export default function RssFeeds() {
                   </button>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm text-foreground">{feed.name}</span>
                       {!feed.isActive && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Paused</span>}
                       {feed.feedType === "eventbrite" && <span className="text-xs text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Eventbrite</span>}
+                      {feed.feedType === "sdcc" && <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">SDCC scraper</span>}
                       {feed.filterMode === "events_only" && <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Events only</span>}
+                      {feed.keywordFilters && feed.keywordFilters.length > 0 && (
+                        <span className="text-xs text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">
+                          {feed.keywordFilters.length} keyword{feed.keywordFilters.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
                     </div>
                     <a
                       href={feed.url}

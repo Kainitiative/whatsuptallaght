@@ -114,17 +114,18 @@ export interface RssFeed {
   createdAt: string;
   filterMode: string | null;
   feedType: string;
+  keywordFilters: string[] | null;
 }
 
 export async function getRssFeeds() {
   return request<RssFeed[]>("/rss/feeds");
 }
 
-export async function createRssFeed(data: { name: string; url: string; checkIntervalMinutes?: number; filterMode?: string | null; feedType?: string }) {
+export async function createRssFeed(data: { name: string; url: string; checkIntervalMinutes?: number; filterMode?: string | null; feedType?: string; keywordFilters?: string[] }) {
   return request<RssFeed>("/rss/feeds", { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function updateRssFeed(id: number, data: Partial<Pick<RssFeed, "name" | "url" | "isActive" | "checkIntervalMinutes" | "filterMode" | "feedType">>) {
+export async function updateRssFeed(id: number, data: Partial<Pick<RssFeed, "name" | "url" | "isActive" | "checkIntervalMinutes" | "filterMode" | "feedType" | "keywordFilters">>) {
   return request<RssFeed>(`/rss/feeds/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
