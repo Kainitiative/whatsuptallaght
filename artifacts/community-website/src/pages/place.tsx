@@ -48,6 +48,16 @@ interface LinkedArticle {
   publishedAt: string | null;
 }
 
+interface RelatedPage {
+  id: number;
+  name: string;
+  slug: string;
+  entityType: string;
+  shortDescription: string | null;
+  photos: string[];
+  relationLabel: string | null;
+}
+
 interface EntityPageData {
   id: number;
   name: string;
@@ -68,6 +78,7 @@ interface EntityPageData {
   publishedAt: string | null;
   updatedAt: string;
   linkedArticles: LinkedArticle[];
+  relatedPages: RelatedPage[];
 }
 
 async function fetchEntityPage(slug: string): Promise<EntityPageData> {
@@ -336,6 +347,46 @@ export default function PlacePage() {
                       status: "published",
                     } as any}
                   />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Related Places */}
+          {page.relatedPages && page.relatedPages.length > 0 && (
+            <section className="mt-14">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Related Places</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {page.relatedPages.map((rp) => (
+                  <Link key={rp.id} href={`/place/${rp.slug}`}>
+                    <a className="group flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-sm transition-all">
+                      {rp.photos?.[0] ? (
+                        <img
+                          src={rp.photos[0]}
+                          alt={rp.name}
+                          className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-border"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-muted flex-shrink-0 flex items-center justify-center">
+                          <span className="text-xl">📍</span>
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors leading-tight">
+                          {rp.name}
+                        </p>
+                        {rp.relationLabel && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{rp.relationLabel}</p>
+                        )}
+                        {rp.shortDescription && !rp.relationLabel && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{rp.shortDescription}</p>
+                        )}
+                        <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium border ${TYPE_COLORS[rp.entityType] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                          {TYPE_LABELS[rp.entityType] ?? rp.entityType}
+                        </span>
+                      </div>
+                    </a>
+                  </Link>
                 ))}
               </div>
             </section>

@@ -3,12 +3,14 @@ import { db } from "@workspace/db";
 import {
   entityPagesTable,
   entityPageArticlesTable,
+  entityPageRelationsTable,
   insertEntityPageSchema,
   postsTable,
 } from "@workspace/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import OpenAI from "openai";
 import { getSettingValue } from "./settings";
+import { scanEntityPageRelations } from "../lib/entity-page-linker";
 
 const router = Router();
 
@@ -80,7 +82,9 @@ router.get("/admin/entity-pages/:id", async (req, res) => {
       .where(eq(entityPageArticlesTable.entityPageId, id))
       .orderBy(desc(postsTable.publishedAt));
 
-    res.json({ ...page, linkedArticles });
+    const relatedPages = await fetchRelatedPages(id);
+
+    res.json({ ...page, linkedArticles, relatedPages });
   } catch (err) {
     req.log.error(err, "Failed to get entity page");
     res.status(500).json({ error: "Failed to get entity page" });
@@ -246,6 +250,11 @@ META_DESCRIPTION: [155-char max description for Google]`;
       .where(eq(entityPagesTable.id, id))
       .returning();
 
+    // Auto-scan for related entity pages after body is saved (non-blocking)
+    scanEntityPageRelations(id).catch((err) =>
+      req.log.warn({ err, entityPageId: id }, "Auto relation scan failed (non-fatal)"),
+    );
+
     res.json({
       generatedBody,
       generatedSeoTitle,
@@ -333,6 +342,24 @@ The briefing is for a journalist writing articles about ${page.name}. Tell them 
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+async function fetchRelatedPages(entityPageId: number) {
+  const rows = await db
+    .select({
+      id: entityPagesTable.id,
+      name: entityPagesTable.name,
+      slug: entityPagesTable.slug,
+      entityType: entityPagesTable.entityType,
+      shortDescription: entityPagesTable.shortDescription,
+      photos: entityPagesTable.photos,
+      relationLabel: entityPageRelationsTable.relationLabel,
+    })
+    .from(entityPageRelationsTable)
+    .innerJoin(entityPagesTable, eq(entityPageRelationsTable.relatedEntityPageId, entityPagesTable.id))
+    .where(eq(entityPageRelationsTable.entityPageId, entityPageId))
+    .orderBy(entityPagesTable.name);
+  return rows;
+}
 
 interface TrendsData {
   lastUploadedAt: string;
@@ -534,6 +561,75 @@ function getMonthName(yearMonth: string): string {
   const d = new Date(parseInt(year), parseInt(month) - 1, 1);
   return d.toLocaleString("en-IE", { month: "long" });
 }
+
+// POST /admin/entity-pages/:id/scan-relations — scan body for related entity pages
+router.post("/admin/entity-pages/:id/scan-relations", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const [page] = await db.select({ id: entityPagesTable.id }).from(entityPagesTable).where(eq(entityPagesTable.id, id));
+    if (!page) return res.status(404).json({ error: "Entity page not found" });
+    const result = await scanEntityPageRelations(id);
+    res.json(result);
+  } catch (err) {
+    req.log.error(err, "Failed to scan entity page relations");
+    res.status(500).json({ error: "Failed to scan entity page relations" });
+  }
+});
+
+// POST /admin/entity-pages/:id/relations — manually add a relation
+router.post("/admin/entity-pages/:id/relations", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+    const { relatedEntityPageId, relationLabel } = req.body;
+    if (!relatedEntityPageId || typeof relatedEntityPageId !== "number") {
+      return res.status(400).json({ error: "relatedEntityPageId is required" });
+    }
+    if (relatedEntityPageId === id) return res.status(400).json({ error: "Cannot relate a page to itself" });
+
+    // Insert A→B
+    const existsAB = await db.select({ id: entityPageRelationsTable.id }).from(entityPageRelationsTable)
+      .where(and(eq(entityPageRelationsTable.entityPageId, id), eq(entityPageRelationsTable.relatedEntityPageId, relatedEntityPageId))).limit(1);
+    if (existsAB.length === 0) {
+      await db.insert(entityPageRelationsTable).values({ entityPageId: id, relatedEntityPageId, relationLabel: relationLabel ?? null });
+    }
+    // Insert B→A
+    const existsBA = await db.select({ id: entityPageRelationsTable.id }).from(entityPageRelationsTable)
+      .where(and(eq(entityPageRelationsTable.entityPageId, relatedEntityPageId), eq(entityPageRelationsTable.relatedEntityPageId, id))).limit(1);
+    if (existsBA.length === 0) {
+      await db.insert(entityPageRelationsTable).values({ entityPageId: relatedEntityPageId, relatedEntityPageId: id, relationLabel: relationLabel ?? null });
+    }
+
+    const relatedPages = await fetchRelatedPages(id);
+    res.json({ relatedPages });
+  } catch (err) {
+    req.log.error(err, "Failed to add entity page relation");
+    res.status(500).json({ error: "Failed to add entity page relation" });
+  }
+});
+
+// DELETE /admin/entity-pages/:id/relations/:relatedId — remove a relation (both directions)
+router.delete("/admin/entity-pages/:id/relations/:relatedId", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const relatedId = parseInt(req.params.relatedId, 10);
+    if (isNaN(id) || isNaN(relatedId)) return res.status(400).json({ error: "Invalid id" });
+
+    await db.delete(entityPageRelationsTable).where(
+      and(eq(entityPageRelationsTable.entityPageId, id), eq(entityPageRelationsTable.relatedEntityPageId, relatedId)),
+    );
+    await db.delete(entityPageRelationsTable).where(
+      and(eq(entityPageRelationsTable.entityPageId, relatedId), eq(entityPageRelationsTable.relatedEntityPageId, id)),
+    );
+
+    const relatedPages = await fetchRelatedPages(id);
+    res.json({ relatedPages });
+  } catch (err) {
+    req.log.error(err, "Failed to remove entity page relation");
+    res.status(500).json({ error: "Failed to remove entity page relation" });
+  }
+});
 
 // POST /admin/entity-pages/:id/rescan-posts — link all matching published posts
 router.post("/admin/entity-pages/:id/rescan-posts", async (req, res) => {

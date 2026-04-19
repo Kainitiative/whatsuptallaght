@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postsTable, categoriesTable, entityPagesTable, entityPageArticlesTable } from "@workspace/db/schema";
+import { postsTable, categoriesTable, entityPagesTable, entityPageArticlesTable, entityPageRelationsTable } from "@workspace/db/schema";
 import { eq, and, sql, count, desc } from "drizzle-orm";
 import { getSettingValue } from "./settings";
 
@@ -88,7 +88,28 @@ router.get("/public/entity-pages/:slug", async (req, res) => {
       .orderBy(desc(postsTable.publishedAt))
       .limit(6);
 
-    res.json({ ...page, linkedArticles });
+    const relatedPages = await db
+      .select({
+        id: entityPagesTable.id,
+        name: entityPagesTable.name,
+        slug: entityPagesTable.slug,
+        entityType: entityPagesTable.entityType,
+        shortDescription: entityPagesTable.shortDescription,
+        photos: entityPagesTable.photos,
+        relationLabel: entityPageRelationsTable.relationLabel,
+      })
+      .from(entityPageRelationsTable)
+      .innerJoin(entityPagesTable, eq(entityPageRelationsTable.relatedEntityPageId, entityPagesTable.id))
+      .where(
+        and(
+          eq(entityPageRelationsTable.entityPageId, page.id),
+          eq(entityPagesTable.status, "published"),
+        ),
+      )
+      .orderBy(entityPagesTable.name)
+      .limit(6);
+
+    res.json({ ...page, linkedArticles, relatedPages });
   } catch (err) {
     res.status(500).json({ error: "internal_error", message: "Failed to fetch entity page" });
   }

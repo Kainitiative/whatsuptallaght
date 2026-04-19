@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getEntityPage,
+  getEntityPages,
   createEntityPage,
   updateEntityPage,
   publishEntityPage,
@@ -11,11 +12,16 @@ import {
   requestUploadUrl,
   uploadEntityPageTrends,
   rescanEntityPagePosts,
+  scanEntityPageRelationsApi,
+  addEntityPageRelation,
+  removeEntityPageRelation,
   type EntityPageType,
   type EntityPageAiContext,
   type CreateEntityPageInput,
   type TrendsData,
   type RescanPostsResult,
+  type ScanRelationsResult,
+  type RelatedEntityPage,
 } from "@/lib/api";
 
 const ENTITY_TYPES: { value: EntityPageType; label: string }[] = [
@@ -80,6 +86,12 @@ export default function EntityPageEdit() {
     enabled: !isNew && pageId !== null,
   });
 
+  const { data: allEntityPages } = useQuery({
+    queryKey: ["entity-pages-list"],
+    queryFn: () => getEntityPages(),
+    enabled: !isNew && pageId !== null,
+  });
+
   const [form, setForm] = useState<CreateEntityPageInput>({
     name: "",
     slug: "",
@@ -114,6 +126,9 @@ export default function EntityPageEdit() {
   const [trendsSummary, setTrendsSummary] = useState<string>("");
   const [isRescanning, setIsRescanning] = useState(false);
   const [rescanResult, setRescanResult] = useState<RescanPostsResult | null>(null);
+  const [isScanningRelations, setIsScanningRelations] = useState(false);
+  const [scanRelationsResult, setScanRelationsResult] = useState<ScanRelationsResult | null>(null);
+  const [relationsError, setRelationsError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -849,6 +864,126 @@ export default function EntityPageEdit() {
               <p className="text-sm text-muted-foreground italic">
                 No articles linked yet. Click "Find Related Articles" to scan all published posts.
               </p>
+            )}
+          </Section>
+        )}
+
+        {/* Related pages */}
+        {!isNew && (
+          <Section title="Related Pages">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-muted-foreground">
+                Entity pages that are related to this one appear as "Related Places" on the public page.
+                The system auto-detects relations by scanning the page body after Generate.
+              </p>
+              <button
+                type="button"
+                disabled={isScanningRelations}
+                onClick={async () => {
+                  if (!pageId) return;
+                  setIsScanningRelations(true);
+                  setScanRelationsResult(null);
+                  setRelationsError(null);
+                  try {
+                    const result = await scanEntityPageRelationsApi(pageId);
+                    setScanRelationsResult(result);
+                    qc.invalidateQueries({ queryKey: ["entity-page", pageId] });
+                  } catch {
+                    setRelationsError("Scan failed");
+                  } finally {
+                    setIsScanningRelations(false);
+                  }
+                }}
+                className="ml-4 flex-shrink-0 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {isScanningRelations ? "Scanning…" : "Find Related Pages"}
+              </button>
+            </div>
+            {scanRelationsResult && (
+              <div className="mb-3 text-xs rounded-lg px-3 py-2 bg-green-50 text-green-700 border border-green-200">
+                Scan complete — {scanRelationsResult.linked} new relation{scanRelationsResult.linked !== 1 ? "s" : ""} found
+                {scanRelationsResult.skipped > 0 ? `, ${scanRelationsResult.skipped} already linked` : ""}.
+              </div>
+            )}
+            {relationsError && (
+              <div className="mb-3 text-xs rounded-lg px-3 py-2 bg-red-50 text-red-700 border border-red-200">
+                {relationsError}
+              </div>
+            )}
+            {existing?.relatedPages && existing.relatedPages.length > 0 ? (
+              <div className="divide-y divide-border mb-4">
+                {existing.relatedPages.map((rp) => (
+                  <div key={rp.id} className="py-2.5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {rp.photos?.[0] && (
+                        <img src={rp.photos[0]} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-foreground">{rp.name}</span>
+                        {rp.relationLabel && (
+                          <span className="ml-2 text-xs text-muted-foreground">({rp.relationLabel})</span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!pageId) return;
+                        try {
+                          await removeEntityPageRelation(pageId, rp.id);
+                          qc.invalidateQueries({ queryKey: ["entity-page", pageId] });
+                        } catch {
+                          setRelationsError("Failed to remove relation");
+                        }
+                      }}
+                      className="flex-shrink-0 text-xs text-red-600 hover:text-red-800 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic mb-4">
+                No related pages yet. Click "Find Related Pages" to auto-detect from the body text, or add one manually below.
+              </p>
+            )}
+            {/* Manual add */}
+            {allEntityPages && allEntityPages.filter((p) => p.id !== pageId).length > 0 && (
+              <div className="flex gap-2 mt-2">
+                <select
+                  id="manual-related-select"
+                  className="flex-1 px-3 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
+                  defaultValue=""
+                >
+                  <option value="" disabled>Add related page…</option>
+                  {allEntityPages
+                    .filter((p) => p.id !== pageId && !(existing?.relatedPages ?? []).some((r) => r.id === p.id))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!pageId) return;
+                    const sel = document.getElementById("manual-related-select") as HTMLSelectElement;
+                    const val = parseInt(sel.value, 10);
+                    if (isNaN(val)) return;
+                    setRelationsError(null);
+                    try {
+                      await addEntityPageRelation(pageId, val);
+                      sel.value = "";
+                      qc.invalidateQueries({ queryKey: ["entity-page", pageId] });
+                    } catch {
+                      setRelationsError("Failed to add relation");
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-secondary/80 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
             )}
           </Section>
         )}

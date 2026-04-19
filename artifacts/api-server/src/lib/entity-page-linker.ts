@@ -20,8 +20,8 @@
  */
 
 import { db } from "@workspace/db";
-import { entityPagesTable, entityPageArticlesTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { entityPagesTable, entityPageArticlesTable, entityPageRelationsTable } from "@workspace/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 import { logger } from "./logger";
 
 function escapeRegex(str: string): string {
@@ -168,5 +168,103 @@ export async function linkEntityPagesToPost(
     );
   } catch (err) {
     logger.warn({ err, postId }, "Entity page linker: error during linking (non-fatal)");
+  }
+}
+
+/**
+ * Scan a published entity page's generated body for mentions of other entity
+ * pages. Creates bidirectional rows in entity_page_relations for each match.
+ *
+ * Called automatically after Generate and on demand via the admin button.
+ * Errors are non-fatal.
+ */
+export async function scanEntityPageRelations(pageId: number): Promise<{ linked: number; skipped: number }> {
+  try {
+    const [page] = await db
+      .select({
+        id: entityPagesTable.id,
+        name: entityPagesTable.name,
+        generatedBody: entityPagesTable.generatedBody,
+        shortDescription: entityPagesTable.shortDescription,
+      })
+      .from(entityPagesTable)
+      .where(eq(entityPagesTable.id, pageId));
+
+    if (!page) return { linked: 0, skipped: 0 };
+
+    const haystack = `${page.name} ${page.shortDescription ?? ""} ${page.generatedBody ?? ""}`.toLowerCase();
+
+    // All other entity pages to match against
+    const others = await db
+      .select({
+        id: entityPagesTable.id,
+        name: entityPagesTable.name,
+        aliases: entityPagesTable.aliases,
+      })
+      .from(entityPagesTable)
+      .where(ne(entityPagesTable.id, pageId));
+
+    let linked = 0;
+    let skipped = 0;
+
+    for (const other of others) {
+      const nameHit = wholeWordMatch(haystack, other.name);
+      const aliasHit = !nameHit && (other.aliases ?? []).some((a) => wholeWordMatch(haystack, a));
+      if (!nameHit && !aliasHit) continue;
+
+      // Insert A→B if not exists
+      const existsAB = await db
+        .select({ id: entityPageRelationsTable.id })
+        .from(entityPageRelationsTable)
+        .where(
+          and(
+            eq(entityPageRelationsTable.entityPageId, pageId),
+            eq(entityPageRelationsTable.relatedEntityPageId, other.id),
+          ),
+        )
+        .limit(1);
+
+      if (existsAB.length === 0) {
+        await db.insert(entityPageRelationsTable).values({
+          entityPageId: pageId,
+          relatedEntityPageId: other.id,
+        });
+        linked++;
+        logger.info(
+          { entityPageId: pageId, relatedEntityPageId: other.id, relatedName: other.name },
+          "Entity page linker: relation created (A→B)",
+        );
+      } else {
+        skipped++;
+      }
+
+      // Insert B→A if not exists (bidirectional)
+      const existsBA = await db
+        .select({ id: entityPageRelationsTable.id })
+        .from(entityPageRelationsTable)
+        .where(
+          and(
+            eq(entityPageRelationsTable.entityPageId, other.id),
+            eq(entityPageRelationsTable.relatedEntityPageId, pageId),
+          ),
+        )
+        .limit(1);
+
+      if (existsBA.length === 0) {
+        await db.insert(entityPageRelationsTable).values({
+          entityPageId: other.id,
+          relatedEntityPageId: pageId,
+        });
+        logger.info(
+          { entityPageId: other.id, relatedEntityPageId: pageId, relatedName: page.name },
+          "Entity page linker: relation created (B→A)",
+        );
+      }
+    }
+
+    return { linked, skipped };
+  } catch (err) {
+    logger.warn({ err, pageId }, "Entity page linker: scanEntityPageRelations failed (non-fatal)");
+    return { linked: 0, skipped: 0 };
   }
 }

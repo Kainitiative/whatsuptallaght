@@ -39,6 +39,18 @@ export const entityPageArticlesTable = pgTable("entity_page_articles", {
   linkedAt: timestamp("linked_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const entityPageRelationsTable = pgTable("entity_page_relations", {
+  id: serial("id").primaryKey(),
+  entityPageId: integer("entity_page_id")
+    .notNull()
+    .references(() => entityPagesTable.id, { onDelete: "cascade" }),
+  relatedEntityPageId: integer("related_entity_page_id")
+    .notNull()
+    .references(() => entityPagesTable.id, { onDelete: "cascade" }),
+  relationLabel: text("relation_label"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertEntityPageSchema = createInsertSchema(entityPagesTable).omit({
   id: true,
   createdAt: true,
@@ -49,3 +61,4 @@ export const selectEntityPageSchema = createSelectSchema(entityPagesTable);
 export type InsertEntityPage = z.infer<typeof insertEntityPageSchema>;
 export type EntityPage = typeof entityPagesTable.$inferSelect;
 export type EntityPageArticle = typeof entityPageArticlesTable.$inferSelect;
+export type EntityPageRelation = typeof entityPageRelationsTable.$inferSelect;

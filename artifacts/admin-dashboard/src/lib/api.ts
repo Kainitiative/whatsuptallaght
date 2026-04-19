@@ -618,6 +618,16 @@ export interface UploadTrendsResult {
   page: EntityPageDetail;
 }
 
+export interface RelatedEntityPage {
+  id: number;
+  name: string;
+  slug: string;
+  entityType: string;
+  shortDescription: string | null;
+  photos: string[];
+  relationLabel: string | null;
+}
+
 export interface EntityPageDetail extends EntityPageSummary {
   aliases: string[];
   generatedBody: string | null;
@@ -633,6 +643,7 @@ export interface EntityPageDetail extends EntityPageSummary {
   trendsData: TrendsData | null;
   trendsSummary: string | null;
   linkedArticles: LinkedArticle[];
+  relatedPages: RelatedEntityPage[];
 }
 
 export interface CreateEntityPageInput {
@@ -720,4 +731,31 @@ export interface RescanPostsResult {
 
 export async function rescanEntityPagePosts(id: number): Promise<RescanPostsResult> {
   return request<RescanPostsResult>(`/admin/entity-pages/${id}/rescan-posts`, { method: "POST" });
+}
+
+export interface ScanRelationsResult {
+  linked: number;
+  skipped: number;
+}
+
+export async function scanEntityPageRelationsApi(id: number): Promise<ScanRelationsResult> {
+  return request<ScanRelationsResult>(`/admin/entity-pages/${id}/scan-relations`, { method: "POST" });
+}
+
+export async function addEntityPageRelation(
+  id: number,
+  relatedEntityPageId: number,
+  relationLabel?: string,
+): Promise<{ relatedPages: RelatedEntityPage[] }> {
+  return request(`/admin/entity-pages/${id}/relations`, {
+    method: "POST",
+    body: JSON.stringify({ relatedEntityPageId, relationLabel }),
+  });
+}
+
+export async function removeEntityPageRelation(
+  id: number,
+  relatedId: number,
+): Promise<{ relatedPages: RelatedEntityPage[] }> {
+  return request(`/admin/entity-pages/${id}/relations/${relatedId}`, { method: "DELETE" });
 }
