@@ -20,6 +20,7 @@ import entitiesRouter from "./entities";
 import competitionsRouter from "./competitions";
 import entityPagesRouter from "./entity-pages";
 import facebookWebhookRouter from "./webhook-facebook";
+import contactRouter from "./contact";
 import { adminAuth } from "../lib/admin-auth";
 
 const router: IRouter = Router();
@@ -38,6 +39,7 @@ router.use(webhookRouter);
 router.use(facebookWebhookRouter); // GET/POST /webhooks/facebook — public for Meta verification
 router.use(adminRouter); // contains POST /admin/auth — must be unprotected
 router.use(eventsRouter); // GET /public/events is public; admin CRUD protected below
+router.use(contactRouter); // POST /public/contact and POST /public/newsletter/subscribe are public; GET /contact and GET /newsletter/subscribers protected below
 
 // Protected admin-only routes — require Bearer token
 router.use(adminAuth);

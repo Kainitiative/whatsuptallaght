@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Menu, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { NewsletterSignup } from "@/components/newsletter-signup";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -40,6 +41,9 @@ export function Layout({ children }: { children: ReactNode }) {
       </Link>
       <Link href="/about" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         About
+      </Link>
+      <Link href="/contact" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
+        Contact
       </Link>
     </>
   );
@@ -117,6 +121,8 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="flex-1 w-full">
         {children}
       </main>
+
+      <NewsletterSignup />
 
       {/* Light footer — Option B logo */}
       <footer className="border-t bg-card text-card-foreground">

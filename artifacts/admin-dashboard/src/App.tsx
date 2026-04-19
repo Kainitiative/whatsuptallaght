@@ -19,6 +19,8 @@ import ImageAssets from "@/pages/ImageAssets";
 import Competitions from "@/pages/Competitions";
 import EntityPages from "@/pages/EntityPages";
 import EntityPageEdit from "@/pages/EntityPageEdit";
+import ContactMessages from "@/pages/ContactMessages";
+import NewsletterSubscribers from "@/pages/NewsletterSubscribers";
 import { Menu } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -39,6 +41,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/image-assets": "Image Library",
   "/golden": "Golden Examples",
   "/usage": "AI Usage",
+  "/contact-messages": "Contact Messages",
+  "/newsletter": "Newsletter",
   "/settings": "Settings",
 };
 
@@ -89,6 +93,8 @@ function ProtectedLayout() {
             <Route path="/competitions" component={Competitions} />
             <Route path="/image-assets" component={ImageAssets} />
             <Route path="/usage" component={Usage} />
+            <Route path="/contact-messages" component={ContactMessages} />
+            <Route path="/newsletter" component={NewsletterSubscribers} />
             <Route path="/settings" component={Settings} />
             <Route>
               <div className="p-8">

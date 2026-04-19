@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { clearToken } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { clearToken, apiFetch, isLoggedIn } from "@/lib/api";
 import { X } from "lucide-react";
 
 const NAV = [
@@ -16,6 +17,8 @@ const NAV = [
   { href: "/image-assets", label: "Image Library", icon: "🖼️" },
   { href: "/golden", label: "Golden Examples", icon: "⭐" },
   { href: "/usage", label: "AI Usage", icon: "📊" },
+  { href: "/contact-messages", label: "Contact Messages", icon: "✉️" },
+  { href: "/newsletter", label: "Newsletter", icon: "📨" },
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
@@ -26,6 +29,16 @@ interface SidebarProps {
 
 export default function Sidebar({ open = false, onClose }: SidebarProps) {
   const [location] = useLocation();
+
+  const { data: contactData } = useQuery({
+    queryKey: ["contact-unread-count"],
+    queryFn: () => apiFetch("/contact").then((r) => r.json()),
+    enabled: isLoggedIn(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  const unreadCount: number = contactData?.unreadCount ?? 0;
 
   function logout() {
     clearToken();
@@ -60,6 +73,7 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
           const active = item.href === "/"
             ? location === "/"
             : location.startsWith(item.href);
+          const badge = item.href === "/contact-messages" && unreadCount > 0 ? unreadCount : null;
           return (
             <Link key={item.href} href={item.href}>
               <a
@@ -71,7 +85,12 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
                 }`}
               >
                 <span className="text-base leading-none">{item.icon}</span>
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {badge !== null && (
+                  <span className="ml-auto flex-shrink-0 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                    {badge}
+                  </span>
+                )}
               </a>
             </Link>
           );

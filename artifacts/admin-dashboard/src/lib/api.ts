@@ -18,6 +18,22 @@ export function isLoggedIn(): boolean {
   return !!getToken();
 }
 
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = import.meta.env.BASE_URL + "login";
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {

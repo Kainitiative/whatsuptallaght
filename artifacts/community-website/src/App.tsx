@@ -19,6 +19,7 @@ import TallaghtNewsPage from "@/pages/tallaght-news";
 import TallaghtCommunityPage from "@/pages/tallaght-community";
 import WhatsOnTallaghtPage from "@/pages/whats-on-tallaght";
 import PlacePage from "@/pages/place";
+import ContactPage from "@/pages/contact";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ function Router() {
         <Route path="/tallaght-community" component={TallaghtCommunityPage} />
         <Route path="/whats-on-tallaght" component={WhatsOnTallaghtPage} />
         <Route path="/place/:slug" component={PlacePage} />
+        <Route path="/contact" component={ContactPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
