@@ -126,6 +126,54 @@ export default function WeatherPage() {
 
         {data && (
           <>
+            {/* SEO content block */}
+            <div className="rounded-2xl border border-border bg-muted/30 p-6 md:p-8 space-y-4 text-sm text-muted-foreground leading-relaxed">
+              <h2 className="text-lg font-bold text-foreground">{place} Weather — What to Expect</h2>
+              <p>
+                {place} sits in the south-west of County Dublin, giving it a mild, maritime climate year-round.
+                Temperatures rarely dip below freezing in winter or climb above 25°C in summer, with most days
+                falling somewhere between 8°C and 18°C. Rainfall is spread fairly evenly across the year —
+                there's no true dry season, so a light jacket is always a sensible companion.
+              </p>
+              <p>
+                Spring (March–May) brings longer days and gradual warming, often with bright spells and the
+                occasional sharp shower. Summer (June–August) is the warmest and driest stretch — warm evenings
+                are perfect for outdoor events in the area. Autumn is mild and changeable, with the first frosts
+                typically arriving in November. Winters are cool and damp rather than bitterly cold, though
+                Atlantic storms can bring strong winds between November and February.
+              </p>
+              <p>
+                This weather data is pulled live from{" "}
+                <a
+                  href="https://open-meteo.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground transition-colors"
+                >
+                  Open-Meteo
+                </a>{" "}
+                and refreshes every 30 minutes. For Met Éireann warnings and severe weather alerts, visit{" "}
+                <a
+                  href="https://www.met.ie"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground transition-colors"
+                >
+                  met.ie
+                </a>.
+              </p>
+              <p>
+                Want to know what's happening in {place} this week?{" "}
+                <Link href="/events" className="underline hover:text-foreground transition-colors">
+                  Check local events
+                </Link>{" "}
+                or{" "}
+                <Link href="/" className="underline hover:text-foreground transition-colors">
+                  browse the latest news
+                </Link>.
+              </p>
+            </div>
+
             {/* Current conditions */}
             <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
               <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-5">
@@ -221,53 +269,6 @@ export default function WeatherPage() {
               </div>
             </div>
 
-            {/* SEO content block */}
-            <div className="rounded-2xl border border-border bg-muted/30 p-6 md:p-8 space-y-4 text-sm text-muted-foreground leading-relaxed">
-              <h2 className="text-lg font-bold text-foreground">{place} Weather — What to Expect</h2>
-              <p>
-                {place} sits in the south-west of County Dublin, giving it a mild, maritime climate year-round.
-                Temperatures rarely dip below freezing in winter or climb above 25°C in summer, with most days
-                falling somewhere between 8°C and 18°C. Rainfall is spread fairly evenly across the year —
-                there's no true dry season, so a light jacket is always a sensible companion.
-              </p>
-              <p>
-                Spring (March–May) brings longer days and gradual warming, often with bright spells and the
-                occasional sharp shower. Summer (June–August) is the warmest and driest stretch — warm evenings
-                are perfect for outdoor events in the area. Autumn is mild and changeable, with the first frosts
-                typically arriving in November. Winters are cool and damp rather than bitterly cold, though
-                Atlantic storms can bring strong winds between November and February.
-              </p>
-              <p>
-                This weather data is pulled live from{" "}
-                <a
-                  href="https://open-meteo.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-foreground transition-colors"
-                >
-                  Open-Meteo
-                </a>{" "}
-                and refreshes every 30 minutes. For Met Éireann warnings and severe weather alerts, visit{" "}
-                <a
-                  href="https://www.met.ie"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-foreground transition-colors"
-                >
-                  met.ie
-                </a>.
-              </p>
-              <p>
-                Want to know what's happening in {place} this week?{" "}
-                <Link href="/events" className="underline hover:text-foreground transition-colors">
-                  Check local events
-                </Link>{" "}
-                or{" "}
-                <Link href="/" className="underline hover:text-foreground transition-colors">
-                  browse the latest news
-                </Link>.
-              </p>
-            </div>
           </>
         )}
       </div>
