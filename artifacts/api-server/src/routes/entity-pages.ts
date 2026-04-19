@@ -188,12 +188,19 @@ router.post("/admin/entity-pages/:id/generate", async (req, res) => {
     if (aiCtx.departments) contextLines.push(`Departments/services: ${aiCtx.departments}`);
     if (aiCtx.additionalContext) contextLines.push(`Additional info: ${aiCtx.additionalContext}`);
 
+    // Top queries from Google Trends — vocabulary the AI can draw on naturally in the body
+    const trendsDataRaw = page.trendsData as any;
+    const topQueries: string[] = trendsDataRaw?.topQueries ?? [];
+    const topQueriesBlock = topQueries.length > 0
+      ? `\nEstablished search terms people use for ${page.name} (from Google Trends — weave relevant phrases naturally into the body where they fit, do not list them or force every one in):\n${topQueries.map((q) => `- "${q}"`).join("\n")}`
+      : "";
+
     const systemPrompt = `You are a local content writer for What's Up Tallaght, a community news platform serving Tallaght, Dublin. Write warm, informative, SEO-friendly content about local places, clubs, and businesses. Write in third person. Be accurate, factual, and community-focused. Do not invent facts not provided.`;
 
     const userPrompt = `Write a 450–550 word page about "${page.name}", a ${typeLabel[page.entityType] ?? page.entityType} in Tallaght, Dublin.
 
 Known facts:
-${contextLines.join("\n")}
+${contextLines.join("\n")}${topQueriesBlock}
 
 Requirements:
 - Open with a strong introductory paragraph establishing what this is and why it matters to the Tallaght community
