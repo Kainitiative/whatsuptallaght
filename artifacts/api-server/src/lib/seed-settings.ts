@@ -252,6 +252,50 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 32,
   },
 
+  // ── Weather ───────────────────────────────────────────────────────────────────
+
+  {
+    key: "weather_place_name",
+    label: "Weather: Place Name",
+    description:
+      "The name of the location shown on the weather page — e.g. 'Tallaght', 'Galway City', 'Cork'. " +
+      "This drives all weather page headings and SEO content. " +
+      "For a new licensee, simply change this to their town or city name.",
+    category: "weather",
+    isSecret: false,
+    isRequired: false,
+    isConfigured: false,
+    displayOrder: 50,
+  },
+
+  {
+    key: "weather_lat",
+    label: "Weather: Latitude",
+    description:
+      "Latitude of the community's location, used to pull live weather data. " +
+      "Default is Tallaght, Dublin (53.2877). " +
+      "To find coordinates for another location, search Google Maps, right-click the location, and copy the first number.",
+    category: "weather",
+    isSecret: false,
+    isRequired: false,
+    isConfigured: false,
+    displayOrder: 51,
+  },
+
+  {
+    key: "weather_lon",
+    label: "Weather: Longitude",
+    description:
+      "Longitude of the community's location, used to pull live weather data. " +
+      "Default is Tallaght, Dublin (-6.3664). " +
+      "To find coordinates for another location, search Google Maps, right-click the location, and copy the second number.",
+    category: "weather",
+    isSecret: false,
+    isRequired: false,
+    isConfigured: false,
+    displayOrder: 52,
+  },
+
   // ── Instagram ──────────────────────────────────────────────────────────────────
 
   {

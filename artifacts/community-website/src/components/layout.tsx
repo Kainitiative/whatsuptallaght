@@ -139,6 +139,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 <li><Link href="/" className="text-muted-foreground hover:text-primary transition-colors text-sm">Home</Link></li>
                 <li><Link href="/search" className="text-muted-foreground hover:text-primary transition-colors text-sm">Search</Link></li>
                 <li><Link href="/events" className="text-muted-foreground hover:text-primary transition-colors text-sm">Events</Link></li>
+                <li><Link href="/weather" className="text-muted-foreground hover:text-primary transition-colors text-sm">Weather</Link></li>
                 <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors text-sm">How it works</Link></li>
               </ul>
             </div>

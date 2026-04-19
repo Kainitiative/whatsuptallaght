@@ -21,6 +21,7 @@ import competitionsRouter from "./competitions";
 import entityPagesRouter from "./entity-pages";
 import facebookWebhookRouter from "./webhook-facebook";
 import contactRouter from "./contact";
+import weatherRouter from "./weather";
 import { adminAuth } from "../lib/admin-auth";
 
 const router: IRouter = Router();
@@ -40,6 +41,7 @@ router.use(facebookWebhookRouter); // GET/POST /webhooks/facebook — public for
 router.use(adminRouter); // contains POST /admin/auth — must be unprotected
 router.use(eventsRouter); // GET /public/events is public; admin CRUD protected below
 router.use(contactRouter); // POST /public/contact and POST /public/newsletter/subscribe are public; GET /contact and GET /newsletter/subscribers protected below
+router.use(weatherRouter); // GET /public/weather — public, cached 30 min
 
 // Protected admin-only routes — require Bearer token
 router.use(adminAuth);
