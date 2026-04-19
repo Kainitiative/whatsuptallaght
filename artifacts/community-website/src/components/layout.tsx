@@ -33,9 +33,6 @@ export function Layout({ children }: { children: ReactNode }) {
       <Link href="/events" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Events
       </Link>
-      <Link href="/contributors" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
-        Contributors
-      </Link>
       <Link href="/advertise" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Advertise
       </Link>
@@ -142,7 +139,6 @@ export function Layout({ children }: { children: ReactNode }) {
                 <li><Link href="/" className="text-muted-foreground hover:text-primary transition-colors text-sm">Home</Link></li>
                 <li><Link href="/search" className="text-muted-foreground hover:text-primary transition-colors text-sm">Search</Link></li>
                 <li><Link href="/events" className="text-muted-foreground hover:text-primary transition-colors text-sm">Events</Link></li>
-                <li><Link href="/contributors" className="text-muted-foreground hover:text-primary transition-colors text-sm">Contributors</Link></li>
                 <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors text-sm">How it works</Link></li>
               </ul>
             </div>
