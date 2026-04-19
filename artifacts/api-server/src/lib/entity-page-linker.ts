@@ -42,6 +42,9 @@ function wholeWordMatch(text: string, term: string): boolean {
  * Called by the AI pipeline before DALL-E so real community photos take
  * priority over generated images when available.
  */
+// Entity types too broad to use as article header images (e.g. "Tallaght" matches every article)
+const EXCLUDED_HEADER_TYPES = ["place"];
+
 export async function findEntityPageHeaderPhoto(articleText: string): Promise<string | null> {
   try {
     const pages = await db
@@ -50,6 +53,8 @@ export async function findEntityPageHeaderPhoto(articleText: string): Promise<st
         name: entityPagesTable.name,
         aliases: entityPagesTable.aliases,
         photos: entityPagesTable.photos,
+        entityType: entityPagesTable.entityType,
+        useAsArticleHeader: entityPagesTable.useAsArticleHeader,
       })
       .from(entityPagesTable)
       .where(eq(entityPagesTable.status, "published"));
@@ -57,6 +62,12 @@ export async function findEntityPageHeaderPhoto(articleText: string): Promise<st
     const normalised = articleText.toLowerCase();
 
     for (const page of pages) {
+      // Skip entity types that are too broad (areas/localities match every article)
+      if (EXCLUDED_HEADER_TYPES.includes(page.entityType)) continue;
+
+      // Skip if admin has explicitly disabled header image use for this entity
+      if (page.useAsArticleHeader === false) continue;
+
       const photos = (page.photos ?? []) as string[];
       if (photos.length === 0) continue;
 

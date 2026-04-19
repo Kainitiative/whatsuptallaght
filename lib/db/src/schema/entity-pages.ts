@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { postsTable } from "./posts";
@@ -24,6 +24,7 @@ export const entityPagesTable = pgTable("entity_pages", {
   trendsSummary: text("trends_summary"),
   status: text("status").notNull().default("draft"),
   primaryCategoryId: integer("primary_category_id"),
+  useAsArticleHeader: boolean("use_as_article_header").notNull().default(true),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

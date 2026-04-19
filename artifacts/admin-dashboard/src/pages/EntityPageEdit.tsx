@@ -110,6 +110,7 @@ export default function EntityPageEdit() {
     metaDescription: null,
     status: "draft",
     primaryCategoryId: null,
+    useAsArticleHeader: true,
   });
   const [aliasInput, setAliasInput] = useState("");
   const [slugManual, setSlugManual] = useState(false);
@@ -152,6 +153,7 @@ export default function EntityPageEdit() {
         metaDescription: existing.metaDescription,
         status: existing.status,
         primaryCategoryId: existing.primaryCategoryId,
+        useAsArticleHeader: existing.useAsArticleHeader ?? true,
       });
       setAliasInput((existing.aliases ?? []).join(", "));
       setSlugManual(true);
@@ -605,6 +607,25 @@ export default function EntityPageEdit() {
           >
             {isUploading ? "Uploading…" : "+ Upload Photos"}
           </button>
+
+          <div className="mt-4 pt-4 border-t border-border">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={form.useAsArticleHeader ?? true}
+                onChange={(e) => set("useAsArticleHeader", e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border text-primary"
+              />
+              <div>
+                <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                  Use first photo as article header image
+                </span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When enabled, the first photo from this page will be used as the header image on articles that mention this entity. Disable for broad place pages (e.g. "Tallaght") to prevent the same image appearing on every article.
+                </p>
+              </div>
+            </label>
+          </div>
         </Section>
 
         {/* Generated Page Body */}

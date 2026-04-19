@@ -657,6 +657,7 @@ export interface EntityPageDetail extends EntityPageSummary {
   aiContext: EntityPageAiContext | null;
   metaDescription: string | null;
   primaryCategoryId: number | null;
+  useAsArticleHeader: boolean;
   trendsData: TrendsData | null;
   trendsSummary: string | null;
   linkedArticles: LinkedArticle[];
@@ -682,6 +683,7 @@ export interface CreateEntityPageInput {
   trendsSummary?: string | null;
   status?: EntityPageStatus;
   primaryCategoryId?: number | null;
+  useAsArticleHeader?: boolean;
 }
 
 export interface GenerateEntityPageResult {
