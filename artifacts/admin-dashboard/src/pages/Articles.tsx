@@ -1,9 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, rematchPostEntity, extractEventFromPost, postArticleToFacebook, type Post, type PostCost } from "@/lib/api";
+import { getPosts, updatePost, deletePost, createGoldenExample, getPostCost, regeneratePostImage, rematchPostEntity, extractEventFromPost, postArticleToFacebook, getPostSource, type Post, type PostCost } from "@/lib/api";
 import { formatDateShort, statusColour, confidenceColour } from "@/lib/utils";
 import StarRating from "@/components/StarRating";
 import ArticleEditModal from "@/components/ArticleEditModal";
+
+interface PostSource {
+  sourceRawText: string | null;
+  sourceVoiceTranscript: string | null;
+}
 
 const STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -27,6 +32,9 @@ export default function Articles() {
   const [toast, setToast] = useState<string | null>(null);
   const [editPost, setEditPost] = useState<Post | null>(null);
   const [costs, setCosts] = useState<Record<number, PostCost>>({});
+  const [sources, setSources] = useState<Record<number, PostSource>>({});
+  const [loadingSource, setLoadingSource] = useState<number | null>(null);
+  const [showSource, setShowSource] = useState<Set<number>>(new Set());
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -107,6 +115,26 @@ export default function Articles() {
         const cost = await getPostCost(next);
         setCosts((prev) => ({ ...prev, [next]: cost }));
       } catch {}
+    }
+  }
+
+  async function handleToggleSource(postId: number) {
+    const isShowing = showSource.has(postId);
+    if (isShowing) {
+      setShowSource((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+      return;
+    }
+    setShowSource((prev) => new Set(prev).add(postId));
+    if (!sources[postId]) {
+      setLoadingSource(postId);
+      try {
+        const src = await getPostSource(postId);
+        setSources((prev) => ({ ...prev, [postId]: src }));
+      } catch {
+        setSources((prev) => ({ ...prev, [postId]: { sourceRawText: null, sourceVoiceTranscript: null } }));
+      } finally {
+        setLoadingSource(null);
+      }
     }
   }
 
@@ -338,7 +366,44 @@ export default function Articles() {
                       >
                         📅 Extract Event
                       </button>
+                      {post.submissionSource === "whatsapp" && (
+                        <button
+                          onClick={() => handleToggleSource(post.id)}
+                          disabled={loadingSource === post.id}
+                          className="px-3 py-1.5 text-xs bg-green-50 border border-green-300 text-green-800 rounded-lg hover:bg-green-100 disabled:opacity-50 transition-colors"
+                          title="Show the original WhatsApp message this article was created from"
+                        >
+                          {loadingSource === post.id ? "Loading…" : showSource.has(post.id) ? "💬 Hide original" : "💬 Original message"}
+                        </button>
+                      )}
                     </div>
+
+                    {/* WhatsApp source message */}
+                    {post.submissionSource === "whatsapp" && showSource.has(post.id) && (
+                      <div className="border-t border-border pt-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Original WhatsApp message</p>
+                        {sources[post.id] ? (
+                          <>
+                            {sources[post.id].sourceRawText ? (
+                              <div className="bg-[#dcf8c6] border border-green-200 rounded-xl rounded-tl-sm px-4 py-3 max-w-xl">
+                                <p className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed">{sources[post.id].sourceRawText}</p>
+                              </div>
+                            ) : null}
+                            {sources[post.id].sourceVoiceTranscript ? (
+                              <div className={`${sources[post.id].sourceRawText ? "mt-2" : ""} bg-[#dcf8c6] border border-green-200 rounded-xl rounded-tl-sm px-4 py-3 max-w-xl`}>
+                                <p className="text-xs text-green-700 mb-1">🎤 Voice note transcript</p>
+                                <p className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed italic">{sources[post.id].sourceVoiceTranscript}</p>
+                              </div>
+                            ) : null}
+                            {!sources[post.id].sourceRawText && !sources[post.id].sourceVoiceTranscript && (
+                              <p className="text-xs text-muted-foreground italic">No original message recorded for this article.</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Loading…</p>
+                        )}
+                      </div>
+                    )}
                     {costs[post.id] && (
                       <div className="border-t border-border pt-3">
                         {!costs[post.id].hasData ? (

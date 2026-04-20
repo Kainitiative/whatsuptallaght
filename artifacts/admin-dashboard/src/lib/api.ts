@@ -184,6 +184,8 @@ export interface Post {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  sourceSubmissionId: number | null;
+  submissionSource: "whatsapp" | "rss" | null;
 }
 
 export async function getPostSource(id: number): Promise<{ sourceRawText: string | null; sourceVoiceTranscript: string | null }> {

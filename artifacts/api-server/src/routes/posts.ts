@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { postsTable, postCategoriesTable, categoriesTable, rssItemsTable, rssFeedsTable, submissionsTable, contributorsTable, aiUsageLogTable, socialCaptionsTable } from "@workspace/db/schema";
-import { eq, and, desc, count, sql, ilike, sum } from "drizzle-orm";
+import { eq, and, desc, count, sql, ilike, sum, inArray } from "drizzle-orm";
 import { sendTextMessage } from "../lib/whatsapp-client";
 import { getSettingValue } from "./settings";
 import { regeneratePostImage } from "../lib/ai-pipeline";
@@ -92,8 +92,24 @@ router.get("/posts", async (req, res) => {
       .limit(limit)
       .offset(offset);
 
+    // Enrich posts with submission source type (whatsapp vs rss) via a batched secondary query
+    const submissionIds = posts.map((p) => p.sourceSubmissionId).filter((id): id is number => id !== null);
+    const sourceMap: Record<number, "whatsapp" | "rss"> = {};
+    if (submissionIds.length > 0) {
+      const sources = await db
+        .select({ id: submissionsTable.id, source: submissionsTable.source })
+        .from(submissionsTable)
+        .where(inArray(submissionsTable.id, submissionIds));
+      for (const s of sources) sourceMap[s.id] = s.source as "whatsapp" | "rss";
+    }
+
+    const enrichedPosts = posts.map((p) => ({
+      ...p,
+      submissionSource: p.sourceSubmissionId ? (sourceMap[p.sourceSubmissionId] ?? null) : null,
+    }));
+
     res.json({
-      posts,
+      posts: enrichedPosts,
       pagination: {
         page,
         limit,
