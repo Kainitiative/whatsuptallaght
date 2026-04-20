@@ -81,6 +81,30 @@ export default function Article() {
     return cat ? { name: cat.name, slug: cat.slug, color: cat.color } : { name: "News", slug: "news", color: "" };
   };
 
+  // Fetch linked event + weather — must stay above conditional returns (Rules of Hooks)
+  useEffect(() => {
+    if (!slug) return;
+    setLinkedEvent(undefined);
+    setEventWeather(null);
+    fetch(`${BASE}/api/public/events/by-article/${encodeURIComponent(slug)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((event: LinkedEvent | null) => {
+        setLinkedEvent(event);
+        if (!event) return;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const eventDate = new Date(event.eventDate + "T12:00:00");
+        const daysAway = Math.floor((eventDate.getTime() - today.getTime()) / 86400000);
+        if (daysAway >= 0 && daysAway <= 15) {
+          fetch(`${BASE}/api/public/weather/day?date=${event.eventDate}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((w: DayForecast | null) => setEventWeather(w))
+            .catch(() => {});
+        }
+      })
+      .catch(() => setLinkedEvent(null));
+  }, [slug]);
+
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
@@ -157,30 +181,6 @@ export default function Article() {
     });
     return withLinks.replace(/\n/g, "<br/>");
   }
-
-  // Fetch linked event when post loads
-  useEffect(() => {
-    if (!slug) return;
-    setLinkedEvent(undefined);
-    setEventWeather(null);
-    fetch(`${BASE}/api/public/events/by-article/${encodeURIComponent(slug)}`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((event: LinkedEvent | null) => {
-        setLinkedEvent(event);
-        if (!event) return;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const eventDate = new Date(event.eventDate + "T12:00:00");
-        const daysAway = Math.floor((eventDate.getTime() - today.getTime()) / 86400000);
-        if (daysAway >= 0 && daysAway <= 15) {
-          fetch(`${BASE}/api/public/weather/day?date=${event.eventDate}`)
-            .then((r) => r.ok ? r.json() : null)
-            .then((w: DayForecast | null) => setEventWeather(w))
-            .catch(() => {});
-        }
-      })
-      .catch(() => setLinkedEvent(null));
-  }, [slug]);
 
   const relatedPosts = relatedData?.posts?.filter(p => p.id !== post.id).slice(0, 3) || [];
 
