@@ -9,6 +9,7 @@ import {
 import { eq } from "drizzle-orm";
 import { getFeedTrustLevel } from "./geo-filter";
 import { logger } from "./logger";
+import { getSettingValue } from "../routes/settings";
 
 // ---------------------------------------------------------------------------
 // Events-only filter — returns true if content describes a real upcoming event
@@ -217,7 +218,7 @@ async function fetchSdccNewsPage(url: string): Promise<NormalisedFeedItem[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Eventbrite page scraper — extracts JSON-LD event list from a search page
+// Shared item type
 // ---------------------------------------------------------------------------
 
 interface NormalisedFeedItem {
@@ -229,100 +230,130 @@ interface NormalisedFeedItem {
   pubDate: Date;
 }
 
-async function fetchEventbritePage(url: string): Promise<NormalisedFeedItem[]> {
-  const res = await fetch(url, {
+// ---------------------------------------------------------------------------
+// Eventbrite API client — replaces the old HTML scraper (blocked by Eventbrite)
+// Extracts the search term from the feed URL and queries the official API.
+// e.g. https://www.eventbrite.ie/d/ireland--dublin/tallaght/ → q="tallaght"
+// ---------------------------------------------------------------------------
+
+interface EventbriteApiResponse {
+  events?: EventbriteEvent[];
+  pagination?: { page_count: number; page_number: number };
+}
+
+interface EventbriteEvent {
+  id?: string;
+  url?: string;
+  name?: { text?: string };
+  description?: { text?: string };
+  summary?: string;
+  start?: { local?: string; utc?: string };
+  end?: { local?: string; utc?: string };
+  logo?: { url?: string };
+  is_free?: boolean;
+  venue?: {
+    name?: string;
+    address?: { address_1?: string; city?: string };
+  };
+  organizer?: { name?: string };
+}
+
+function buildEventContent(ev: EventbriteEvent): { title: string; content: string; link: string; feedImageUrl: string | null; pubDate: Date; guid: string } {
+  const link = ev.url ?? "";
+  const title = ev.name?.text ?? "";
+  const description = ev.description?.text ?? ev.summary ?? "";
+  const startDate = ev.start?.local ?? ev.start?.utc ?? "";
+  const endDate = ev.end?.local ?? ev.end?.utc ?? "";
+  const imageUrl = ev.logo?.url ?? null;
+
+  const venueName = ev.venue?.name ?? "";
+  const venueAddress = [
+    ev.venue?.address?.address_1,
+    ev.venue?.address?.city,
+  ].filter(Boolean).join(", ");
+  const venueStr = [venueName, venueAddress].filter(Boolean).join(" — ");
+
+  const organiserName = ev.organizer?.name ?? "";
+  const price = ev.is_free ? "Free" : "";
+  const ticketUrl = link;
+
+  let dateLine = "";
+  if (startDate) {
+    try {
+      const start = new Date(startDate);
+      const dateStr = start.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      const timeStr = start.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", hour12: true });
+      let end = "";
+      if (endDate) {
+        const endDt = new Date(endDate);
+        end = ` – ${endDt.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+      }
+      dateLine = `${dateStr} at ${timeStr}${end}`;
+    } catch {
+      dateLine = startDate;
+    }
+  }
+
+  const contentParts = [
+    dateLine      ? `Date/Time: ${dateLine}`         : "",
+    venueStr      ? `Venue: ${venueStr}`              : "",
+    organiserName ? `Organiser: ${organiserName}`     : "",
+    price         ? `Price: ${price}`                 : "",
+    ticketUrl     ? `Tickets/More info: ${ticketUrl}` : "",
+    description   ? `\n${description}`               : "",
+  ];
+
+  return {
+    guid: ev.id ? `eventbrite-${ev.id}` : link,
+    title,
+    content: contentParts.filter(Boolean).join("\n"),
+    link,
+    feedImageUrl: imageUrl,
+    pubDate: startDate ? new Date(startDate) : new Date(),
+  };
+}
+
+async function fetchEventbriteApi(feedUrl: string, apiKey: string): Promise<NormalisedFeedItem[]> {
+  // Extract the search term from the Eventbrite browse URL
+  // e.g. /d/ireland--dublin/tallaght/ → "tallaght"
+  const slugMatch = feedUrl.match(/\/d\/[^/]+\/([^/?#]+)\/?/);
+  const searchSlug = slugMatch?.[1] ?? "";
+  const searchTerm = searchSlug.replace(/-+/g, " ").trim();
+
+  if (!searchTerm) throw new Error(`Could not extract search term from Eventbrite URL: ${feedUrl}`);
+
+  const params = new URLSearchParams({
+    q: searchTerm,
+    "location.address": "Dublin, Ireland",
+    "location.within": "20km",
+    "time_filter": "current_future",
+    "sort_by": "date",
+    "expand": "venue,organizer",
+    "page_size": "50",
+  });
+
+  const res = await fetch(`https://www.eventbriteapi.com/v3/events/search/?${params}`, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; TallaghtCommunityBot/1.0; +https://whatsuptallaght.ie)",
-      "Accept": "text/html,application/xhtml+xml",
+      "Authorization": `Bearer ${apiKey}`,
+      "Accept": "application/json",
     },
     signal: AbortSignal.timeout(20_000),
   });
 
-  if (!res.ok) throw new Error(`Eventbrite fetch failed: ${res.status}`);
-  const html = await res.text();
-
-  // Extract all JSON-LD blocks
-  const jsonLdBlocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
-  const items: NormalisedFeedItem[] = [];
-
-  for (const [, raw] of jsonLdBlocks) {
-    let data: any;
-    try { data = JSON.parse(raw.trim()); } catch { continue; }
-
-    const events = Array.isArray(data?.itemListElement) ? data.itemListElement : [];
-    for (const entry of events) {
-      const ev = entry?.item ?? entry;
-      const link: string = ev?.url ?? ev?.["@id"] ?? "";
-      if (!link) continue;
-
-      const title: string = ev?.name ?? "";
-      const description: string = ev?.description ?? "";
-      const startDate: string = ev?.startDate ?? "";
-      const endDate: string = ev?.endDate ?? "";
-      const imageUrl: string | null = typeof ev?.image === "string" ? ev.image : null;
-
-      // Location / venue
-      const venueName: string = ev?.location?.name ?? "";
-      const venueAddress: string = [
-        ev?.location?.address?.streetAddress,
-        ev?.location?.address?.addressLocality,
-        ev?.location?.address?.addressRegion,
-      ].filter(Boolean).join(", ");
-      const venueStr = [venueName, venueAddress].filter(Boolean).join(" — ");
-
-      // Organiser
-      const organiserName: string = Array.isArray(ev?.organizer)
-        ? (ev.organizer[0]?.name ?? "")
-        : (ev?.organizer?.name ?? "");
-
-      // Ticket price and booking URL
-      const offers = Array.isArray(ev?.offers) ? ev.offers[0] : ev?.offers;
-      const price: string = offers?.price
-        ? `${offers.priceCurrency ?? "€"}${offers.price}`
-        : (offers?.availability?.includes("SoldOut") ? "Sold out" : "");
-      const ticketUrl: string = offers?.url ?? link;
-
-      // Format date/time in a human-readable way
-      let dateLine = "";
-      if (startDate) {
-        try {
-          const start = new Date(startDate);
-          const dateStr = start.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-          const timeStr = start.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", hour12: true });
-          let end = "";
-          if (endDate) {
-            const endDt = new Date(endDate);
-            end = ` – ${endDt.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", hour12: true })}`;
-          }
-          dateLine = `${dateStr} at ${timeStr}${end}`;
-        } catch {
-          dateLine = startDate;
-        }
-      }
-
-      // Build structured content block — every field the AI needs to write a useful article
-      const contentParts = [
-        dateLine      ? `Date/Time: ${dateLine}`       : "",
-        venueStr      ? `Venue: ${venueStr}`            : "",
-        organiserName ? `Organiser: ${organiserName}`   : "",
-        price         ? `Price: ${price}`               : "",
-        ticketUrl     ? `Tickets/More info: ${ticketUrl}` : "",
-        description   ? `\n${description}`              : "",
-      ];
-      const content = contentParts.filter(Boolean).join("\n");
-
-      items.push({
-        guid: link,
-        title,
-        content,
-        link,
-        feedImageUrl: imageUrl,
-        pubDate: startDate ? new Date(startDate) : new Date(),
-      });
-    }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Eventbrite API error ${res.status}: ${body.slice(0, 200)}`);
   }
 
-  logger.info({ url, count: items.length }, "RSS: Eventbrite page scraped");
+  const data = await res.json() as EventbriteApiResponse;
+  const items: NormalisedFeedItem[] = [];
+
+  for (const ev of data.events ?? []) {
+    if (!ev.url) continue;
+    items.push(buildEventContent(ev));
+  }
+
+  logger.info({ feedUrl, searchTerm, count: items.length }, "RSS: Eventbrite API fetched");
   return items;
 }
 
@@ -337,10 +368,16 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
   let normalisedItems: NormalisedFeedItem[] = [];
 
   if (feedType === "eventbrite") {
+    const apiKey = await getSettingValue("eventbrite_api_key");
+    if (!apiKey) {
+      logger.warn({ feedId: feed.id, url: feed.url }, "RSS: Eventbrite feed skipped — no API key configured (add eventbrite_api_key in Settings)");
+      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      return;
+    }
     try {
-      normalisedItems = await fetchEventbritePage(feed.url);
+      normalisedItems = await fetchEventbriteApi(feed.url, apiKey);
     } catch (err) {
-      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to fetch Eventbrite page");
+      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to fetch Eventbrite via API");
       await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
       return;
     }

@@ -252,6 +252,30 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 32,
   },
 
+  // ── Eventbrite ────────────────────────────────────────────────────────────────
+
+  {
+    key: "eventbrite_api_key",
+    label: "Eventbrite API Key",
+    description:
+      "Your personal Eventbrite API key. This allows the platform to fetch local events directly from Eventbrite " +
+      "instead of scraping the website (which Eventbrite blocks). " +
+      "Events are pulled automatically based on the search terms in each Eventbrite feed URL in RSS Feeds. " +
+      "\n\n" +
+      "HOW TO GET YOUR KEY:\n" +
+      "Step 1 — Go to eventbrite.com/platform/api-keys and sign in.\n" +
+      "Step 2 — Your private token is shown on the page — copy it.\n" +
+      "Step 3 — Paste it here and save.\n" +
+      "\n" +
+      "Once saved, all Eventbrite feeds will automatically switch to using the API.",
+    helpUrl: "https://www.eventbrite.com/platform/api-keys",
+    category: "eventbrite",
+    isSecret: true,
+    isRequired: false,
+    isConfigured: false,
+    displayOrder: 45,
+  },
+
   // ── Weather ───────────────────────────────────────────────────────────────────
 
   {
