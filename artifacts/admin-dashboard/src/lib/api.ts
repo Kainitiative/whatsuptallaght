@@ -184,8 +184,10 @@ export interface Post {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  sourceRawText: string | null;
-  sourceVoiceTranscript: string | null;
+}
+
+export async function getPostSource(id: number): Promise<{ sourceRawText: string | null; sourceVoiceTranscript: string | null }> {
+  return request(`/posts/${id}/source`);
 }
 
 export interface Category {

@@ -85,35 +85,8 @@ router.get("/posts", async (req, res) => {
       .where(whereClause);
 
     const posts = await db
-      .select({
-        id: postsTable.id,
-        title: postsTable.title,
-        slug: postsTable.slug,
-        body: postsTable.body,
-        excerpt: postsTable.excerpt,
-        headerImageUrl: postsTable.headerImageUrl,
-        bodyImages: postsTable.bodyImages,
-        imagePrompt: postsTable.imagePrompt,
-        status: postsTable.status,
-        confidenceScore: postsTable.confidenceScore,
-        wordCount: postsTable.wordCount,
-        primaryCategoryId: postsTable.primaryCategoryId,
-        sourceSubmissionId: postsTable.sourceSubmissionId,
-        isSponsored: postsTable.isSponsored,
-        isFeatured: postsTable.isFeatured,
-        starRating: postsTable.starRating,
-        tone: postsTable.tone,
-        publishedAt: postsTable.publishedAt,
-        createdAt: postsTable.createdAt,
-        updatedAt: postsTable.updatedAt,
-        sourceName: rssFeedsTable.name,
-        sourceRawText: submissionsTable.rawText,
-        sourceVoiceTranscript: submissionsTable.voiceTranscript,
-      })
+      .select()
       .from(postsTable)
-      .leftJoin(rssItemsTable, eq(rssItemsTable.postId, postsTable.id))
-      .leftJoin(rssFeedsTable, eq(rssFeedsTable.id, rssItemsTable.feedId))
-      .leftJoin(submissionsTable, eq(submissionsTable.id, postsTable.sourceSubmissionId))
       .where(whereClause)
       .orderBy(desc(postsTable.createdAt))
       .limit(limit)
@@ -128,8 +101,9 @@ router.get("/posts", async (req, res) => {
         totalPages: Math.ceil(Number(total) / limit),
       },
     });
-  } catch (err) {
-    res.status(500).json({ error: "internal_error", message: "Failed to fetch posts" });
+  } catch (err: any) {
+    console.error("[GET /posts] error:", err?.message, err?.stack);
+    res.status(500).json({ error: "internal_error", message: "Failed to fetch posts", detail: err?.message });
   }
 });
 
@@ -175,6 +149,35 @@ router.post("/posts", async (req, res) => {
       return res.status(409).json({ error: "conflict", message: "A post with this slug already exists" });
     }
     res.status(500).json({ error: "internal_error", message: "Failed to create post" });
+  }
+});
+
+router.get("/posts/:id/source", async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "validation_error", message: "Invalid ID" });
+
+  try {
+    const [post] = await db
+      .select({ sourceSubmissionId: postsTable.sourceSubmissionId })
+      .from(postsTable)
+      .where(eq(postsTable.id, id))
+      .limit(1);
+
+    if (!post) return res.status(404).json({ error: "not_found", message: "Post not found" });
+    if (!post.sourceSubmissionId) return res.json({ sourceRawText: null, sourceVoiceTranscript: null });
+
+    const [submission] = await db
+      .select({ rawText: submissionsTable.rawText, voiceTranscript: submissionsTable.voiceTranscript })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.id, post.sourceSubmissionId))
+      .limit(1);
+
+    res.json({
+      sourceRawText: submission?.rawText ?? null,
+      sourceVoiceTranscript: submission?.voiceTranscript ?? null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "internal_error", message: "Failed to fetch post source" });
   }
 });
 
