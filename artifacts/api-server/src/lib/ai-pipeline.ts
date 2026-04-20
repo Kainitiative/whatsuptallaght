@@ -241,7 +241,7 @@ Report: event name, date, time, venue, organiser, ticket price, and a brief desc
 // ---------------------------------------------------------------------------
 
 interface ToneResult {
-  tone: "news" | "event" | "sport" | "community" | "business" | "warning" | "memorial" | "other";
+  tone: "news" | "event" | "sport" | "community" | "business" | "warning" | "memorial" | "personal_story" | "other";
   suggestedCategory: string;
   confidence: number;
 }
@@ -263,6 +263,17 @@ async function classifyTone(
       {
         role: "system",
         content: `You are an editor for a Tallaght, Dublin community news platform. Classify the tone of the following submission and suggest the best category from the list below.
+
+Tone options:
+- news: A factual report about something that happened in the community.
+- event: An announcement about an upcoming event (gig, sports match, community meeting, etc.).
+- sport: A sports result, fixture, or sports club update.
+- community: A community notice, local update, or general neighbourhood information.
+- business: A local business opening, closure, offer, or update.
+- warning: A safety alert, scam warning, traffic notice, or urgent local notice.
+- memorial: A death notice, tribute, or announcement of passing.
+- personal_story: A first-person lived experience — addiction, grief, mental health, a personal testimony or plea for help. The person is sharing their own story, not reporting news. Use this when the submission is written in the first person about the contributor's own life.
+- other: Does not fit any of the above.
 
 Categories available:
 ${categoryList}
@@ -576,9 +587,10 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
     sport:     "real sports photography, telephoto lens, fast shutter speed, natural daylight, slight motion blur on movement, background crowd softly out of focus, captured mid-action like a real match photo, no hoardings or advertising boards visible",
     community: "real candid street photography, 50mm lens, natural light, unposed people, genuine interactions, slightly imperfect framing, like a real moment captured without staging, no close-up signage",
     business:  "real commercial photography, natural interior or exterior lighting, clean but realistic, not staged, no artificial glow or colour boost, no visible signage or text on surfaces",
-    warning:   "documentary-style photography, overcast or soft natural light, grounded tone, realistic environment, slightly muted colours, serious but natural atmosphere, no text-bearing objects in focus",
-    memorial:  "documentary-style photography, soft natural diffused light, quiet dignified scene, gentle muted tones, peaceful respectful atmosphere, no written text elements",
-    other:     "real candid photography, natural light, authentic unposed scene, documentary feel, clean realistic composition, no signs or text",
+    warning:        "documentary-style photography, overcast or soft natural light, grounded tone, realistic environment, slightly muted colours, serious but natural atmosphere, no text-bearing objects in focus",
+    memorial:       "documentary-style photography, soft natural diffused light, quiet dignified scene, gentle muted tones, peaceful respectful atmosphere, no written text elements",
+    personal_story: "documentary-style photography, soft natural light, quiet intimate scene, warm but understated colours, a sense of stillness and reflection, dignified and human, no text or signage",
+    other:          "real candid photography, natural light, authentic unposed scene, documentary feel, clean realistic composition, no signs or text",
   };
 
   const style = styleByTone[tone] ?? styleByTone.other;
@@ -877,14 +889,15 @@ async function writeArticle(
       : "";
 
   const toneGuide: Record<string, string> = {
-    community: "Tone: neutral and helpful. Informative without being dramatic. Friendly but factual.",
-    event:     "Tone: informative. Clearly communicate what's happening, when, where, and who it's for. No hype.",
-    sport:     "Tone: controlled energy. Enthusiastic but grounded — reflect the result or activity without over-celebrating or over-dramatising.",
-    warning:   "Tone: clear and urgent. Lead with the essential information. Short sentences. No softening language.",
-    memorial:  "Tone: respectful and minimal. Dignified, simple, no filler. Let the facts speak — avoid flowery or emotional language.",
-    news:      "Tone: neutral and factual. Report what happened. No editorial opinion.",
-    business:  "Tone: professional but accessible. Factual, concise, community-focused.",
-    other:     "Tone: neutral, clear, and factual.",
+    community:      "Tone: neutral and helpful. Informative without being dramatic. Friendly but factual.",
+    event:          "Tone: informative. Clearly communicate what's happening, when, where, and who it's for. No hype.",
+    sport:          "Tone: controlled energy. Enthusiastic but grounded — reflect the result or activity without over-celebrating or over-dramatising.",
+    warning:        "Tone: clear and urgent. Lead with the essential information. Short sentences. No softening language.",
+    memorial:       "Tone: respectful and minimal. Dignified, simple, no filler. Let the facts speak — avoid flowery or emotional language.",
+    news:           "Tone: neutral and factual. Report what happened. No editorial opinion.",
+    business:       "Tone: professional but accessible. Factual, concise, community-focused.",
+    personal_story: "Tone: compassionate and human. Preserve the contributor's voice. Do not summarise — write in first person from their perspective.",
+    other:          "Tone: neutral, clear, and factual.",
   };
   const toneInstruction = toneGuide[tone.tone] ?? toneGuide.other;
 
@@ -995,6 +1008,51 @@ async function writeArticle(
   });
 
   logUsage(ctx, "gpt-4o", "write_article", response.usage ?? undefined);
+  return response.choices[0].message.content?.trim() ?? "";
+}
+
+// ---------------------------------------------------------------------------
+// Stage 6 (personal story variant) — Community Voices article (GPT-4o)
+// ---------------------------------------------------------------------------
+
+async function writePersonalStoryArticle(
+  openai: OpenAI,
+  combinedText: string,
+  ctx: UsageCtx,
+): Promise<string> {
+  const systemPrompt = [
+    "You are a compassionate editor for Tallaght Community, a local news platform for Tallaght, Dublin, Ireland.",
+    "You handle a special section called 'Community Voices' — first-person stories from local residents sharing lived experiences.",
+    "",
+    "Your job is to gently shape the contributor's message into a publishable Community Voices piece.",
+    "",
+    "CORE PRINCIPLES:",
+    "1. PRESERVE THE CONTRIBUTOR'S VOICE — write in the first person, as if the contributor wrote it themselves.",
+    "   - Do not convert to third person. Do not summarise. Do not report it as news.",
+    "   - If they wrote 'I was struggling', keep 'I was struggling'. Do not write 'A local resident struggled'.",
+    "2. CLEAN FOR CLARITY AND DIGNITY — fix grammar, remove filler words, and smooth sentences where needed.",
+    "   - But do not change the meaning, the emotion, or the facts they shared.",
+    "   - If something is unclear, leave it as-is rather than guess.",
+    "3. COMPASSIONATE TONE — the writing should feel warm, honest, and dignified.",
+    "   - No clinical language. No dramatic language. Just a real person's words, carefully tidied.",
+    "4. DO NOT ADD anything that was not in the original message — no background, no statistics, no context.",
+    "5. LENGTH — write to the natural length of what was shared. Do not pad.",
+    "   - Short submission: 80–150 words. Longer submission: up to 300 words.",
+    "6. OUTPUT — the article body only. No headline, no byline, no category label.",
+    "   - Begin with the contributor's first-person voice immediately.",
+    "7. SENSITIVITY — if the submission mentions self-harm, addiction, grief, or trauma, treat it with full respect.",
+    "   - Do not sensationalise. Do not minimise.",
+  ].join("\n");
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: combinedText },
+    ],
+  });
+
+  logUsage(ctx, "gpt-4o", "write_personal_story", response.usage ?? undefined);
   return response.choices[0].message.content?.trim() ?? "";
 }
 
@@ -1276,14 +1334,23 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   }
 
   // --- Stage 7: Write article ---
-  // Minimal mode activates when both the completeness score is low AND the raw submission
-  // is thin. A long submission (opinion pieces, detailed community messages) should always
-  // get full article treatment — don't cap it at 1-3 sentences just because it lacks
-  // structured who/what/where/when facts.
-  const submissionWordCount = combinedText.trim().split(/\s+/).filter(Boolean).length;
-  const minimalMode = infoResult.completenessScore <= 0.75 && submissionWordCount < 50;
-  logger.info({ submissionId, minimalMode }, "AI pipeline: writing article");
-  const articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode, entityTrends);
+  // Personal stories use a dedicated writer that preserves the contributor's first-person voice.
+  // All other tones use the standard article writer.
+  const isPersonalStory = toneResult.tone === "personal_story";
+  let articleBody: string;
+  if (isPersonalStory) {
+    logger.info({ submissionId }, "AI pipeline: writing personal story (Community Voices)");
+    articleBody = await writePersonalStoryArticle(openai, combinedText, ctx);
+  } else {
+    // Minimal mode activates when both the completeness score is low AND the raw submission
+    // is thin. A long submission (opinion pieces, detailed community messages) should always
+    // get full article treatment — don't cap it at 1-3 sentences just because it lacks
+    // structured who/what/where/when facts.
+    const submissionWordCount = combinedText.trim().split(/\s+/).filter(Boolean).length;
+    const minimalMode = infoResult.completenessScore <= 0.75 && submissionWordCount < 50;
+    logger.info({ submissionId, minimalMode }, "AI pipeline: writing article");
+    articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode, entityTrends);
+  }
 
   // --- Stage 7b: Fact-check ---
   logger.info({ submissionId }, "AI pipeline: fact-checking article");
@@ -1322,8 +1389,9 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   }
 
   // --- Create the post ---
-  // Soft safety flag OR fact-check FAIL forces "held" — editor must review before the article can go live
-  const postStatus = (confidence >= 0.75 && factCheck.result === "PASS" && !softFlagged) ? "published" : "held";
+  // Personal stories are ALWAYS held — editors must review before any personal story can go live.
+  // Soft safety flag OR fact-check FAIL also forces "held".
+  const postStatus = (isPersonalStory || confidence < 0.75 || factCheck.result !== "PASS" || softFlagged) ? "held" : "published";
 
   // --- Stage 7.5: Entity matching (with centrality check) ---
   logger.info({ submissionId }, "AI pipeline: matching entities");
@@ -1384,6 +1452,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
       headerImageUrl: headerImagePath ?? undefined,
       imagePrompt: headerImagePrompt ?? undefined,
       bodyImages: bodyImagePaths,
+      tone: toneResult.tone,
     })
     .returning();
 

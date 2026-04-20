@@ -87,6 +87,15 @@ export default function ReviewQueue() {
           {posts.map((post) => (
             <div key={post.id} className="bg-white border border-border rounded-xl overflow-hidden">
               <div className="p-5">
+                {post.tone === "personal_story" && (
+                  <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2.5 mb-3">
+                    <span className="text-base leading-none mt-0.5">💜</span>
+                    <div>
+                      <p className="text-xs font-semibold text-purple-800">Personal Story — Handle with Care</p>
+                      <p className="text-xs text-purple-700 mt-0.5">This is a first-person lived experience. Read in full before making any decision. Never auto-publish. Preserve the contributor's voice and dignity.</p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-foreground leading-tight">{post.title}</h3>
@@ -99,6 +108,9 @@ export default function ReviewQueue() {
                       )}
                       {post.wordCount && (
                         <span className="text-xs text-muted-foreground">{post.wordCount} words</span>
+                      )}
+                      {post.tone && (
+                        <span className="text-xs text-muted-foreground capitalize">{post.tone.replace("_", " ")}</span>
                       )}
                     </div>
                     {post.excerpt && (
@@ -155,8 +167,29 @@ export default function ReviewQueue() {
                     </div>
                   ) : null}
 
+                  {/* Original WhatsApp message */}
+                  {(post.sourceRawText || post.sourceVoiceTranscript) && (
+                    <div className="px-5 pt-4">
+                      <div className="bg-gray-100 border border-gray-200 rounded-xl px-4 py-3">
+                        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Original message</p>
+                        {post.sourceRawText && (
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{post.sourceRawText}</p>
+                        )}
+                        {post.sourceVoiceTranscript && (
+                          <div className={post.sourceRawText ? "mt-2 pt-2 border-t border-gray-300" : ""}>
+                            <p className="text-xs text-gray-400 mb-1">Voice note transcript</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed italic">{post.sourceVoiceTranscript}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Article body */}
                   <div className="px-5 py-4">
+                    <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+                      {post.tone === "personal_story" ? "Community Voices draft" : "AI-generated article"}
+                    </p>
                     <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap text-sm leading-relaxed">
                       {post.body}
                     </div>

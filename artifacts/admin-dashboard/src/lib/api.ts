@@ -180,9 +180,12 @@ export interface Post {
   headerImageUrl: string | null;
   bodyImages: string[] | null;
   imagePrompt: string | null;
+  tone: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  sourceRawText: string | null;
+  sourceVoiceTranscript: string | null;
 }
 
 export interface Category {

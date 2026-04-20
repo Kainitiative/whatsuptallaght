@@ -102,14 +102,18 @@ router.get("/posts", async (req, res) => {
         isSponsored: postsTable.isSponsored,
         isFeatured: postsTable.isFeatured,
         starRating: postsTable.starRating,
+        tone: postsTable.tone,
         publishedAt: postsTable.publishedAt,
         createdAt: postsTable.createdAt,
         updatedAt: postsTable.updatedAt,
         sourceName: rssFeedsTable.name,
+        sourceRawText: submissionsTable.rawText,
+        sourceVoiceTranscript: submissionsTable.voiceTranscript,
       })
       .from(postsTable)
       .leftJoin(rssItemsTable, eq(rssItemsTable.postId, postsTable.id))
       .leftJoin(rssFeedsTable, eq(rssFeedsTable.id, rssItemsTable.feedId))
+      .leftJoin(submissionsTable, eq(submissionsTable.id, postsTable.sourceSubmissionId))
       .where(whereClause)
       .orderBy(desc(postsTable.createdAt))
       .limit(limit)
