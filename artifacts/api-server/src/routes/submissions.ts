@@ -1,9 +1,43 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { submissionsTable } from "@workspace/db/schema";
-import { eq, desc, count, and } from "drizzle-orm";
+import { submissionsTable, contributorsTable } from "@workspace/db/schema";
+import { eq, desc, count, and, inArray, isNotNull } from "drizzle-orm";
 
 const router = Router();
+
+router.get("/submissions/story-consents", async (req, res) => {
+  try {
+    const awaiting = await db
+      .select()
+      .from(submissionsTable)
+      .where(eq(submissionsTable.status, "awaiting_consent"))
+      .orderBy(desc(submissionsTable.updatedAt));
+
+    if (awaiting.length === 0) return res.json([]);
+
+    const contributorIds = [...new Set(awaiting.map((s) => s.contributorId).filter(Boolean))] as number[];
+    const contributors = contributorIds.length
+      ? await db
+          .select()
+          .from(contributorsTable)
+          .where(inArray(contributorsTable.id, contributorIds))
+      : [];
+
+    const consentedIds = new Set(contributors.filter((c) => c.consentStatus === "consented").map((c) => c.id));
+    const contributorMap = Object.fromEntries(contributors.map((c) => [c.id, c]));
+
+    const storyConsents = awaiting
+      .filter((s) => s.contributorId !== null && consentedIds.has(s.contributorId))
+      .map((s) => ({
+        ...s,
+        contributor: s.contributorId ? (contributorMap[s.contributorId] ?? null) : null,
+      }));
+
+    res.json(storyConsents);
+  } catch (err) {
+    res.status(500).json({ error: "internal_error", message: "Failed to fetch story consents" });
+  }
+});
 
 router.get("/submissions", async (req, res) => {
   const page = Math.max(1, parseInt(String(req.query.page ?? "1")));

@@ -7,6 +7,7 @@ import { isEncryptionKeySet } from "./lib/encryption";
 import { startQueueWorker } from "./lib/queue-worker";
 import { startRssScheduler } from "./lib/rss-fetcher";
 import { startWeekendRoundupScheduler } from "./lib/weekend-roundup-scheduler";
+import { startConsentExpiryScheduler } from "./lib/consent-expiry-scheduler";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { db } from "@workspace/db";
 import path from "path";
@@ -60,6 +61,7 @@ async function start() {
     startQueueWorker();
     startRssScheduler();
     startWeekendRoundupScheduler();
+    startConsentExpiryScheduler();
   });
 }
 

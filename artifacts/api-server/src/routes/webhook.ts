@@ -266,6 +266,68 @@ async function handleIncomingMessage(
     return;
   }
 
+  // --- Phase 3: Story consent reply check ---
+  // For already-consented contributors, a YES or NO may be a response to a personal
+  // story consent request. Check before treating the message as a new submission.
+  if (consentStatus === "consented") {
+    const replyNorm = rawText.trim().toUpperCase();
+    if (replyNorm === "YES" || replyNorm === "NO") {
+      const pendingStoryConsent = await db
+        .select()
+        .from(submissionsTable)
+        .where(
+          and(
+            eq(submissionsTable.contributorId, contributor.id),
+            eq(submissionsTable.status, "awaiting_consent"),
+          ),
+        )
+        .limit(1);
+
+      if (pendingStoryConsent.length > 0) {
+        const held = pendingStoryConsent[0];
+
+        if (replyNorm === "YES") {
+          await db
+            .update(submissionsTable)
+            .set({ status: "pending", updatedAt: new Date() })
+            .where(eq(submissionsTable.id, held.id));
+
+          await db.insert(jobQueueTable).values({
+            jobType: "PROCESS_WHATSAPP_SUBMISSION",
+            payload: {
+              submissionId: held.id,
+              phoneNumber,
+              contributorId: contributor.id,
+              storyConsentGiven: true,
+            },
+            status: "pending",
+            maxAttempts: 3,
+          });
+
+          logger.info({ submissionId: held.id, phoneHash }, "Story consent granted — queued for article generation");
+
+          await sendTextMessage(
+            phoneNumber,
+            "💜 Thank you. Your story is now with our editorial team. We'll handle it with care and let you know when it's published.",
+          ).catch(() => {});
+        } else {
+          await db
+            .update(submissionsTable)
+            .set({ status: "rejected", rejectionReason: "contributor_declined_story_consent", updatedAt: new Date() })
+            .where(eq(submissionsTable.id, held.id));
+
+          logger.info({ submissionId: held.id, phoneHash }, "Story consent declined by contributor");
+
+          await sendTextMessage(
+            phoneNumber,
+            "No problem at all — your story will stay private and won't be published. Thank you for sharing it with us. 💜",
+          ).catch(() => {});
+        }
+        return;
+      }
+    }
+  }
+
   // --- Consented — normal submission flow ---
   const mediaIds: string[] = [];
   if (message.image?.id) mediaIds.push(message.image.id);

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getPosts, updatePost, getPostSource, type Post } from "@/lib/api";
+import { getPosts, updatePost, getPostSource, getStoryConsents, type Post, type StoryConsent } from "@/lib/api";
 import { formatDate, confidenceColour } from "@/lib/utils";
 import ArticleEditModal from "@/components/ArticleEditModal";
 
@@ -16,12 +16,18 @@ export default function ReviewQueue() {
   const [editPost, setEditPost] = useState<Post | null>(null);
   const [sources, setSources] = useState<Record<number, PostSource>>({});
   const [loadingSource, setLoadingSource] = useState<number | null>(null);
+  const [storyConsents, setStoryConsents] = useState<StoryConsent[]>([]);
+  const [expandedConsent, setExpandedConsent] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getPosts({ status: "held", limit: 50 });
+      const [data, consents] = await Promise.all([
+        getPosts({ status: "held", limit: 50 }),
+        getStoryConsents(),
+      ]);
       setPosts(data.posts);
+      setStoryConsents(consents);
     } finally {
       setLoading(false);
     }
@@ -100,6 +106,67 @@ export default function ReviewQueue() {
         </div>
         <button onClick={load} className="text-sm text-primary hover:underline">Refresh</button>
       </div>
+
+      {/* Awaiting Consent section */}
+      {storyConsents.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base">💜</span>
+            <h2 className="text-sm font-semibold text-purple-800">Awaiting Contributor Consent</h2>
+            <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+              {storyConsents.length}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {storyConsents.map((consent) => {
+              const isOpen = expandedConsent === consent.id;
+              const hoursWaiting = Math.floor((Date.now() - new Date(consent.updatedAt).getTime()) / 3600000);
+              return (
+                <div key={consent.id} className="bg-purple-50 border border-purple-200 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-purple-900">
+                        {consent.contributor?.displayName ?? "Anonymous contributor"}
+                      </p>
+                      <p className="text-xs text-purple-600 mt-0.5">
+                        Consent requested {hoursWaiting}h ago · waiting for YES or NO reply
+                      </p>
+                      {!isOpen && consent.rawText && (
+                        <p className="text-xs text-purple-700 mt-1 line-clamp-1 italic">"{consent.rawText}"</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setExpandedConsent(isOpen ? null : consent.id)}
+                      className="text-xs border border-purple-300 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition-colors flex-shrink-0"
+                    >
+                      {isOpen ? "Hide" : "Read"}
+                    </button>
+                  </div>
+                  {isOpen && (
+                    <div className="border-t border-purple-200 px-4 py-3">
+                      <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">Original message</p>
+                      {consent.rawText && (
+                        <p className="text-sm text-purple-900 whitespace-pre-wrap leading-relaxed">{consent.rawText}</p>
+                      )}
+                      {consent.voiceTranscript && (
+                        <div className={consent.rawText ? "mt-2 pt-2 border-t border-purple-200" : ""}>
+                          <p className="text-xs text-purple-500 mb-1">Voice note transcript</p>
+                          <p className="text-sm text-purple-900 whitespace-pre-wrap leading-relaxed italic">{consent.voiceTranscript}</p>
+                        </div>
+                      )}
+                      <div className="mt-3 p-2.5 bg-purple-100 rounded-lg">
+                        <p className="text-xs text-purple-700">
+                          <span className="font-semibold">Waiting for contributor:</span> They've been sent a WhatsApp message asking if they want this published. It will expire automatically after 48 hours if no reply is received.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {posts.length === 0 ? (
         <div className="bg-white border border-border rounded-xl p-12 text-center">

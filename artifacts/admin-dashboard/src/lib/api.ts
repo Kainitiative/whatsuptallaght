@@ -190,6 +190,23 @@ export async function getPostSource(id: number): Promise<{ sourceRawText: string
   return request(`/posts/${id}/source`);
 }
 
+export interface StoryConsent {
+  id: number;
+  rawText: string | null;
+  voiceTranscript: string | null;
+  updatedAt: string;
+  createdAt: string;
+  contributor: {
+    id: number;
+    displayName: string | null;
+    phoneHash: string;
+  } | null;
+}
+
+export async function getStoryConsents(): Promise<StoryConsent[]> {
+  return request("/submissions/story-consents");
+}
+
 export interface Category {
   id: number;
   name: string;

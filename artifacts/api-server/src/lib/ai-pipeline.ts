@@ -15,6 +15,7 @@ import {
   eventsTable,
   headerImageAssetsTable,
   entityPagesTable,
+  contributorsTable,
 } from "@workspace/db/schema";
 import { eq, desc, isNotNull } from "drizzle-orm";
 import { getSettingValue } from "../routes/settings";
@@ -1130,10 +1131,11 @@ export interface PipelinePayload {
   submissionId: number;
   phoneNumber: string;
   contributorId: number;
+  storyConsentGiven?: boolean;
 }
 
 export async function processWhatsAppSubmission(payload: PipelinePayload & { jobId?: number }): Promise<void> {
-  const { submissionId, phoneNumber, contributorId, jobId } = payload;
+  const { submissionId, phoneNumber, contributorId, jobId, storyConsentGiven } = payload;
   const ctx: UsageCtx = { submissionId, jobId };
 
   logger.info({ submissionId }, "AI pipeline: starting");
@@ -1333,10 +1335,41 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     );
   }
 
+  // --- Phase 3: Story consent gate ---
+  // Personal stories from already-consented contributors require explicit per-story
+  // consent before we generate an article. This ensures vulnerable contributors who
+  // share deeply personal content always have final say on publication.
+  const isPersonalStory = toneResult.tone === "personal_story";
+
+  if (isPersonalStory && !payload.storyConsentGiven) {
+    const [contributor] = await db
+      .select({ consentStatus: contributorsTable.consentStatus })
+      .from(contributorsTable)
+      .where(eq(contributorsTable.id, contributorId))
+      .limit(1);
+
+    if (contributor?.consentStatus === "consented") {
+      logger.info({ submissionId }, "AI pipeline: personal story — requesting story-level consent from contributor");
+
+      await db
+        .update(submissionsTable)
+        .set({ status: "awaiting_consent", updatedAt: new Date() })
+        .where(eq(submissionsTable.id, submissionId));
+
+      await sendTextMessage(
+        phoneNumber,
+        "💜 Thanks for sharing your story with us.\n\nWould you like us to publish it on What's Up Tallaght? Reply *YES* to confirm, or *NO* to keep it private.\n\nYour story will be treated with care and dignity, and handled by a human editor before anything is published.",
+      ).catch(() => {});
+
+      return;
+    }
+    // Contributor is pending/declined — fall through to normal flow.
+    // General terms consent flow will hold it, or the article routes to held for editor review.
+  }
+
   // --- Stage 7: Write article ---
   // Personal stories use a dedicated writer that preserves the contributor's first-person voice.
   // All other tones use the standard article writer.
-  const isPersonalStory = toneResult.tone === "personal_story";
   let articleBody: string;
   if (isPersonalStory) {
     logger.info({ submissionId }, "AI pipeline: writing personal story (Community Voices)");
