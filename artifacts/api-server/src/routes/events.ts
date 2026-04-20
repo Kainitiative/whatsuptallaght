@@ -107,6 +107,35 @@ router.get("/public/events", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Public — get event linked to a specific article slug
+// ---------------------------------------------------------------------------
+
+router.get("/public/events/by-article/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const [event] = await db
+      .select({
+        id: eventsTable.id,
+        title: eventsTable.title,
+        eventDate: eventsTable.eventDate,
+        eventTime: eventsTable.eventTime,
+        endTime: eventsTable.endTime,
+        location: eventsTable.location,
+        status: eventsTable.status,
+      })
+      .from(eventsTable)
+      .innerJoin(postsTable, eq(eventsTable.articleId, postsTable.id))
+      .where(and(eq(postsTable.slug, slug), eq(eventsTable.status, "upcoming")))
+      .limit(1);
+
+    if (!event) return res.json(null);
+    res.json(event);
+  } catch (err) {
+    res.status(500).json({ error: "internal_error", message: "Failed to fetch event" });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Admin — list all events
 // ---------------------------------------------------------------------------
 

@@ -4,7 +4,7 @@ import { getSettingValue } from "./settings";
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// In-memory cache (30-minute TTL — weather doesn't change faster than this)
+// In-memory caches (30-minute TTL)
 // ---------------------------------------------------------------------------
 
 interface WeatherCache {
@@ -12,7 +12,14 @@ interface WeatherCache {
   expiresAt: number;
 }
 
-let cache: WeatherCache | null = null;
+interface DayCache {
+  data: DayForecast;
+  expiresAt: number;
+}
+
+let cache7: WeatherCache | null = null;
+let cache16: WeatherCache | null = null;
+const dayCache: Record<string, DayCache> = {};
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
@@ -40,7 +47,25 @@ function windDirection(deg: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Response shape
+// Rule-based human weather message (exported for server-side use)
+// ---------------------------------------------------------------------------
+
+export function generateWeatherMessage(
+  tempMax: number,
+  precipProbMax: number,
+  conditionCode: number,
+  placeName: string,
+): string {
+  const isSunny = conditionCode <= 2;
+  if (tempMax >= 20 && isSunny) return "Looks like a lovely day — sun cream wouldn't go amiss.";
+  if (precipProbMax > 60) return "Rain is likely — worth packing an umbrella.";
+  if (tempMax <= 4) return "It's going to be bitter — wrap up well.";
+  if (tempMax <= 10 && precipProbMax > 40) return "A cold, wet one — the classic Irish combo.";
+  return `Typical ${placeName} weather expected — be prepared for anything.`;
+}
+
+// ---------------------------------------------------------------------------
+// Response shapes
 // ---------------------------------------------------------------------------
 
 export interface WeatherResponse {
@@ -57,15 +82,15 @@ export interface WeatherResponse {
     condition: { label: string; emoji: string };
   };
   hourly: Array<{
-    time: string;       // ISO
-    hour: string;       // "14:00"
+    time: string;
+    hour: string;
     temp: number;
     precipProb: number;
     condition: { label: string; emoji: string };
   }>;
   daily: Array<{
-    date: string;       // "2025-04-20"
-    dayLabel: string;   // "Mon", "Tue" etc
+    date: string;
+    dayLabel: string;
     tempMax: number;
     tempMin: number;
     precipSum: number;
@@ -74,11 +99,22 @@ export interface WeatherResponse {
   }>;
 }
 
+export interface DayForecast {
+  date: string;
+  dayLabel: string;
+  tempMax: number;
+  tempMin: number;
+  precipProbMax: number;
+  condition: { label: string; emoji: string };
+  message: string;
+  placeName: string;
+}
+
 // ---------------------------------------------------------------------------
-// Fetch from Open-Meteo (free, no key required)
+// Fetch from Open-Meteo
 // ---------------------------------------------------------------------------
 
-async function fetchWeather(lat: number, lon: number): Promise<WeatherResponse> {
+async function fetchWeather(lat: number, lon: number, forecastDays = 7): Promise<WeatherResponse> {
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
@@ -101,7 +137,7 @@ async function fetchWeather(lat: number, lon: number): Promise<WeatherResponse> 
       "precipitation_probability_max",
     ].join(","),
     timezone: "Europe/Dublin",
-    forecast_days: "7",
+    forecast_days: String(forecastDays),
   });
 
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
@@ -112,7 +148,6 @@ async function fetchWeather(lat: number, lon: number): Promise<WeatherResponse> 
   const h = raw.hourly as Record<string, number[]>;
   const d = raw.daily as Record<string, (number | string)[]>;
 
-  // Only return the next 12 hourly slots from now
   const nowHour = new Date().getHours();
   const startIdx = h.time.findIndex((t: string) => {
     const hour = new Date(t).getHours();
@@ -142,7 +177,7 @@ async function fetchWeather(lat: number, lon: number): Promise<WeatherResponse> 
   });
 
   return {
-    placeName: "", // filled in by the route
+    placeName: "",
     fetchedAt: new Date().toISOString(),
     current: {
       temp: Math.round(c.temperature_2m as number),
@@ -160,15 +195,70 @@ async function fetchWeather(lat: number, lon: number): Promise<WeatherResponse> 
 }
 
 // ---------------------------------------------------------------------------
-// Public: GET /public/weather
+// Internal export: fetch forecast for a specific date (used by schedulers)
 // ---------------------------------------------------------------------------
 
-router.get("/public/weather", async (_req, res) => {
+export async function getWeatherForDate(date: string): Promise<DayForecast | null> {
   try {
     const now = Date.now();
+    const cached = dayCache[date];
+    if (cached && cached.expiresAt > now) return cached.data;
 
-    if (cache && cache.expiresAt > now) {
-      return res.json(cache.data);
+    const [latStr, lonStr, placeName] = await Promise.all([
+      getSettingValue("weather_lat"),
+      getSettingValue("weather_lon"),
+      getSettingValue("weather_place_name"),
+    ]);
+
+    const lat = latStr ? parseFloat(latStr) : 53.2877;
+    const lon = lonStr ? parseFloat(lonStr) : -6.3664;
+    const name = placeName ?? "Tallaght";
+
+    // Use cached 16-day data if available, otherwise fetch
+    let weather: WeatherResponse;
+    if (cache16 && cache16.expiresAt > now) {
+      weather = cache16.data;
+    } else {
+      weather = await fetchWeather(lat, lon, 16);
+      weather.placeName = name;
+      cache16 = { data: weather, expiresAt: now + CACHE_TTL_MS };
+    }
+
+    const day = weather.daily.find((d) => d.date === date);
+    if (!day) return null;
+
+    const result: DayForecast = {
+      date: day.date,
+      dayLabel: day.dayLabel,
+      tempMax: day.tempMax,
+      tempMin: day.tempMin,
+      precipProbMax: day.precipProbMax,
+      condition: day.condition,
+      message: generateWeatherMessage(day.tempMax, day.precipProbMax, 0, name),
+      placeName: name,
+    };
+
+    dayCache[date] = { data: result, expiresAt: now + CACHE_TTL_MS };
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public: GET /public/weather   (7-day, existing endpoint — unchanged shape)
+// Optional ?days=16 for extended forecast
+// ---------------------------------------------------------------------------
+
+router.get("/public/weather", async (req, res) => {
+  try {
+    const requestedDays = Math.min(16, Math.max(1, parseInt(String(req.query.days ?? "7")) || 7));
+    const use16 = requestedDays > 7;
+    const now = Date.now();
+
+    const activeCache = use16 ? cache16 : cache7;
+    if (activeCache && activeCache.expiresAt > now) {
+      return res.json(activeCache.data);
     }
 
     const [latStr, lonStr, placeName] = await Promise.all([
@@ -181,14 +271,40 @@ router.get("/public/weather", async (_req, res) => {
     const lon = lonStr ? parseFloat(lonStr) : -6.3664;
     const name = placeName ?? "Tallaght";
 
-    const data = await fetchWeather(lat, lon);
+    const data = await fetchWeather(lat, lon, requestedDays);
     data.placeName = name;
 
-    cache = { data, expiresAt: now + CACHE_TTL_MS };
+    if (use16) {
+      cache16 = { data, expiresAt: now + CACHE_TTL_MS };
+    } else {
+      cache7 = { data, expiresAt: now + CACHE_TTL_MS };
+    }
 
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: "weather_fetch_failed", message: "Could not fetch weather data. Please try again shortly." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Public: GET /public/weather/day?date=YYYY-MM-DD
+// Returns a single day's forecast with a human message, or 404 if out of range
+// ---------------------------------------------------------------------------
+
+router.get("/public/weather/day", async (req, res) => {
+  const date = String(req.query.date ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: "validation_error", message: "date must be YYYY-MM-DD" });
+  }
+
+  try {
+    const forecast = await getWeatherForDate(date);
+    if (!forecast) {
+      return res.status(404).json({ error: "not_found", message: "Date is outside the 16-day forecast window" });
+    }
+    res.json(forecast);
+  } catch (err) {
+    res.status(502).json({ error: "weather_fetch_failed", message: "Could not fetch weather data." });
   }
 });
 

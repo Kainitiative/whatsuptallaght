@@ -9,6 +9,7 @@ import {
 import { eq, gte, lte, and, asc } from "drizzle-orm";
 import { logger } from "./logger";
 import { getSettingValue } from "../routes/settings";
+import { getWeatherForDate, generateWeatherMessage, type DayForecast } from "../routes/weather";
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -153,6 +154,44 @@ async function fetchWeekendEvents(
 }
 
 // ---------------------------------------------------------------------------
+// Fetch 3-day weekend weather forecast (Fri / Sat / Sun)
+// ---------------------------------------------------------------------------
+
+async function fetchWeekendWeather(
+  friday: string,
+  saturday: string,
+  sunday: string,
+): Promise<{ friday: DayForecast | null; saturday: DayForecast | null; sunday: DayForecast | null }> {
+  const [fri, sat, sun] = await Promise.allSettled([
+    getWeatherForDate(friday),
+    getWeatherForDate(saturday),
+    getWeatherForDate(sunday),
+  ]);
+  return {
+    friday:   fri.status  === "fulfilled" ? fri.value  : null,
+    saturday: sat.status  === "fulfilled" ? sat.value  : null,
+    sunday:   sun.status  === "fulfilled" ? sun.value  : null,
+  };
+}
+
+function buildWeatherBlock(
+  fri: DayForecast | null,
+  sat: DayForecast | null,
+  sun: DayForecast | null,
+): string | null {
+  const lines: string[] = [];
+  const fmt = (label: string, d: DayForecast) =>
+    `${label}: ${d.condition.emoji} ${d.condition.label}, high ${d.tempMax}°C, ${d.precipProbMax}% chance of rain. ${generateWeatherMessage(d.tempMax, d.precipProbMax, 0, d.placeName)}`;
+
+  if (fri) lines.push(fmt("Friday", fri));
+  if (sat) lines.push(fmt("Saturday", sat));
+  if (sun) lines.push(fmt("Sunday", sun));
+
+  if (lines.length === 0) return null;
+  return "WEEKEND WEATHER FORECAST:\n" + lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Format an event for the GPT prompt
 // ---------------------------------------------------------------------------
 
@@ -188,6 +227,7 @@ function buildEventsBlock(events: WeekendEvent[]): string {
 async function generateRoundupArticle(
   events: WeekendEvent[],
   whatsappNumber: string,
+  weatherBlock: string | null,
 ): Promise<{ title: string; body: string; slug: string } | null> {
   const apiKey = await getSettingValue("openai_api_key");
   if (!apiKey) {
@@ -219,11 +259,23 @@ async function generateRoundupArticle(
     "- Keep the article practical and easy to scan. Focus on what's happening, when, and where. Avoid long introductions or overly descriptive language.",
     "- Length: 200–450 words total.",
     "- Output the article body ONLY — no headline, no byline, no markdown formatting.",
+    "",
+    "WEATHER RULES (if a forecast is provided):",
+    "- Sunny / warm (≥18°C, low rain chance): open with it enthusiastically, encourage people to get out and enjoy the weather.",
+    "- Mixed / day-dependent: weave in which day looks better and plan accordingly.",
+    "- Wet / cold: acknowledge briefly in the intro but keep the tone positive and highlight any indoor-friendly options.",
+    "- Integrate weather naturally into the opening paragraph — do NOT write a separate weather section.",
+    "- Do NOT mention specific percentages or degrees in the article — translate them into natural language.",
   ].join("\n");
+
+  const weatherSection = weatherBlock
+    ? `\n\nWeather context for your opening (use this to set the tone, not as a separate section):\n${weatherBlock}`
+    : "";
 
   const userPrompt =
     `Write a 'Things to Do in Tallaght This Weekend' article using the following events:\n\n` +
     eventsBlock +
+    weatherSection +
     `\n\nCall to action to include verbatim at the end:\n${cta}`;
 
   let body = "";
@@ -316,7 +368,21 @@ async function runRoundupCheck(): Promise<void> {
   const whatsappNumber =
     (await getSettingValue("platform_whatsapp_display_number")) ?? "+353 85 714 1023";
 
-  const article = await generateRoundupArticle(events, whatsappNumber);
+  // Try to fetch weather — fall back silently if unavailable
+  let weatherBlock: string | null = null;
+  try {
+    const w = await fetchWeekendWeather(friday, saturday, sunday);
+    weatherBlock = buildWeatherBlock(w.friday, w.saturday, w.sunday);
+    if (weatherBlock) {
+      logger.info("Weekend roundup: weather forecast included in prompt");
+    } else {
+      logger.info("Weekend roundup: weather not available — generating without forecast");
+    }
+  } catch (err) {
+    logger.warn({ err }, "Weekend roundup: weather fetch failed — generating without forecast");
+  }
+
+  const article = await generateRoundupArticle(events, whatsappNumber, weatherBlock);
   if (!article) return;
 
   const excerpt = article.body.split(". ").slice(0, 2).join(". ") + ".";

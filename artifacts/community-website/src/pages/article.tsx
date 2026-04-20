@@ -1,6 +1,7 @@
 import { useRoute } from "wouter";
 import { format } from "date-fns";
 import { Helmet } from "react-helmet-async";
+import { useEffect, useState } from "react";
 import { 
   useGetPostBySlug, 
   getGetPostBySlugQueryKey,
@@ -20,10 +21,33 @@ import { getCategoryBadgeStyle } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { WhatsAppLoopCTA } from "@/components/whatsapp-loop-cta";
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+interface LinkedEvent {
+  id: number;
+  title: string;
+  eventDate: string;
+  eventTime: string | null;
+  location: string | null;
+}
+
+interface DayForecast {
+  date: string;
+  dayLabel: string;
+  tempMax: number;
+  tempMin: number;
+  precipProbMax: number;
+  condition: { label: string; emoji: string };
+  message: string;
+  placeName: string;
+}
+
 export default function Article() {
   const [, params] = useRoute("/article/:slug");
   const slug = params?.slug;
   const { toast } = useToast();
+  const [linkedEvent, setLinkedEvent] = useState<LinkedEvent | null | undefined>(undefined);
+  const [eventWeather, setEventWeather] = useState<DayForecast | null>(null);
 
   const { data: post, isLoading, error } = useGetPostBySlug(slug || "", {
     query: {
@@ -134,6 +158,30 @@ export default function Article() {
     return withLinks.replace(/\n/g, "<br/>");
   }
 
+  // Fetch linked event when post loads
+  useEffect(() => {
+    if (!slug) return;
+    setLinkedEvent(undefined);
+    setEventWeather(null);
+    fetch(`${BASE}/api/public/events/by-article/${encodeURIComponent(slug)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((event: LinkedEvent | null) => {
+        setLinkedEvent(event);
+        if (!event) return;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const eventDate = new Date(event.eventDate + "T12:00:00");
+        const daysAway = Math.floor((eventDate.getTime() - today.getTime()) / 86400000);
+        if (daysAway >= 0 && daysAway <= 15) {
+          fetch(`${BASE}/api/public/weather/day?date=${event.eventDate}`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((w: DayForecast | null) => setEventWeather(w))
+            .catch(() => {});
+        }
+      })
+      .catch(() => setLinkedEvent(null));
+  }, [slug]);
+
   const relatedPosts = relatedData?.posts?.filter(p => p.id !== post.id).slice(0, 3) || [];
 
   const metaDescription = post.excerpt
@@ -239,6 +287,22 @@ export default function Article() {
             </Button>
           </div>
         </div>
+
+        {/* Weather callout — shown if this article has a linked upcoming event within 16 days */}
+        {eventWeather && (
+          <div className="mb-8 rounded-xl border border-sky-200 bg-sky-50 px-5 py-4 flex items-start gap-4">
+            <div className="text-3xl leading-none mt-0.5 flex-shrink-0">{eventWeather.condition.emoji}</div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="font-semibold text-sky-900 text-sm">
+                  {eventWeather.dayLabel} weather · {eventWeather.tempMax}°C
+                </span>
+                <span className="text-xs text-sky-600">{eventWeather.condition.label}</span>
+              </div>
+              <p className="text-sm text-sky-800 mt-0.5 leading-snug">{eventWeather.message}</p>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="prose prose-lg md:prose-xl max-w-none text-foreground prose-headings:font-bold prose-headings:text-foreground prose-a:text-accent">

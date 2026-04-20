@@ -53,6 +53,12 @@ const FILTERS: { key: FilterMode; label: string }[] = [
   { key: "past", label: "Past Events" },
 ];
 
+interface WeatherChip {
+  emoji: string;
+  tempMax: number;
+  label: string;
+}
+
 export default function EventsPage() {
   const [filter, setFilter] = useState<FilterMode>("upcoming");
   const [events, setEvents] = useState<PublicEvent[]>([]);
@@ -61,21 +67,35 @@ export default function EventsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [weekendRange, setWeekendRange] = useState<{ saturday: string; sunday: string } | null>(null);
+  const [weatherByDate, setWeatherByDate] = useState<Record<string, WeatherChip>>({});
 
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   async function load(f: FilterMode, p: number) {
     setLoading(true);
     try {
-      const res = await fetch(`${BASE}/api/public/events?status=${f}&page=${p}`);
-      if (!res.ok) throw new Error();
-      const data: EventsResponse = await res.json();
-      setEvents(data.events);
-      setTotal(data.total);
-      setTotalPages(data.totalPages);
-      setWeekendRange(data.weekendRange ?? null);
-    } catch {
-      setEvents([]);
+      const [eventsRes, weatherRes] = await Promise.allSettled([
+        fetch(`${BASE}/api/public/events?status=${f}&page=${p}`).then((r) => r.ok ? r.json() as Promise<EventsResponse> : Promise.reject()),
+        fetch(`${BASE}/api/public/weather?days=16`).then((r) => r.ok ? r.json() : null),
+      ]);
+
+      if (eventsRes.status === "fulfilled") {
+        const data = eventsRes.value;
+        setEvents(data.events);
+        setTotal(data.total);
+        setTotalPages(data.totalPages);
+        setWeekendRange(data.weekendRange ?? null);
+      } else {
+        setEvents([]);
+      }
+
+      if (weatherRes.status === "fulfilled" && weatherRes.value?.daily) {
+        const map: Record<string, WeatherChip> = {};
+        for (const d of weatherRes.value.daily) {
+          map[d.date] = { emoji: d.condition.emoji, tempMax: d.tempMax, label: d.condition.label };
+        }
+        setWeatherByDate(map);
+      }
     } finally {
       setLoading(false);
     }
@@ -152,6 +172,7 @@ export default function EventsPage() {
           {events.map((event) => {
             const { day, month, weekday } = formatEventDate(event.eventDate);
             const isWhatsApp = event.submissionSource === "whatsapp";
+            const chip = weatherByDate[event.eventDate];
             return (
               <div
                 key={event.id}
@@ -166,6 +187,11 @@ export default function EventsPage() {
                     <span className="text-xs font-semibold text-primary uppercase tracking-wider">{month}</span>
                     <span className="text-3xl font-bold text-primary leading-tight">{day}</span>
                     <span className="text-xs text-muted-foreground mt-0.5">{weekday.slice(0, 3)}</span>
+                    {chip && (
+                      <span className="mt-1.5 text-xs text-sky-700 bg-sky-50 border border-sky-200 rounded-full px-1.5 py-0.5 leading-tight whitespace-nowrap" title={chip.label}>
+                        {chip.emoji} {chip.tempMax}°
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 p-4 min-w-0">
                     <div className="flex items-start justify-between gap-2">
