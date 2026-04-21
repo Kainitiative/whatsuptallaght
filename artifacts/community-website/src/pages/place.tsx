@@ -178,15 +178,16 @@ export default function PlacePage() {
         {/* Hero — photo if available, otherwise a clean colour strip */}
         {heroPhoto ? (
           <div className="w-full overflow-hidden bg-black relative" style={{ aspectRatio: "21/7" }}>
-            <img
-              src={heroPhoto}
-              alt=""
+            {/* Blurred fill — CSS background so it is excluded from LCP */}
+            <div
               aria-hidden
-              className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl brightness-50 pointer-events-none select-none"
+              className="absolute inset-0 scale-110 blur-2xl brightness-50 pointer-events-none select-none"
+              style={{ backgroundImage: `url(${heroPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
             />
             <img
               src={heroPhoto}
               alt={page.name}
+              fetchPriority="high"
               className="relative w-full h-full object-contain object-center z-10"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent z-20" />

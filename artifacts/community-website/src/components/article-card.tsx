@@ -30,10 +30,10 @@ export function ArticleCard({
   
   // Try to use real provided images, fallback to generated
   const fallbackImages = [
-    '/images/tallaght-event.png',
-    '/images/tallaght-sport.png',
-    '/images/tallaght-business.png',
-    '/images/tallaght-news.png'
+    '/images/tallaght-event.webp',
+    '/images/tallaght-sport.webp',
+    '/images/tallaght-business.webp',
+    '/images/tallaght-news.webp'
   ];
   
   // Use post id to predictably pick a fallback if none provided
@@ -59,16 +59,16 @@ export function ArticleCard({
       <Link href={`/article/${post.slug}`}>
         <Card className="overflow-hidden border-0 shadow-md hover-elevate transition-all duration-300 group cursor-pointer bg-card h-full flex flex-col md:flex-row" data-testid={`card-post-featured-${post.id}`}>
           <div className="w-full md:w-2/3 h-64 md:h-80 relative overflow-hidden bg-black">
-            {/* Blurred backdrop so square logos/crests don't push the card height */}
-            <img
-              src={imageUrl}
-              alt=""
+            {/* Blurred backdrop — CSS background so it is excluded from LCP */}
+            <div
               aria-hidden
-              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl brightness-50 pointer-events-none select-none"
+              className="absolute inset-0 scale-110 blur-xl brightness-50 pointer-events-none select-none"
+              style={{ backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
             />
             <img 
               src={imageUrl} 
-              alt={post.title} 
+              alt={post.title}
+              fetchPriority="high"
               className="relative w-full h-full object-contain transition-transform duration-700 group-hover:scale-105 z-10"
             />
             <div className="absolute top-4 left-4 z-10">
@@ -112,16 +112,16 @@ export function ArticleCard({
     <Link href={`/article/${post.slug}`}>
       <Card className="overflow-hidden border border-card-border shadow-sm hover-elevate transition-all duration-300 group cursor-pointer bg-card h-full flex flex-col" data-testid={`card-post-${post.id}`}>
         <div className="w-full aspect-[4/3] relative overflow-hidden bg-black">
-          {/* Blurred fill — ensures no dark gaps for square logos or portrait crests */}
-          <img
-            src={imageUrl}
-            alt=""
+          {/* Blurred fill — CSS background so it is excluded from LCP */}
+          <div
             aria-hidden
-            className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl brightness-50 pointer-events-none select-none"
+            className="absolute inset-0 scale-110 blur-xl brightness-50 pointer-events-none select-none"
+            style={{ backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
           />
           <img 
             src={imageUrl} 
-            alt={post.title} 
+            alt={post.title}
+            loading="lazy"
             className="relative w-full h-full object-contain transition-transform duration-700 group-hover:scale-105 z-10"
           />
           <div className="absolute top-3 left-3 z-10">

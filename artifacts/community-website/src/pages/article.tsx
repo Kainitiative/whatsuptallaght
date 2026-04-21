@@ -230,18 +230,17 @@ export default function Article() {
            Blurred backdrop fills the 21:7 frame for any image shape (square logos,
            portrait crests, landscape photos) without cropping or stretching. */}
       <div className="w-full overflow-hidden bg-black relative" style={{ aspectRatio: "21/7" }}>
-        {/* Blurred fill layer — scaled up so no gaps at edges */}
-        <img
-          src={headerImageUrl}
-          alt=""
+        {/* Blurred fill layer — CSS background so it is excluded from LCP */}
+        <div
           aria-hidden
-          className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl brightness-50 pointer-events-none select-none"
-          style={{ display: "block" }}
+          className="absolute inset-0 scale-110 blur-2xl brightness-50 pointer-events-none select-none"
+          style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
         />
         {/* Main image — contained so logos/crests aren't cropped */}
         <img 
           src={headerImageUrl} 
           alt={post.title}
+          fetchPriority="high"
           className="relative w-full h-full object-contain object-center z-10"
           style={{ display: "block" }}
         />
