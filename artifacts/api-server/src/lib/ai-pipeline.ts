@@ -339,11 +339,11 @@ async function extractInfo(openai: OpenAI, combinedText: string, ctx: UsageCtx):
     messages: [
       {
         role: "system",
-        content: `You are an editor for a Tallaght, Dublin community news platform. Extract key information from this submission.
+        content: `You are an editor for a Tallaght, Dublin community news platform. Extract key information from this submission. Today's date is ${new Date().toISOString().split("T")[0]}.
 
 Respond in JSON:
 {
-  "headline": "Article headline for search. Up to 16 words. Must include the specific venue or place name if mentioned (e.g. 'Tallaght Library', 'Tallaght Stadium', 'Civic Theatre Tallaght' — not just 'the library'). For events, include month and year (e.g. 'Free Kids Workshop at Tallaght Library – April 2026'). Write how someone would search, not how a journalist would write a headline. Factual only — no invented details.",
+  "headline": "Article headline for search. Up to 16 words. Must include the specific venue or place name if mentioned (e.g. 'Tallaght Library', 'Tallaght Stadium', 'Civic Theatre Tallaght' — not just 'the library'). For events, include month and year (e.g. 'Free Kids Workshop at Tallaght Library – April 2026'). Use the current year unless the submission explicitly states a different year. Write how someone would search, not how a journalist would write a headline. Factual only — no invented details.",
   "location": "Specific area in Tallaght/Dublin or null",
   "eventDate": "ISO date string if an event date is mentioned, or null",
   "keyFacts": ["Array of up to 5 key facts from the submission"],
@@ -902,8 +902,10 @@ async function writeArticle(
   };
   const toneInstruction = toneGuide[tone.tone] ?? toneGuide.other;
 
+  const today = new Date().toISOString().split("T")[0];
   const systemPrompt = [
     "You are an editor for Tallaght Community, a local news platform for Tallaght, Dublin, Ireland.",
+    `Today's date is ${today}. Always use the current year when referring to dates unless the submission explicitly states a different year.`,
     "Your job is to rewrite community submissions into clean, readable news articles.",
     "",
     "VOICE: Tallaght Community writes like a local person sharing real updates — clear, simple, and grounded. It should feel like something you'd read on Facebook or hear from a neighbour.",
