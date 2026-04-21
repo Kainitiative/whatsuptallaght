@@ -79,6 +79,7 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   "gpt-4o": { input: 2.50, output: 10.00 },
   "gpt-4o-mini": { input: 0.15, output: 0.60 },
   "gpt-5": { input: 0.63, output: 5.00 },
+  "gpt-image-1-mini": { input: 0, output: 0 }, // flat cost logged directly as estimatedCostUsd
 };
 
 function calcCostUsd(model: string, inputTokens: number, outputTokens: number): number {
@@ -715,18 +716,19 @@ async function generateHeaderImage(
 
     const prompt = buildDallePrompt(headline, keyFacts, tone, entityContext);
     const response = await openai.images.generate({
-      model: "dall-e-3",
+      model: "gpt-image-1-mini",
       prompt,
       n: 1,
-      size: "1792x1024",
-      quality: "hd",
-      response_format: "url",
-    });
+      size: "1536x1024",
+      quality: "medium",
+      output_format: "jpeg",
+      output_compression: 80,
+    } as any);
 
-    const tempUrl = response.data?.[0]?.url;
-    if (!tempUrl) return null;
+    const b64 = response.data?.[0]?.b64_json;
+    if (!b64) return null;
 
-    const buffer = await downloadBuffer(tempUrl);
+    const buffer = Buffer.from(b64, "base64");
     const storedPath = await uploadImageBuffer(buffer, "image/jpeg");
     if (!storedPath) return null;
 
@@ -734,19 +736,19 @@ async function generateHeaderImage(
       .values({
         submissionId: ctx.submissionId,
         jobId: ctx.jobId,
-        model: "dall-e-3",
+        model: "gpt-image-1-mini",
         stage: "generate_image",
         inputTokens: 0,
         outputTokens: 0,
-        estimatedCostUsd: "0.040000",
+        estimatedCostUsd: "0.014000",
       })
       .execute()
-      .catch((err) => logger.warn({ err }, "Failed to log DALL·E usage"));
+      .catch((err) => logger.warn({ err }, "Failed to log image generation usage"));
 
     logger.info({ submissionId: ctx.submissionId }, "AI pipeline: header image generated");
     return { imageUrl: storedPath, imagePrompt: prompt };
   } catch (err) {
-    logger.error({ err, submissionId: ctx.submissionId }, "AI pipeline: DALL·E generation failed (non-fatal)");
+    logger.error({ err, submissionId: ctx.submissionId }, "AI pipeline: image generation failed (non-fatal)");
     return null;
   }
 }
