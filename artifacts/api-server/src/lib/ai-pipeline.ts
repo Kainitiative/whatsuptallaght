@@ -78,6 +78,7 @@ async function getOpenAI(): Promise<OpenAI> {
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   "gpt-4o": { input: 2.50, output: 10.00 },
   "gpt-4o-mini": { input: 0.15, output: 0.60 },
+  "gpt-5": { input: 0.63, output: 5.00 },
 };
 
 function calcCostUsd(model: string, inputTokens: number, outputTokens: number): number {
@@ -206,7 +207,7 @@ async function describeImage(openai: OpenAI, buffer: Buffer, mimeType: string, c
   const dataUrl = `data:${mimeType};base64,${base64}`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5",
     max_tokens: 600,
     messages: [
       {
@@ -1003,14 +1004,14 @@ async function writeArticle(
     .join("\n");
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
   });
 
-  logUsage(ctx, "gpt-4o", "write_article", response.usage ?? undefined);
+  logUsage(ctx, "gpt-5", "write_article", response.usage ?? undefined);
   return response.choices[0].message.content?.trim() ?? "";
 }
 
@@ -1048,14 +1049,14 @@ async function writePersonalStoryArticle(
   ].join("\n");
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: combinedText },
     ],
   });
 
-  logUsage(ctx, "gpt-4o", "write_personal_story", response.usage ?? undefined);
+  logUsage(ctx, "gpt-5", "write_personal_story", response.usage ?? undefined);
   return response.choices[0].message.content?.trim() ?? "";
 }
 
