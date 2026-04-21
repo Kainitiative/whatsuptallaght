@@ -119,8 +119,10 @@ export default function EventsPage() {
     <Helmet>
       <title>Tallaght Events – What's On Near You | What's Up Tallaght</title>
       <meta name="description" content="Browse upcoming events in Tallaght, Dublin. Community events, sports, arts, family activities and more — submitted by local residents." />
+      <link rel="canonical" href="https://whatsuptallaght.ie/events" />
       <meta property="og:title" content="Tallaght Events – What's On Near You | What's Up Tallaght" />
       <meta property="og:description" content="Browse upcoming events in Tallaght, Dublin. Community events, sports, arts, family activities and more." />
+      <meta property="og:url" content="https://whatsuptallaght.ie/events" />
       <meta property="og:site_name" content="What's Up Tallaght" />
     </Helmet>
     <div className="container mx-auto px-4 py-8 max-w-3xl">

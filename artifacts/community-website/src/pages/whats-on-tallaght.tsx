@@ -152,8 +152,10 @@ export default function WhatsOnTallaghtPage() {
     <Helmet>
       <title>What's On in Tallaght – Events & Activities | What's Up Tallaght</title>
       <meta name="description" content="Find out what's on in Tallaght, Dublin. Upcoming events, activities, classes, and things to do near you — updated daily from the local community." />
+      <link rel="canonical" href="https://whatsuptallaght.ie/whats-on-tallaght" />
       <meta property="og:title" content="What's On in Tallaght – Events & Activities | What's Up Tallaght" />
       <meta property="og:description" content="Find out what's on in Tallaght — events, activities and things to do updated daily." />
+      <meta property="og:url" content="https://whatsuptallaght.ie/whats-on-tallaght" />
       <meta property="og:site_name" content="What's Up Tallaght" />
     </Helmet>
     <div className="w-full flex flex-col bg-background pb-20">

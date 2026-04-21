@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import { useListPosts, getListPostsQueryKey, useListCategories, getListCategoriesQueryKey } from "@workspace/api-client-react";
 import { ArticleCard } from "@/components/article-card";
@@ -100,6 +101,16 @@ export default function Home() {
   const eventPosts = eventPostsData?.posts || [];
 
   return (
+    <>
+    <Helmet>
+      <title>What's Up Tallaght – Local News & Community Stories</title>
+      <meta name="description" content="Local news, events, and stories from Tallaght, Dublin. Submitted by the community, for the community." />
+      <link rel="canonical" href="https://whatsuptallaght.ie/" />
+      <meta property="og:title" content="What's Up Tallaght – Local News & Community Stories" />
+      <meta property="og:description" content="Local news, events, and stories from Tallaght, Dublin. Submitted by the community, for the community." />
+      <meta property="og:url" content="https://whatsuptallaght.ie/" />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+    </Helmet>
     <div className="w-full flex flex-col pb-20">
       <CategoryFilter />
 
@@ -291,5 +302,6 @@ export default function Home() {
         )}
       </section>
     </div>
+    </>
   );
 }

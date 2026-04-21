@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, CheckCircle2, ShieldCheck, Newspaper } from "lucide-react";
 import { CategoryFilter } from "@/components/category-filter";
@@ -36,6 +37,16 @@ export default function About() {
   const waUrl = waNumber ? `https://wa.me/${waNumber}` : null;
 
   return (
+    <>
+    <Helmet>
+      <title>About What's Up Tallaght – Local Community News Platform</title>
+      <meta name="description" content="What's Up Tallaght is a community-driven news platform for Tallaght, Dublin. Submit local stories via WhatsApp and read news about your area." />
+      <link rel="canonical" href="https://whatsuptallaght.ie/about" />
+      <meta property="og:title" content="About What's Up Tallaght" />
+      <meta property="og:description" content="What's Up Tallaght is a community-driven news platform for Tallaght, Dublin." />
+      <meta property="og:url" content="https://whatsuptallaght.ie/about" />
+      <meta property="og:site_name" content="What's Up Tallaght" />
+    </Helmet>
     <div className="w-full flex flex-col bg-background pb-20">
       <CategoryFilter />
       
@@ -185,5 +196,6 @@ export default function About() {
         </div>
       </section>
     </div>
+    </>
   );
 }

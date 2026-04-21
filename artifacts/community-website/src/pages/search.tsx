@@ -80,8 +80,10 @@ export default function SearchPage() {
     <Helmet>
       <title>Search Tallaght News | What's Up Tallaght</title>
       <meta name="description" content="Search all local news and community stories from Tallaght, Dublin. Find articles about your area, local organisations, events and more." />
+      <link rel="canonical" href="https://whatsuptallaght.ie/search" />
       <meta property="og:title" content="Search Tallaght News | What's Up Tallaght" />
       <meta property="og:description" content="Search all local news and community stories from Tallaght, Dublin." />
+      <meta property="og:url" content="https://whatsuptallaght.ie/search" />
       <meta property="og:site_name" content="What's Up Tallaght" />
     </Helmet>
     <div className="container mx-auto px-4 py-8 max-w-2xl">

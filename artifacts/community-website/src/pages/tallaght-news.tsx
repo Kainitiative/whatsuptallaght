@@ -100,8 +100,10 @@ export default function TallaghtNewsPage() {
     <Helmet>
       <title>Tallaght News – Latest Local Stories | What's Up Tallaght</title>
       <meta name="description" content="The latest news from Tallaght, Dublin — community updates, local stories, and breaking news submitted by residents and sourced from local organisations." />
+      <link rel="canonical" href="https://whatsuptallaght.ie/tallaght-news" />
       <meta property="og:title" content="Tallaght News – Latest Local Stories | What's Up Tallaght" />
       <meta property="og:description" content="The latest news from Tallaght, Dublin — community updates and local stories." />
+      <meta property="og:url" content="https://whatsuptallaght.ie/tallaght-news" />
       <meta property="og:site_name" content="What's Up Tallaght" />
     </Helmet>
     <div className="w-full flex flex-col bg-background pb-20">

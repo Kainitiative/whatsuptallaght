@@ -119,8 +119,10 @@ export default function TallaghtCommunityPage() {
     <Helmet>
       <title>Tallaght Community – Local Groups, Clubs & Initiatives | What's Up Tallaght</title>
       <meta name="description" content="Community news and stories from Tallaght, Dublin. Local clubs, groups, charities, schools and neighbourhood initiatives — all in one place." />
+      <link rel="canonical" href="https://whatsuptallaght.ie/tallaght-community" />
       <meta property="og:title" content="Tallaght Community – Local Groups, Clubs & Initiatives | What's Up Tallaght" />
       <meta property="og:description" content="Community news from Tallaght — local clubs, groups, charities and neighbourhood initiatives." />
+      <meta property="og:url" content="https://whatsuptallaght.ie/tallaght-community" />
       <meta property="og:site_name" content="What's Up Tallaght" />
     </Helmet>
     <div className="w-full flex flex-col bg-background pb-20">

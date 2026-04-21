@@ -67,8 +67,10 @@ export default function Category() {
     <Helmet>
       <title>{categoryTitle}</title>
       <meta name="description" content={categoryDescription} />
+      <link rel="canonical" href={`https://whatsuptallaght.ie/category/${slug}`} />
       <meta property="og:title" content={categoryTitle} />
       <meta property="og:description" content={categoryDescription} />
+      <meta property="og:url" content={`https://whatsuptallaght.ie/category/${slug}`} />
       <meta property="og:site_name" content="What's Up Tallaght" />
     </Helmet>
     <div className="w-full flex flex-col pb-20">
