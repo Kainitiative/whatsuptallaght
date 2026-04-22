@@ -209,7 +209,7 @@ async function describeImage(openai: OpenAI, buffer: Buffer, mimeType: string, c
 
   const response = await openai.chat.completions.create({
     model: "gpt-5",
-    max_tokens: 600,
+    max_completion_tokens: 600,
     messages: [
       {
         role: "user",
