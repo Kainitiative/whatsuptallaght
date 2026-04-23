@@ -701,6 +701,61 @@ CRITICAL: no text, signs, banners, logos, or hoardings. Colours and materials on
   }
 }
 
+/**
+ * Researches factual background about the topic/entities in a submission so the
+ * article writer can understand what it's writing about — even when the submission
+ * is thin on context (e.g. "Ludlow Cup 2026 results" with no mention of fly fishing).
+ *
+ * Unlike researchEntityContext() which returns visual details for image generation,
+ * this returns factual context: what is this organisation, sport, or event?
+ *
+ * The result is passed to writeArticle() as "background understanding only" —
+ * the writer uses it to choose appropriate terminology, not to introduce new facts.
+ */
+async function researchArticleContext(
+  openai: OpenAI,
+  headline: string,
+  keyFacts: string[],
+): Promise<string | null> {
+  const text = `${headline}. ${keyFacts.slice(0, 4).join(". ")}`;
+
+  const SYSTEM_PROMPT = `You are a research assistant for a local community news platform in Tallaght, Dublin, Ireland.
+
+Given a news headline and key facts, search the web to identify what specific organisations, clubs, competitions, or events are mentioned and provide a short factual summary.
+
+Focus on:
+- What this organisation/club/competition/event actually is (type, sport, activity, purpose)
+- What sport or activity is involved (e.g. fly fishing, hurling, basketball, running)
+- Who runs it or who it is associated with
+- Where it is based or where it typically takes place
+
+CRITICAL CONSTRAINTS:
+- 2–3 sentences maximum
+- Factual, neutral language only — no opinions or promotional language
+- Only include details you found or are highly confident about — do not invent
+- If no specific identifiable organisations or events are mentioned, return an empty string
+- Return ONLY the factual summary, no citations, no source references, no explanations`;
+
+  try {
+    const response = await (openai.responses.create as Function)({
+      model: "gpt-4o",
+      tools: [{ type: "web_search_preview" }],
+      input: `${SYSTEM_PROMPT}\n\nArticle: ${text}`,
+    });
+
+    const raw: string = (response.output_text ?? "").trim();
+    const result = raw.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
+    if (result.length > 10) {
+      logger.debug({ headline, result }, "AI pipeline: article context research succeeded");
+      return result;
+    }
+  } catch (err) {
+    logger.debug({ err, headline }, "AI pipeline: article context research failed — skipping");
+  }
+
+  return null;
+}
+
 async function downloadBuffer(url: string): Promise<Buffer> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to download image: ${res.status}`);
@@ -963,6 +1018,7 @@ async function writeArticle(
   ctx: UsageCtx,
   minimalMode = false,
   entityTrends: EntityTrendsContext[] = [],
+  articleContext: string | null = null,
 ): Promise<string> {
   const examplesBlock =
     goldenExamples.length > 0
@@ -1057,6 +1113,17 @@ async function writeArticle(
           "Write in a similar way, but do NOT copy phrases or sentences directly.",
           "",
           examplesBlock,
+        ]
+      : []),
+    ...(articleContext
+      ? [
+          "",
+          "TOPIC CONTEXT (background understanding only — do NOT add these facts to the article):",
+          "The following is research about what the organisations, clubs, or events in this article actually are.",
+          "Use it to understand the subject and choose appropriate terminology (e.g. the correct sport name, activity type).",
+          "You may NOT introduce any of these facts into the article unless they are explicitly stated in the submission.",
+          "",
+          articleContext,
         ]
       : []),
     ...(entityTrends.length > 0
@@ -1410,15 +1477,26 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     .orderBy(desc(goldenExamplesTable.createdAt))
     .limit(3);
 
-  // --- Phase 4B: Entity trends context (pre-write SEO lookup) ---
-  // Find any entity pages mentioned in the submission text that have a reviewed
-  // trendsSummary. These are passed to writeArticle as optional background context
-  // so the AI can phrase things in a way that aligns with how people actually search.
-  const entityTrends = await fetchEntityTrendsSummaries(combinedText);
+  // --- Phase 4B: Pre-write research (runs in parallel) ---
+  // 1. Entity trends: SEO context from entity pages already in the DB.
+  // 2. Article context: live web research so the writer understands what the
+  //    topic actually is (e.g. "Ludlow Cup = fly fishing competition") even when
+  //    the submission doesn't explain it. Passed as background understanding only —
+  //    the writer cannot introduce these facts unless they're in the submission.
+  const [entityTrends, articleContext] = await Promise.all([
+    fetchEntityTrendsSummaries(combinedText),
+    researchArticleContext(openai, infoResult.headline, infoResult.keyFacts),
+  ]);
   if (entityTrends.length > 0) {
     logger.info(
       { submissionId, entities: entityTrends.map((e) => e.entityName) },
       "AI pipeline: injecting entity trends context into article writer",
+    );
+  }
+  if (articleContext) {
+    logger.info(
+      { submissionId, articleContext },
+      "AI pipeline: injecting article research context into article writer",
     );
   }
 
@@ -1469,7 +1547,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     const submissionWordCount = combinedText.trim().split(/\s+/).filter(Boolean).length;
     const minimalMode = infoResult.completenessScore <= 0.75 && submissionWordCount < 50;
     logger.info({ submissionId, minimalMode }, "AI pipeline: writing article");
-    articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode, entityTrends);
+    articleBody = await writeArticle(openai, combinedText, infoResult, toneResult, examples, ctx, minimalMode, entityTrends, articleContext);
   }
 
   // --- Stage 7b: Fact-check ---
