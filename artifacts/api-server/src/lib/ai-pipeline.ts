@@ -587,7 +587,7 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
   const styleByTone: Record<string, string> = {
     news:      "journalistic press photography, neutral composition, natural lighting, authentic documentary feel, like a newspaper photo, not staged, no constructed signage in frame",
     event:     "real event photography, natural ambient lighting, candid crowd moments, genuine unposed atmosphere, authentic documentary feel, no banners or signs in foreground",
-    sport:     "real sports photography, telephoto lens, fast shutter speed, natural daylight, slight motion blur on movement, background crowd softly out of focus, captured mid-action like a real match photo, no hoardings or advertising boards visible",
+    sport:     "real sports photography, telephoto lens, fast shutter speed, natural daylight, slight motion blur on movement, background crowd softly out of focus, captured mid-action like a real match photo, no hoardings or advertising boards visible, no trophies, no medals, no award ceremonies, no posed group photos — show the sport in motion",
     community: "real candid street photography, 50mm lens, natural light, unposed people, genuine interactions, slightly imperfect framing, like a real moment captured without staging, no close-up signage",
     business:  "real commercial photography, natural interior or exterior lighting, clean but realistic, not staged, no artificial glow or colour boost, no visible signage or text on surfaces",
     warning:        "documentary-style photography, overcast or soft natural light, grounded tone, realistic environment, slightly muted colours, serious but natural atmosphere, no text-bearing objects in focus",
@@ -711,11 +711,12 @@ async function downloadBuffer(url: string): Promise<Buffer> {
 /**
  * Translates a news headline and key facts into a specific, vivid visual scene description
  * for the image generator. Acts as an "art director" step — turning abstract headlines like
- * "Join the Tallaght Photographic Society" into concrete scenes like "Three adults standing
- * outdoors in a Dublin park, two holding DSLR cameras, one reviewing photos on a camera screen,
- * natural afternoon light, candid relaxed atmosphere."
+ * "Join the Tallaght Photographic Society" into concrete scenes like "Two adults outdoors in
+ * a Dublin park, one holding a DSLR camera to their eye, the other reviewing shots on a camera
+ * screen, natural afternoon light filtering through trees."
  *
- * Runs in parallel with researchEntityContext — adds negligible cost (gpt-4o-mini, ~100 tokens).
+ * Receives entity research context (e.g. "Ludlow Cup = fly fishing competition") so it can
+ * pick the right scene — the sport being played, not a generic trophy ceremony.
  */
 async function generateImageConcept(
   openai: OpenAI,
@@ -723,31 +724,43 @@ async function generateImageConcept(
   keyFacts: string[],
   tone: string,
   ctx: UsageCtx,
+  entityContext?: string | null,
 ): Promise<string | null> {
   try {
+    const entityClause = entityContext
+      ? `\n\nResearch context (use this to understand what the sport/activity/organisation actually is): ${entityContext}`
+      : "";
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.4,
-      max_completion_tokens: 120,
+      max_completion_tokens: 150,
       messages: [
         {
           role: "system",
           content: `You are an art director for a local community news website in Tallaght, Dublin, Ireland.
 Your job is to write a specific, vivid visual scene description that will be used as the subject of a header photograph for a news article.
 
-Rules:
-- Describe ONE specific scene with real people, objects, or settings that directly and obviously illustrates the article topic
-- Be very concrete: what are people doing, what objects are present, what is the setting and lighting
-- DO NOT describe generic buildings, empty rooms, or blank exteriors — unless the article is about a specific architectural event
-- DO NOT include any text, signs, banners, or logos
-- The scene should make the article topic immediately obvious from the image alone
-- Set the scene in Tallaght or Dublin, Ireland
+CRITICAL RULES — read carefully:
+- Describe ONE specific scene that directly and obviously illustrates the article topic
+- Be very concrete: what are people DOING, what objects are visible, what is the setting and lighting
+- ALWAYS show the ACTIVITY or SPORT itself in action — never a trophy presentation, award ceremony, podium, or people holding prizes/cups/medals
+- For sport or competition articles: show the sport BEING PLAYED — a cast mid-air, a tackle, a jump, a race, a goal — not the result or celebration
+- For angling/fishing articles: show a lone angler in waders casting a fly rod from a riverbank, OR a trout leaping from the surface to take a fly
+- For GAA/football: show players on the pitch in mid-action — a kick, a catch, a sprint
+- For running/athletics: show a runner in motion on a track or road
+- DO NOT describe people holding trophies, cups, medals, or awards under any circumstances
+- DO NOT describe posed group photos, line-ups, or handshakes
+- DO NOT describe generic buildings, empty rooms, or blank exteriors
+- DO NOT include text, signs, banners, or logos
+- Choose a dramatic, specific ACTION MOMENT — not a static posed scene
+- Set the scene in Tallaght, Dublin, or the surrounding Irish countryside as appropriate
 - No identifiable real faces
 - Return ONLY the scene description, 1–2 sentences, no explanations`,
         },
         {
           role: "user",
-          content: `Article headline: ${headline}\nKey facts: ${keyFacts.slice(0, 4).join(". ")}\nTone: ${tone}`,
+          content: `Article headline: ${headline}\nKey facts: ${keyFacts.slice(0, 4).join(". ")}\nTone: ${tone}${entityClause}`,
         },
       ],
     });
@@ -773,15 +786,15 @@ async function generateHeaderImage(
   ctx: UsageCtx,
 ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
   try {
-    // Run entity research and image concept generation in parallel — both enrich the prompt,
-    // neither depends on the other, running together adds no extra latency.
-    const [entityContext, imageConcept] = await Promise.all([
-      researchEntityContext(openai, headline, keyFacts),
-      generateImageConcept(openai, headline, keyFacts, tone, ctx),
-    ]);
+    // Run entity research FIRST so the art director knows what the sport/activity actually is.
+    // e.g. "Ludlow Cup" → entity research returns "fly fishing competition" →
+    // concept generation picks a fly fishing scene instead of a generic trophy ceremony.
+    // The small sequential cost (~1s) is worth the quality gain.
+    const entityContext = await researchEntityContext(openai, headline, keyFacts);
     if (entityContext) {
       logger.info({ submissionId: ctx.submissionId, entityContext }, "AI pipeline: entity context found for image");
     }
+    const imageConcept = await generateImageConcept(openai, headline, keyFacts, tone, ctx, entityContext);
 
     const prompt = buildDallePrompt(headline, keyFacts, tone, entityContext, imageConcept);
     const response = await openai.images.generate({
