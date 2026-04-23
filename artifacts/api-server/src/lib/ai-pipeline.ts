@@ -597,15 +597,20 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
   };
 
   const style = styleByTone[tone] ?? styleByTone.other;
-  // Use the art-directed image concept as the subject if available — far more visually specific
-  // than the raw headline. Fall back to the headline if concept generation failed.
+
+  // When the art director has generated a concept, it is the primary visual direction —
+  // entity research (venue descriptions, building details) must not override it.
+  // Entity context is only used in fallback mode when no concept was generated,
+  // e.g. to add kit colours for a sports article where the concept failed.
   const subject = imageConcept ?? headline;
   const factsClause = facts ? ` Scene context: ${facts}.` : "";
-  const entityClause = entityContext ? ` Visual detail: ${entityContext}` : "";
+  const entityClause = (!imageConcept && entityContext) ? ` Visual detail: ${entityContext}` : "";
 
   // No-text rule stated first and twice — DALL-E weights the start of the prompt heavily.
   // Anti-CGI rule added immediately after to reinforce the real-photography requirement.
-  const noText = "CRITICAL RULES — strictly no text, writing, letters, words, numbers, legible signs, banners, placards, scoreboards, advertising hoardings, or logos anywhere in the image. If any text would naturally appear (shirt numbers excepted), replace it with abstract pattern or blur it out of focus. Do not generate illustration, painting, cartoon, or CGI-style imagery. The image must look like a real photograph taken with a camera.";
+  // Explicitly call out building signage — entity research on real venues can cause realistic
+  // building text to appear even when the no-text rule is present.
+  const noText = "CRITICAL RULES — strictly no text, writing, letters, words, numbers, legible signs, banners, placards, scoreboards, advertising hoardings, building name signs, shopfronts, or logos anywhere in the image. If any text would naturally appear (shirt numbers excepted), replace it with abstract pattern or blur it out of focus. Do not generate illustration, painting, cartoon, or CGI-style imagery. The image must look like a real photograph taken with a camera.";
 
   // Camera realism anchor — appended last to reinforce the photographic medium.
   const cameraAnchor = "Shot on DSLR camera, 35mm or 50mm lens, natural depth of field, realistic exposure settings, slight lens imperfections.";
