@@ -574,7 +574,7 @@ function extractTopicKeywords(headline: string): string[] {
     .slice(0, 8);
 }
 
-function buildDallePrompt(headline: string, keyFacts: string[], tone: string, entityContext?: string | null): string {
+function buildDallePrompt(headline: string, keyFacts: string[], tone: string, entityContext?: string | null, imageConcept?: string | null): string {
   const facts = keyFacts.slice(0, 3).filter(Boolean).join(", ");
 
   // Global style base — applies to every image regardless of tone.
@@ -597,6 +597,9 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
   };
 
   const style = styleByTone[tone] ?? styleByTone.other;
+  // Use the art-directed image concept as the subject if available — far more visually specific
+  // than the raw headline. Fall back to the headline if concept generation failed.
+  const subject = imageConcept ?? headline;
   const factsClause = facts ? ` Scene context: ${facts}.` : "";
   const entityClause = entityContext ? ` Visual detail: ${entityContext}` : "";
 
@@ -607,7 +610,7 @@ function buildDallePrompt(headline: string, keyFacts: string[], tone: string, en
   // Camera realism anchor — appended last to reinforce the photographic medium.
   const cameraAnchor = "Shot on DSLR camera, 35mm or 50mm lens, natural depth of field, realistic exposure settings, slight lens imperfections.";
 
-  return `${noText} ${GLOBAL_STYLE}. ${style}. Subject: ${headline}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland. No watermarks. No identifiable real faces. ${cameraAnchor}`;
+  return `${noText} ${GLOBAL_STYLE}. ${style}. Subject: ${subject}.${factsClause}${entityClause} Setting: Tallaght or Dublin, Ireland. No watermarks. No identifiable real faces. ${cameraAnchor}`;
 }
 
 /**
@@ -700,6 +703,63 @@ async function downloadBuffer(url: string): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
+/**
+ * Translates a news headline and key facts into a specific, vivid visual scene description
+ * for the image generator. Acts as an "art director" step — turning abstract headlines like
+ * "Join the Tallaght Photographic Society" into concrete scenes like "Three adults standing
+ * outdoors in a Dublin park, two holding DSLR cameras, one reviewing photos on a camera screen,
+ * natural afternoon light, candid relaxed atmosphere."
+ *
+ * Runs in parallel with researchEntityContext — adds negligible cost (gpt-4o-mini, ~100 tokens).
+ */
+async function generateImageConcept(
+  openai: OpenAI,
+  headline: string,
+  keyFacts: string[],
+  tone: string,
+  ctx: UsageCtx,
+): Promise<string | null> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.4,
+      max_completion_tokens: 120,
+      messages: [
+        {
+          role: "system",
+          content: `You are an art director for a local community news website in Tallaght, Dublin, Ireland.
+Your job is to write a specific, vivid visual scene description that will be used as the subject of a header photograph for a news article.
+
+Rules:
+- Describe ONE specific scene with real people, objects, or settings that directly and obviously illustrates the article topic
+- Be very concrete: what are people doing, what objects are present, what is the setting and lighting
+- DO NOT describe generic buildings, empty rooms, or blank exteriors — unless the article is about a specific architectural event
+- DO NOT include any text, signs, banners, or logos
+- The scene should make the article topic immediately obvious from the image alone
+- Set the scene in Tallaght or Dublin, Ireland
+- No identifiable real faces
+- Return ONLY the scene description, 1–2 sentences, no explanations`,
+        },
+        {
+          role: "user",
+          content: `Article headline: ${headline}\nKey facts: ${keyFacts.slice(0, 4).join(". ")}\nTone: ${tone}`,
+        },
+      ],
+    });
+
+    const result = response.choices[0].message.content?.trim() ?? "";
+    logUsage(ctx, "gpt-4o-mini", "image_concept", response.usage ?? undefined);
+    if (result.length > 10) {
+      logger.info({ submissionId: ctx.submissionId, imageConcept: result }, "AI pipeline: image concept generated");
+      return result;
+    }
+    return null;
+  } catch (err) {
+    logger.warn({ err, headline }, "AI pipeline: image concept generation failed — falling back to headline");
+    return null;
+  }
+}
+
 async function generateHeaderImage(
   openai: OpenAI,
   headline: string,
@@ -708,13 +768,17 @@ async function generateHeaderImage(
   ctx: UsageCtx,
 ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
   try {
-    // Research real-world entity context (team colours, venue details etc.) to enrich the prompt
-    const entityContext = await researchEntityContext(openai, headline, keyFacts);
+    // Run entity research and image concept generation in parallel — both enrich the prompt,
+    // neither depends on the other, running together adds no extra latency.
+    const [entityContext, imageConcept] = await Promise.all([
+      researchEntityContext(openai, headline, keyFacts),
+      generateImageConcept(openai, headline, keyFacts, tone, ctx),
+    ]);
     if (entityContext) {
       logger.info({ submissionId: ctx.submissionId, entityContext }, "AI pipeline: entity context found for image");
     }
 
-    const prompt = buildDallePrompt(headline, keyFacts, tone, entityContext);
+    const prompt = buildDallePrompt(headline, keyFacts, tone, entityContext, imageConcept);
     const response = await openai.images.generate({
       model: "gpt-image-1-mini",
       prompt,
