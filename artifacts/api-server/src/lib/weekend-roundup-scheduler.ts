@@ -387,7 +387,7 @@ async function runRoundupCheck(): Promise<void> {
 
   const excerpt = article.body.split(". ").slice(0, 2).join(". ") + ".";
 
-  await db.insert(postsTable).values({
+  const [inserted] = await db.insert(postsTable).values({
     title: article.title,
     slug: article.slug,
     body: article.body,
@@ -397,7 +397,18 @@ async function runRoundupCheck(): Promise<void> {
     primaryCategoryId: categoryId,
     isFeatured: false,
     publishedAt: null,
-  });
+  }).returning({ id: postsTable.id });
+
+  // Create an event record pointing to the upcoming Saturday so the weather
+  // widget appears on the published article page
+  if (inserted?.id) {
+    await db.insert(eventsTable).values({
+      articleId: inserted.id,
+      title: article.title,
+      eventDate: saturday,
+      status: "upcoming",
+    }).catch((err) => logger.warn({ err }, "Weekend roundup: failed to insert event record"));
+  }
 
   logger.info(
     { slug: article.slug, eventCount },
