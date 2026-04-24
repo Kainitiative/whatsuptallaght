@@ -26,6 +26,7 @@ export const postsTable = pgTable("posts", {
   bodyImages: text("body_images").array().default([]),
   matchedEntityId: integer("matched_entity_id").references(() => entitiesTable.id, { onDelete: "set null" }),
   tone: text("tone"),
+  weatherQuip: text("weather_quip"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,6 +1,7 @@
 import OpenAI, { toFile } from "openai";
 import { applyWatermark } from "./watermark";
 import { postToFacebookPage } from "./facebook-poster";
+import { generateWeatherQuip, getWeatherForDate } from "../routes/weather";
 import { generateAndStoreSocialCaptions, getSocialCaptionsForPost } from "./social-caption-agent";
 import { matchEntityInArticle } from "./entity-matcher";
 import { linkEntityPagesToPost, findEntityPageHeaderPhoto } from "./entity-page-linker";
@@ -1676,6 +1677,31 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   linkEntityPagesToPost(newPost.id, articleBody, bodyImagePaths).catch((err) =>
     logger.warn({ err, postId: newPost.id }, "AI pipeline: entity page linking failed (non-fatal)"),
   );
+
+  // --- Weather quip: generate Dublin satirical weather comment tied to this article (non-fatal) ---
+  // Runs as a fire-and-forget background task so it never blocks article publication.
+  // Uses the event date weather if available, otherwise today's forecast.
+  (async () => {
+    try {
+      const quipDate = infoResult.eventDate ?? new Date().toISOString().split("T")[0];
+      const weather = await getWeatherForDate(quipDate);
+      if (!weather) return;
+      const quip = await generateWeatherQuip(
+        openai,
+        infoResult.headline,
+        toneResult.tone,
+        weather.tempMax,
+        weather.precipProbMax,
+        weather.condition.label,
+      );
+      if (quip) {
+        await db.update(postsTable).set({ weatherQuip: quip }).where(eq(postsTable.id, newPost.id));
+        logger.info({ postId: newPost.id, quip }, "AI pipeline: weather quip generated and saved");
+      }
+    } catch (err) {
+      logger.warn({ err, postId: newPost.id }, "AI pipeline: weather quip generation failed (non-fatal)");
+    }
+  })();
 
   logger.info({ submissionId, postId: newPost.id, status: postStatus }, "AI pipeline: complete");
 

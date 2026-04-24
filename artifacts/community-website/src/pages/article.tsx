@@ -298,7 +298,7 @@ export default function Article() {
                 </span>
                 <span className="text-xs text-sky-600">{eventWeather.condition.label}</span>
               </div>
-              <p className="text-sm text-sky-800 mt-0.5 leading-snug">{eventWeather.message}</p>
+              <p className="text-sm text-sky-800 mt-0.5 leading-snug">{(post as any)?.weatherQuip ?? eventWeather.message}</p>
             </div>
           </div>
         )}

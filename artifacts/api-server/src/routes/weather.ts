@@ -1,4 +1,5 @@
 import { Router } from "express";
+import OpenAI from "openai";
 import { getSettingValue } from "./settings";
 
 const router = Router();
@@ -57,11 +58,93 @@ export function generateWeatherMessage(
   placeName: string,
 ): string {
   const isSunny = conditionCode <= 2;
-  if (tempMax >= 20 && isSunny) return "Looks like a lovely day — sun cream wouldn't go amiss.";
-  if (precipProbMax > 60) return "Rain is likely — worth packing an umbrella.";
-  if (tempMax <= 4) return "It's going to be bitter — wrap up well.";
-  if (tempMax <= 10 && precipProbMax > 40) return "A cold, wet one — the classic Irish combo.";
-  return `Typical ${placeName} weather expected — be prepared for anything.`;
+  if (tempMax >= 20 && isSunny) return "Looks like a deadly day — sun cream wouldn't go amiss.";
+  if (precipProbMax > 60) return "Rain is likely — worth packin' an umbrella, sham.";
+  if (tempMax <= 4) return "Pure Baltic out there — wrap up or you'll be destroyed.";
+  if (tempMax <= 10 && precipProbMax > 40) return "A cold, manky one — the classic Dublin combo.";
+  return `Typical ${placeName} weather — sure you'd be used to it at this stage.`;
+}
+
+// ---------------------------------------------------------------------------
+// AI-generated Dublin satirical weather quip (linked to article topic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a one-line Dublin-flavoured satirical weather comment that ties
+ * together the article topic and the weather forecast. Uses gpt-4o-mini.
+ * Falls back to generateWeatherMessage() if AI is unavailable.
+ *
+ * @param openai  - OpenAI client
+ * @param headline - The article headline
+ * @param tone     - Article tone (sport, event, community, etc.)
+ * @param tempMax  - Max temperature for the day (°C)
+ * @param precipProbMax - Precipitation probability 0–100
+ * @param conditionLabel - Human weather label e.g. "Rainy", "Clear sky"
+ */
+export async function generateWeatherQuip(
+  openai: OpenAI,
+  headline: string,
+  tone: string,
+  tempMax: number,
+  precipProbMax: number,
+  conditionLabel: string,
+): Promise<string | null> {
+  try {
+    const weatherDesc = precipProbMax > 60
+      ? `${conditionLabel}, ${tempMax}°C, high chance of rain`
+      : conditionLabel === "Clear sky" || conditionLabel === "Mainly clear"
+        ? `${conditionLabel}, ${tempMax}°C, sunny`
+        : `${conditionLabel}, ${tempMax}°C`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.9,
+      max_completion_tokens: 60,
+      messages: [
+        {
+          role: "system",
+          content: `You write one-line satirical weather comments for a community news website in Tallaght, Dublin, Ireland.
+
+Your comments are written in the voice of a witty Dublin local — dry humour, light sarcasm, and natural Dublin slang.
+
+Dublin slang to draw from (use naturally, not forced):
+- "deadly" = great/brilliant
+- "bleeding" / "bleedin'" = intensifier (like "very")
+- "gas" = funny/amusing
+- "manky" = awful/disgusting
+- "savage" = brilliant/intense
+- "sham" = mate/friend
+- "rapid" = great
+- "Jaysus" = exclamation of surprise
+- "Pure [adjective]" = very [adjective] e.g. "pure Baltic" = very cold
+- "scarlet" = embarrassed
+- "acting the maggot" = messing around
+- "knackered" = exhausted
+- "bang on" = perfect
+- "the craic" = the fun/vibe
+- "sorted" = done/arranged
+
+Rules:
+- ONE sentence only — short and punchy
+- Must relate to BOTH the article topic AND the weather
+- Dry, self-aware Dublin humour — not try-hard or cringe
+- Never mention specific real people by name
+- Never be offensive or mean-spirited
+- Do not use hashtags, emojis, or quotation marks
+- Return ONLY the one-line comment, nothing else`,
+        },
+        {
+          role: "user",
+          content: `Article headline: ${headline}\nArticle type: ${tone}\nWeather: ${weatherDesc}`,
+        },
+      ],
+    });
+
+    const result = response.choices[0].message.content?.trim() ?? "";
+    return result.length > 5 ? result : null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
