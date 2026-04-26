@@ -518,15 +518,92 @@
 
   ## Social Distribution
 
-  On every publish (auto or manual):
+  ### Platform Structure — One Business, Two Voices
 
-  1. Post to Facebook Page — title, short excerpt, link back to article
-  2. Post to Instagram — via Instagram Graph API connected to the same Facebook App
-  3. Distribution status stored on the post record (shared / failed / pending)
+  Both accounts are **linked inside Meta Business Suite** (formerly Meta Business Manager). This gives:
+  - A single unified inbox for messages and comments across Facebook, Instagram, and WhatsApp
+  - Combined analytics to compare content performance across platforms
+  - One Meta Developer App handling all three (WhatsApp, Facebook, Instagram)
+  - Single Ads Manager access if advertising is used in future
+
+  They are linked at the business level — but **they are not the same content channel**. The same story is told differently on each platform. Auto-cross-posting identical content has been shown to negatively impact algorithmic reach on both sides. Each platform gets a version adapted to its format and audience.
+
+  ---
+
+  ### Facebook — Community Hub
+
+  **Audience:** 35–65, local familiars, community-first readers
+
+  **What the algorithm rewards:** Comments and replies — posts that spark back-and-forth conversation are pushed to a wider organic audience. Facebook now fills feeds with up to 50% recommended content from accounts users don't follow, so engaging posts can reach well beyond existing followers.
+
+  **Post format:**
+  - Headline + 2–3 sentence context paragraph
+  - Direct link to article in caption (links are clickable on Facebook)
+  - One open-ended community question at the end ("Anyone know more about this?", "Have you spotted this?")
+  - 0–1 hashtags maximum
+  - Reels: +22% reach boost over standard posts
+
+  **What the pipeline posts (already live):**
+  On every publish — title, short excerpt, link back to article. Distribution status stored on the post record (shared / failed / pending). Failed distributions retried once automatically; persistent failures logged for admin.
+
+  ---
+
+  ### Instagram — Visual Storytelling
+
+  **Audience:** 18–40, visual-first, discovery-oriented, less familiar with the platform
+
+  **What the algorithm rewards:** Watch time, likes, and shares. Sends (DMs sharing a post) are the strongest signal for reaching accounts that don't yet follow the page. Reels have a +35% reach boost over standard posts and are the primary growth surface in 2026. Instagram's algorithm now operates across multiple surfaces — Feed, Reels, Stories, Explore, and Search — each with its own ranking.
+
+  **Post format:**
+  - Strong AI-generated article image (already produced by the pipeline — no extra photography needed)
+  - 2–3 punchy sentences in WUT voice — short, casual, community-friendly
+  - No links in the post body (Instagram does not make caption links clickable — link goes in bio)
+  - "Full story — link in bio" as the closing line
+  - 3–5 focused hashtags: mix of local (#Tallaght #Dublin24 #SouthDublin) and topic-specific (#LocalNews #WhatToDoInDublin)
+  - Call to action: "Save this" or "Share with a neighbour"
+
+  **What the pipeline posts (planned):**
+  When an article is published, the AI generates a separate Instagram caption — shorter, punchier, no link, with hashtags — ready to post via the Instagram Graph API. The article image is used as the post image. Distribution status stored alongside the Facebook status on the post record.
+
+  **Reels (future feature):**
+  For high-impact stories — major planning decisions, big community events, feel-good moments — a 30-second text-on-screen Reel will significantly outperform a static post. This is a future addition to the pipeline once the page has an established following.
+
+  ---
+
+  ### Content Strategy — Same Story, Different Voice
+
+  | Element | Facebook | Instagram |
+  |---|---|---|
+  | Caption length | 2–3 sentences + question | 2–3 sentences max |
+  | Links | Directly in caption | Bio only — "link in bio" |
+  | Hashtags | 0–1 | 3–5 focused tags |
+  | CTA | "What do you think? Comment below" | "Save this" / "Share with a neighbour" |
+  | Best format | Text + photo, longer posts | Reels, carousels, strong single image |
+  | Audience age skew | 35–65 | 18–40 |
+
+  ---
+
+  ### Engagement Benchmarks (2026)
+
+  | Metric | Facebook | Instagram |
+  |---|---|---|
+  | Avg. engagement rate | 0.15% | 0.48% |
+  | Reels reach boost | +22% | +35% |
+  | AI-recommended feed content | ~30–50% | Growing |
+
+  Instagram's engagement rate is approximately 3× higher than Facebook — the audience is smaller but more active.
+
+  ---
+
+  ### Technical Implementation
+
+  Both platforms operate through a single Meta Developer App. On every publish (auto or manual):
+
+  1. **Facebook:** Post title + excerpt + article link to Facebook Page
+  2. **Instagram:** Post article image + AI-generated Instagram caption via Instagram Graph API
+  3. Distribution status stored on the post record per platform (shared / failed / pending)
   4. Failed distributions retried once automatically; persistent failures logged for admin
-  5. Admin dashboard shows distribution status per post
-
-  Both WhatsApp and Facebook/Instagram distribution operate through Meta's platform — a single Meta Developer App handles all three.
+  5. Admin dashboard shows per-platform distribution status per post
 
   ---
 
