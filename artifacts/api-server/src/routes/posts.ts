@@ -223,6 +223,7 @@ router.patch("/posts/:id", async (req, res) => {
         sourceSubmissionId: postsTable.sourceSubmissionId,
         headerImageUrl: postsTable.headerImageUrl,
         imagePrompt: postsTable.imagePrompt,
+        tone: postsTable.tone,
       })
       .from(postsTable)
       .where(eq(postsTable.id, id));
@@ -265,14 +266,16 @@ router.patch("/posts/:id", async (req, res) => {
           // We always generate regardless of the auto_generate_images setting so that
           // Facebook always has a real photo to attach to the link card.
           let resolvedHeaderImageUrl: string | null = post.headerImageUrl ?? null;
-          if (!resolvedHeaderImageUrl && currentPost.imagePrompt) {
+          if (!resolvedHeaderImageUrl) {
+            // No image was set during pipeline (article was held, or entity/DALL-E failed).
+            // Always attempt generation now — no prompt needed, regenerate from title + body.
             try {
               const keyFacts = post.body.split(". ").slice(0, 3).map((s: string) => s.trim()).filter(Boolean);
               const generated = await regeneratePostImage(
                 post.id,
                 post.title,
                 keyFacts,
-                "news",
+                currentPost.tone ?? "community",
                 post.sourceSubmissionId ?? post.id,
               );
               if (generated) {

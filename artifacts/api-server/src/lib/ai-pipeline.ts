@@ -1385,7 +1385,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   // --- Stage 2 & 3: Media processing ---
   const transcripts: string[] = [];
   const imageDescriptions: string[] = [];
-  // All submitted images go into the article body — header is always DALL·E generated
+  // Submitted images: first image becomes the article header; all go into bodyImages
   const bodyImagePaths: string[] = [];
 
   for (const mediaId of mediaUrls) {
@@ -1603,15 +1603,20 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   const entityPagePhoto = await findEntityPageHeaderPhoto(articleBody);
 
   // --- Stage 7b: Generate header image ---
-  // Priority: entity page photo (real) > old entity image > DALL-E asset library.
-  // Submitted WhatsApp photos go into bodyImages — displayed inline in the article body.
-  // For held articles we save the prompt text only — image is sourced from the library when admin publishes.
-  // Images are always generated for published articles so Facebook always has a real photo to post.
-  let headerImagePath: string | null = entityPagePhoto ?? entityImagePath ?? null;
+  // Priority: submitted user photo > entity page photo (real) > old entity image > DALL-E asset library.
+  // If the contributor sent a photo, that is the most authentic image for the story — use it as header.
+  // All submitted photos (including the one used as header) also appear inline in the article body.
+  // For held articles with no real photo, we save the prompt text only — image sourced from library when published.
+  let headerImagePath: string | null = bodyImagePaths[0] ?? entityPagePhoto ?? entityImagePath ?? null;
   let headerImagePrompt: string | null = null;
   if (headerImagePath) {
+    const source = bodyImagePaths[0]
+      ? "submitted_user_photo"
+      : entityPagePhoto
+        ? "entity_page_photo"
+        : "entity_image";
     logger.info(
-      { submissionId, source: entityPagePhoto ? "entity_page_photo" : "entity_image" },
+      { submissionId, source },
       "AI pipeline: using real photo as header — skipping DALL-E",
     );
   } else {
@@ -1871,8 +1876,9 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
   // --- Generate header image ---
   // Precedence: real feed photo > entity page photo (real) > old entity image > DALL·E asset library > none
   // For held articles we save the prompt text only — image is sourced from library when admin publishes.
-  let rssStoredFeedImagePath: string | null = null; // stored URL of feed image (used for gallery append too)
+  let rssStoredFeedImagePath: string | null = null; // stored URL of feed image
   let rssImagePath: string | null = null;
+  const rssBodyImages: string[] = []; // scraped image also appears inline in the article body
   let rssImagePrompt: string | null = buildDallePrompt(infoResult.headline || title, infoResult.keyFacts, toneResult.tone);
 
   if (feedImageUrl) {
@@ -1885,7 +1891,8 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
         const storedPath = await uploadImageBuffer(imgBuffer, contentType.split(";")[0] ?? "image/jpeg");
         rssStoredFeedImagePath = storedPath;
         rssImagePath = storedPath;
-        logger.info({ submissionId, feedImageUrl, storedPath }, "RSS pipeline: using real feed photo as header");
+        rssBodyImages.push(storedPath);
+        logger.info({ submissionId, feedImageUrl, storedPath }, "RSS pipeline: using real feed photo as header and body");
       } else {
         logger.warn({ submissionId, feedImageUrl, status: imgRes.status }, "RSS pipeline: feed image download failed — falling back");
       }
@@ -1943,6 +1950,7 @@ export async function processRssSubmission(payload: RssPipelinePayload & { jobId
       matchedEntityId: rssEntityMatch?.entityId ?? null,
       headerImageUrl: rssImagePath ?? undefined,
       imagePrompt: rssImagePrompt ?? undefined,
+      bodyImages: rssBodyImages,
     })
     .returning();
 
@@ -2018,5 +2026,6 @@ export async function regeneratePostImage(
 ): Promise<{ imageUrl: string; imagePrompt: string } | null> {
   const openai = await getOpenAI();
   const ctx: UsageCtx = { submissionId };
-  return generateHeaderImage(openai, headline, keyFacts, tone, ctx);
+  // Use the asset library first — reuses existing images for similar topics before generating new ones.
+  return findOrCreateHeaderAsset(openai, headline, keyFacts, tone, ctx);
 }
