@@ -210,30 +210,97 @@
 
   ## Header Image Strategy
 
-  ### Phase 1 — Launch (Template Headers)
+  ### Principle — Real Images Always Win
 
-  A library of pre-designed category header images. The AI selects the correct one based on the post's category. Zero image generation cost. Site looks visually consistent from day one.
+  Community-submitted photos and RSS-scraped images are more authentic, more relevant, and more engaging than any AI-generated image. If a real image exists — whether submitted by a contributor or scraped from a feed — it should be used everywhere: as the article header, inline in the article body, and on social media. AI generation is a fallback only for articles that arrive with no image at all.
 
-  | Category | Template header |
-  |---|---|
-  | Events | Crowd/festival atmosphere |
-  | Sports | Action/stadium imagery |
-  | Business | Local streetscape/shopfront |
-  | Community | Neighbourhood/people imagery |
-  | Breaking News | Bold, graphic, urgent |
-  | Memorial | Respectful, understated |
-  | Alerts | Clear, attention-grabbing graphic |
+  ---
 
-  ### Phase 2 — When Branding Is Established (Generated Headers)
+  ### WhatsApp Route — Image Priority Chain
 
-  DALL-E 3 HD generates a unique, bespoke header for each post in the platform's defined visual style. Switched on per category — high-value content types first.
+  When a WhatsApp submission is processed, the pipeline follows this priority order for the header image:
 
-  ### Hybrid Rule
+  ```
+  1. Submitted user photo (highest priority — their image, their story)
+       ↓ if none
+  2. Entity page photo (real community photo from an entity page gallery)
+       ↓ if none
+  3. Entity library image (matched organisation or club image)
+       ↓ if none
+  4. AI-generated image from DALL-E asset library (fallback only)
+  ```
 
-  If a user submitted a relevant image with their post:
-  - Their image is stored and displayed in the post body/gallery
-  - A branded overlay/watermark is applied for visual consistency
-  - The category template or generated header still appears at the top of the post
+  **If a user submits one or more images:**
+  - The first image becomes the article **header**
+  - All submitted images (including the first) also appear **inline in the article body**
+  - The same image is used as the **Facebook post image** and **Instagram post image**
+  - No AI image is generated — DALL-E is not called, zero generation cost
+  - The WUT watermark is applied to the header version for brand consistency
+
+  **If no image is submitted:**
+  - Entity page photo or entity library image is used if available (as before)
+  - Otherwise AI generates a header from the asset library (as before)
+
+  > **Current behaviour (to be changed):** Submitted WhatsApp photos are currently placed only in the article body. The header is always sourced from entity images or AI generation, even when a user photo is available. The pipeline comment at this point even reads: *"All submitted images go into the article body — header is always DALL·E generated."* This is the line that needs to change.
+
+  ---
+
+  ### RSS Route — Image Priority Chain
+
+  When an RSS item is processed, the pipeline follows this priority order:
+
+  ```
+  1. Image scraped from the RSS feed (real source image — always prefer this)
+       ↓ if none
+  2. Entity page photo (real community photo)
+       ↓ if none
+  3. Entity library image
+       ↓ if none
+  4. AI-generated image from DALL-E asset library (fallback only)
+  ```
+
+  **If an image is scraped from the feed:**
+  - It becomes the article **header**
+  - It also appears **inline in the article body** (currently missing — body is empty for RSS articles)
+  - The same image is used on **Facebook and Instagram**
+  - No AI image is generated
+
+  **If no image is scraped:**
+  - Entity or AI fallback applies as before
+
+  > **Current behaviour (partially done):** RSS scraped images are already downloaded and used as the header — this part works. What's missing is that the scraped image is **not** currently added to `bodyImages`, so it doesn't appear inside the article body. This is the gap to fill.
+
+  ---
+
+  ### Social Media — Image Source
+
+  Both Facebook and Instagram pull the `headerImageUrl` field from the published post. Since the header is now always the best real image available, no separate social image logic is needed — the same image flows automatically to both platforms.
+
+  | Scenario | Header | Body | Facebook | Instagram |
+  |---|---|---|---|---|
+  | WhatsApp + image submitted | Submitted photo (watermarked) | All submitted photos | Submitted photo | Submitted photo |
+  | WhatsApp + no image | Entity or AI-generated | Empty or entity | AI-generated | AI-generated |
+  | RSS + image scraped | Scraped feed image | Scraped feed image | Scraped feed image | Scraped feed image |
+  | RSS + no image | Entity or AI-generated | Empty or entity | AI-generated | AI-generated |
+
+  ---
+
+  ### Watermarking
+
+  The WUT logo watermark (white, bottom-left, 28% image width) is applied to the header version of any image regardless of source — submitted, scraped, or AI-generated. This ensures brand consistency across the site and on social media without altering the original stored image.
+
+  ---
+
+  ### What Changes in the Pipeline
+
+  **WhatsApp pipeline — one change:**
+  - Move `bodyImagePaths[0]` (the first submitted image) into the header priority chain, above entity images
+  - All images including the first still go into `bodyImages` — no change there
+
+  **RSS pipeline — one change:**
+  - After downloading the scraped feed image and setting it as the header (`rssImagePath`), also push it into the post's `bodyImages` array so it appears inline in the article
+
+  **No schema changes required.** Both `headerImageUrl` and `bodyImages` fields already exist on the posts table.
 
   ---
 
