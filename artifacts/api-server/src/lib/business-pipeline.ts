@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { db } from "@workspace/db";
 import { submissionsTable, contributorsTable, businessesTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { downloadMedia, sendTextMessage } from "./whatsapp-client";
 import { logger } from "./logger";
 import { objectStorageClient } from "./objectStorage";
@@ -44,6 +44,64 @@ async function ensureUniqueSlug(base: string): Promise<string> {
     candidate = `${base}-${suffix}`;
     suffix++;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Deduplication: check for an existing business by slug, phone, or website
+// ---------------------------------------------------------------------------
+
+function normalisePhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  return phone.replace(/[\s\-().+]/g, "").replace(/^00353/, "0").replace(/^353/, "0");
+}
+
+function normaliseWebsite(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return url.toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+}
+
+interface DuplicateMatch {
+  id: number;
+  name: string;
+  slug: string;
+  status: string;
+  matchedOn: "name" | "phone" | "website";
+}
+
+async function findDuplicateBusiness(
+  slug: string,
+  phone: string | null,
+  website: string | null,
+): Promise<DuplicateMatch | null> {
+  // 1. Exact slug (name) match
+  const bySlug = await db
+    .select({ id: businessesTable.id, name: businessesTable.name, slug: businessesTable.slug, status: businessesTable.status })
+    .from(businessesTable)
+    .where(eq(businessesTable.slug, slug))
+    .limit(1);
+  if (bySlug.length > 0) return { ...bySlug[0], matchedOn: "name" };
+
+  // 2. Phone match (normalised)
+  const normPhone = normalisePhone(phone);
+  if (normPhone) {
+    const allWithPhone = await db
+      .select({ id: businessesTable.id, name: businessesTable.name, slug: businessesTable.slug, status: businessesTable.status, phone: businessesTable.phone })
+      .from(businessesTable);
+    const phoneMatch = allWithPhone.find((b) => normalisePhone(b.phone) === normPhone);
+    if (phoneMatch) return { id: phoneMatch.id, name: phoneMatch.name, slug: phoneMatch.slug, status: phoneMatch.status, matchedOn: "phone" };
+  }
+
+  // 3. Website match (normalised)
+  const normSite = normaliseWebsite(website);
+  if (normSite) {
+    const allWithSite = await db
+      .select({ id: businessesTable.id, name: businessesTable.name, slug: businessesTable.slug, status: businessesTable.status, website: businessesTable.website })
+      .from(businessesTable);
+    const siteMatch = allWithSite.find((b) => normaliseWebsite(b.website) === normSite);
+    if (siteMatch) return { id: siteMatch.id, name: siteMatch.name, slug: siteMatch.slug, status: siteMatch.status, matchedOn: "website" };
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +244,35 @@ export async function processBusinessListing(
 
   // --- Build slug ---
   const baseSlug = slugify(extracted.businessName);
-  const slug = await ensureUniqueSlug(baseSlug || `business-${submissionId}`);
+  // Note: we check against baseSlug (not ensureUniqueSlug yet) so we catch the existing record
+  const slug = baseSlug || `business-${submissionId}`;
+
+  // --- Deduplication check ---
+  const duplicate = await findDuplicateBusiness(slug, extracted.phone, extracted.website);
+  if (duplicate) {
+    logger.info({ submissionId, duplicateId: duplicate.id, matchedOn: duplicate.matchedOn }, "Business pipeline: duplicate detected — skipping insert");
+
+    const platformUrl = "https://whatsuptallaght.ie";
+    const isPending = duplicate.status === "pending_review";
+    const isRejected = duplicate.status === "rejected";
+
+    let message: string;
+    if (isRejected) {
+      message = `Hi! It looks like "${duplicate.name}" was already submitted to the WUT directory but wasn't approved. If you'd like to re-apply or have any questions, please reply here and we'll sort it out 👍`;
+    } else if (isPending) {
+      message = `Hi! "${duplicate.name}" has already been submitted to the WUT directory and is currently under review. We'll let you know as soon as it's live 👍`;
+    } else {
+      const listingUrl = `${platformUrl}/directory/${duplicate.slug}`;
+      message = `Hi! "${duplicate.name}" is already listed in the WUT Business Directory 🎉\n\nYou can see the listing here:\n${listingUrl}\n\nIf you'd like to update any details, just reply here and we'll help you out 👍`;
+    }
+
+    await sendTextMessage(phoneNumber, message).catch(() => {});
+    await db.update(submissionsTable).set({ status: "processed", updatedAt: new Date() }).where(eq(submissionsTable.id, submissionId));
+    return;
+  }
+
+  // --- Ensure unique slug (only needed if not a duplicate) ---
+  const uniqueSlug = await ensureUniqueSlug(slug);
 
   // --- Set expiry (1 year from now) ---
   const expiresAt = new Date();
@@ -196,7 +282,7 @@ export async function processBusinessListing(
   const [business] = await db
     .insert(businessesTable)
     .values({
-      slug,
+      slug: uniqueSlug,
       name: extracted.businessName,
       ownerName: extracted.ownerName,
       category: extracted.category,
@@ -216,7 +302,7 @@ export async function processBusinessListing(
     })
     .returning();
 
-  logger.info({ submissionId, businessId: business.id, slug }, "Business pipeline: record created (pending_review)");
+  logger.info({ submissionId, businessId: business.id, slug: uniqueSlug }, "Business pipeline: record created (pending_review)");
 
   // --- Mark submission as processed ---
   await db
