@@ -278,7 +278,7 @@ Tone options:
 - warning: A safety alert, scam warning, traffic notice, or urgent local notice.
 - memorial: A death notice, tribute, or announcement of passing.
 - personal_story: A first-person lived experience — addiction, grief, mental health, a personal testimony or plea for help. The person is sharing their own story, not reporting news. Use this when the submission is written in the first person about the contributor's own life.
-- business_listing: The sender is submitting their OWN business for listing in the community business directory. Signs: first-person ("I am", "we are", "my business", "my company"), provides contact details (phone, website, email), describes what they do as a service/trade/profession. NOT a news story about a business — this is self-promotion/registration.
+- business_listing: The sender is submitting a business or organisation for listing in the community directory. Signs: explicit phrases like "here is a local business", "I want to list my business", "can you add [business]", "list us in the directory"; OR first-person ("I am", "we are", "my business", "my company") with contact details (phone, website, email); OR third-person description of an organisation WITH contact details (phone number, website, address) clearly provided for listing purposes. NOT a news story about a business — this is a directory registration. When in doubt and contact details are present alongside a business description, prefer business_listing.
 - other: Does not fit any of the above.
 
 Categories available:
@@ -1457,6 +1457,25 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
 
   // --- Resolve categories from DB (used by tone classifier + matching) ---
   const allCategories = await db.select().from(categoriesTable);
+
+  // --- Business listing keyword pre-check (fast path, no AI needed) ---
+  // Catches clear signals before spending tokens on AI classification.
+  const BUSINESS_LISTING_PHRASES = [
+    /here is a local business/i,
+    /here's a local business/i,
+    /i want to (list|add|register|submit) (my |our |a )?business/i,
+    /list (my|our|a|this) business/i,
+    /add (my|our|a|this) business/i,
+    /add us to (the )?directory/i,
+    /list us in (the )?directory/i,
+    /can you (add|list|register|include) (my|our|a|this|the) (business|company|service|organisation|organization)/i,
+  ];
+  const isObviousBusinessListing = BUSINESS_LISTING_PHRASES.some((re) => re.test(combinedText));
+  if (isObviousBusinessListing) {
+    logger.info({ submissionId }, "AI pipeline: keyword pre-check matched business_listing — skipping AI classifier");
+    await processBusinessListing(openai, { submissionId, phoneNumber, contributorId, combinedText, mediaUrls });
+    return;
+  }
 
   // --- Stage 4: Tone classification ---
   logger.info({ submissionId }, "AI pipeline: classifying tone");
