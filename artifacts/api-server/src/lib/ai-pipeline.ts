@@ -278,7 +278,7 @@ Tone options:
 - warning: A safety alert, scam warning, traffic notice, or urgent local notice.
 - memorial: A death notice, tribute, or announcement of passing.
 - personal_story: A first-person lived experience — addiction, grief, mental health, a personal testimony or plea for help. The person is sharing their own story, not reporting news. Use this when the submission is written in the first person about the contributor's own life.
-- business_listing: The sender is submitting a business or organisation for listing in the community directory. Signs: explicit phrases like "here is a local business", "I want to list my business", "can you add [business]", "list us in the directory"; OR first-person ("I am", "we are", "my business", "my company") with contact details (phone, website, email); OR third-person description of an organisation WITH contact details (phone number, website, address) clearly provided for listing purposes. NOT a news story about a business — this is a directory registration. When in doubt and contact details are present alongside a business description, prefer business_listing.
+- business_listing: The sender is submitting a business or organisation for listing in the community directory. Signs: explicit phrases like "here is a local business", "I want to list my business", "can you add [business]", "list us in the directory"; OR first-person ("I am", "we are", "my business", "my company") with contact details (phone, website, email); OR third-person description of an organisation WITH contact details (phone number, website, email) clearly provided for listing purposes, e.g. "contact them through [email]", "their website is [url]", "their number is [phone]". CRITICAL: if the submission mainly describes what an organisation does plus provides contact details (email, website, phone) with NO news hook (no specific event, no recent development, no date), it is almost certainly a business_listing, NOT a community article. When in doubt and contact details are present, prefer business_listing.
 - other: Does not fit any of the above.
 
 Categories available:
@@ -1461,6 +1461,7 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   // --- Business listing keyword pre-check (fast path, no AI needed) ---
   // Catches clear signals before spending tokens on AI classification.
   const BUSINESS_LISTING_PHRASES = [
+    // Explicit directory submission phrases
     /here is a local business/i,
     /here's a local business/i,
     /i want to (list|add|register|submit) (my |our |a )?business/i,
@@ -1469,6 +1470,12 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
     /add us to (the )?directory/i,
     /list us in (the )?directory/i,
     /can you (add|list|register|include) (my|our|a|this|the) (business|company|service|organisation|organization)/i,
+    // "contact them/us through [email/site]" — classic directory-style description
+    /contact (them|us|me|him|her) (through|at|on|via)/i,
+    // "their/our website is ...", "their/our email is ...", "their/our number is ..."
+    /(their|our|my) (website|site|email|phone|number|tel) is /i,
+    // "you can reach them/us at ..."
+    /you can (reach|contact|find) (them|us|me) (at|on|through|via)/i,
   ];
   const isObviousBusinessListing = BUSINESS_LISTING_PHRASES.some((re) => re.test(combinedText));
   if (isObviousBusinessListing) {
