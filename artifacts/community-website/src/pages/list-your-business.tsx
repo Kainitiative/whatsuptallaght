@@ -10,10 +10,11 @@ import {
   MapPin,
   Image,
   Tag,
-  Zap,
   Facebook,
   ChevronDown,
   ChevronUp,
+  ArrowRight,
+  Flame,
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -71,6 +72,39 @@ const FAQS = [
   },
 ];
 
+const STEPS = [
+  {
+    n: "1",
+    icon: "💬",
+    title: "Send us your business on WhatsApp",
+    desc: "Tell us your name, what you do, your phone, website, and address. Attach your logo if you have one.",
+  },
+  {
+    n: "2",
+    icon: "✅",
+    title: "We review and create your listing",
+    desc: "Our team checks your details and builds your directory profile — usually within 24 hours.",
+  },
+  {
+    n: "3",
+    icon: "🌐",
+    title: "Your business goes live on our site",
+    desc: "You get your own page at whatsuptallaght.ie with your full details and a WhatsApp notification with the link.",
+  },
+  {
+    n: "4",
+    icon: "📣",
+    title: "We promote it on Facebook",
+    desc: "We post an introduction to the Tallaght community on our Facebook page so you get an immediate reach boost.",
+  },
+  {
+    n: "5",
+    icon: "🏠",
+    title: "Locals discover and contact you",
+    desc: "Tallaght residents searching for businesses like yours find you on the directory and get in touch.",
+  },
+];
+
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -95,20 +129,18 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   );
 }
 
-function WaButton({ size = "lg" }: { size?: "lg" | "sm" }) {
+function WaButton({ size = "lg", label }: { size?: "lg" | "sm"; label?: string }) {
   return (
     <a
       href={WA_LINK}
       target="_blank"
       rel="noopener noreferrer"
       className={`inline-flex items-center gap-3 bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold rounded-full transition-colors shadow-lg ${
-        size === "lg"
-          ? "px-8 py-4 text-lg"
-          : "px-6 py-3 text-base"
+        size === "lg" ? "px-8 py-4 text-lg" : "px-6 py-3 text-base"
       }`}
     >
       <MessageCircle className={size === "lg" ? "w-6 h-6" : "w-5 h-5"} />
-      List my business on WhatsApp
+      {label ?? "Get my business listed — free"}
     </a>
   );
 }
@@ -117,73 +149,96 @@ export default function ListYourBusinessPage() {
   return (
     <>
       <Helmet>
-        <title>List Your Business FREE — Tallaght Business Directory | What's Up Tallaght</title>
+        <title>Get Your Business Promoted in Tallaght — For Free | What's Up Tallaght</title>
         <meta
           name="description"
-          content="Add your Tallaght business to the WUT community directory for free. Just send us a WhatsApp. Go live within 24 hours and get an intro post on our Facebook page."
+          content="List your Tallaght business for free on What's Up Tallaght. Get your own page, a directory listing, and a Facebook intro post. Just send us a WhatsApp — no forms, no accounts."
         />
       </Helmet>
 
       <div className="w-full flex flex-col bg-background pb-20">
 
+        {/* ── Urgency banner ── */}
+        <div className="bg-amber-500 text-white text-sm font-semibold py-2.5 text-center flex items-center justify-center gap-2">
+          <Flame className="w-4 h-4 shrink-0" />
+          We're currently building out the Tallaght directory — early listings get the most visibility.
+        </div>
+
         {/* ── Hero ── */}
         <section className="bg-zinc-800 text-white py-20 md:py-28 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-700 opacity-80" />
-          <div className="container mx-auto px-4 text-center relative z-10 max-w-3xl flex flex-col items-center gap-7">
-            <div className="inline-flex items-center gap-2 bg-[#25D366]/20 text-[#25D366] text-sm font-semibold px-4 py-1.5 rounded-full">
-              <CheckCircle2 className="w-4 h-4" /> 100% Free · No Forms · Just WhatsApp
+          <div className="container mx-auto px-4 relative z-10 max-w-4xl flex flex-col md:flex-row items-center gap-12">
+
+            {/* Left: headline + benefits */}
+            <div className="flex-1 flex flex-col gap-6">
+              <div className="inline-flex items-center gap-2 bg-[#25D366]/20 text-[#25D366] text-sm font-semibold px-4 py-1.5 rounded-full w-fit">
+                <CheckCircle2 className="w-4 h-4" /> 100% Free
+              </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
+                Get Your Business<br />
+                Promoted in Tallaght<br />
+                <span className="text-[#25D366]">— For Free</span>
+              </h1>
+              <p className="text-white/70 text-base leading-relaxed">
+                Send us a WhatsApp with your business details and we'll:
+              </p>
+              <ul className="flex flex-col gap-3">
+                {[
+                  "Create your own page on What's Up Tallaght",
+                  "Add you to our local business directory",
+                  "Share your business on our Facebook page",
+                  "Help local people discover you",
+                ].map((b) => (
+                  <li key={b} className="flex items-start gap-3 text-white/90 text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-[#25D366] shrink-0 mt-0.5" />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-white/50 text-sm">No forms. No accounts. No hassle.</p>
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
-              List Your Business in the<br />
-              <span className="text-[#25D366]">Tallaght Community Directory</span>
-            </h1>
-            <p className="text-lg text-white/80 leading-relaxed max-w-xl">
-              Reach local residents who are actively looking for businesses like yours. Send us one WhatsApp message — we'll handle the rest.
-            </p>
-            <WaButton size="lg" />
-            <p className="text-white/50 text-sm">{WA_NUMBER} · Usually replies within a few hours</p>
+
+            {/* Right: CTA card */}
+            <div className="w-full md:w-80 bg-white/10 border border-white/20 backdrop-blur-sm rounded-2xl p-8 flex flex-col items-center gap-5 text-center shrink-0">
+              <div className="text-5xl">📲</div>
+              <p className="font-bold text-lg leading-snug">
+                Just send us a message on WhatsApp to get started
+              </p>
+              <WaButton size="lg" />
+              <p className="text-white/40 text-xs">{WA_NUMBER}<br />Usually replies within a few hours</p>
+            </div>
+
           </div>
         </section>
 
         {/* ── How it works ── */}
-        <section className="container mx-auto px-4 py-16 md:py-20 max-w-5xl">
+        <section className="container mx-auto px-4 py-16 md:py-20 max-w-3xl">
           <h2 className="text-3xl font-bold text-center mb-3">How it works</h2>
-          <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">
-            Three steps. No paperwork, no login, no waiting on hold.
+          <p className="text-center text-muted-foreground mb-12">
+            From WhatsApp message to local customers — in five steps.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                step: "1",
-                icon: <MessageCircle className="w-7 h-7 text-[#25D366]" />,
-                title: "Send us a WhatsApp",
-                desc: "Tell us your business name, what you do, your phone, website, address, and attach your logo if you have one.",
-              },
-              {
-                step: "2",
-                icon: <Zap className="w-7 h-7 text-yellow-500" />,
-                title: "We build your listing",
-                desc: "Our team reviews your submission and creates your directory profile — usually within 24 hours.",
-              },
-              {
-                step: "3",
-                icon: <Star className="w-7 h-7 text-primary" />,
-                title: "You go live",
-                desc: "Your listing goes live on the directory and we introduce your business to the Tallaght community on Facebook.",
-              },
-            ].map((s) => (
-              <Card key={s.step} className="relative border shadow-sm overflow-hidden">
-                <div className="absolute top-4 right-4 text-5xl font-black text-muted-foreground/10 select-none leading-none">
-                  {s.step}
-                </div>
-                <CardContent className="p-7 flex flex-col gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                    {s.icon}
+
+          <div className="flex flex-col gap-0">
+            {STEPS.map((s, i) => (
+              <div key={s.n} className="flex gap-5 items-start">
+                {/* Line + number */}
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-zinc-800 text-white flex items-center justify-center font-black text-sm shrink-0 z-10">
+                    {s.n}
                   </div>
-                  <h3 className="text-lg font-bold">{s.title}</h3>
+                  {i < STEPS.length - 1 && (
+                    <div className="w-0.5 flex-1 bg-border my-1 min-h-[2rem]" />
+                  )}
+                </div>
+                {/* Content */}
+                <div className={`pb-8 flex-1 ${i === STEPS.length - 1 ? "pb-0" : ""}`}>
+                  <div className="flex items-center gap-3 mb-1.5">
+                    <span className="text-2xl">{s.icon}</span>
+                    <h3 className="font-bold text-foreground">{s.title}</h3>
+                  </div>
                   <p className="text-muted-foreground text-sm leading-relaxed">{s.desc}</p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -205,7 +260,7 @@ export default function ListYourBusinessPage() {
                 { icon: <Tag className="w-5 h-5 text-primary" />, title: "Category & search", desc: "Listed under the right category and discoverable by search." },
                 { icon: <Facebook className="w-5 h-5 text-primary" />, title: "Facebook intro post", desc: "We post an intro to our Tallaght Facebook community when you go live." },
                 { icon: <Clock className="w-5 h-5 text-primary" />, title: "1-year listing", desc: "Your listing stays live for a full year. We remind you before it expires." },
-                { icon: <CheckCircle2 className="w-5 h-5 text-primary" />, title: "Free. Forever.", desc: "No hidden fees. No subscriptions. List your business at zero cost." },
+                { icon: <CheckCircle2 className="w-5 h-5 text-primary" />, title: "Free. Always.", desc: "No hidden fees. No subscriptions. List your business at zero cost." },
               ].map((item) => (
                 <div key={item.title} className="flex items-start gap-4 bg-card border rounded-xl p-5">
                   <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -242,10 +297,11 @@ export default function ListYourBusinessPage() {
 
         {/* ── Mid CTA ── */}
         <section className="bg-[#25D366]/10 border-y border-[#25D366]/20 py-14">
-          <div className="container mx-auto px-4 text-center max-w-xl flex flex-col items-center gap-5">
+          <div className="container mx-auto px-4 text-center max-w-xl flex flex-col items-center gap-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#25D366]">Early listings get the most visibility</p>
             <h2 className="text-2xl md:text-3xl font-bold">Ready to get listed?</h2>
             <p className="text-muted-foreground">
-              Send us one WhatsApp message. We'll do the rest.
+              Send us one WhatsApp. No forms, no accounts — we'll handle the rest.
             </p>
             <WaButton size="lg" />
           </div>
@@ -263,10 +319,10 @@ export default function ListYourBusinessPage() {
 
         {/* ── Browse existing ── */}
         <section className="container mx-auto px-4 pb-8 max-w-2xl text-center">
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm flex items-center justify-center gap-1.5">
             Want to see what the directory looks like first?{" "}
-            <Link href="/directory" className="text-primary font-medium hover:underline">
-              Browse the Tallaght Business Directory →
+            <Link href="/directory" className="text-primary font-medium hover:underline inline-flex items-center gap-1">
+              Browse the Tallaght Business Directory <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </p>
         </section>
@@ -274,9 +330,9 @@ export default function ListYourBusinessPage() {
         {/* ── Final CTA ── */}
         <section className="bg-zinc-800 text-white py-16">
           <div className="container mx-auto px-4 text-center max-w-xl flex flex-col items-center gap-6">
-            <h2 className="text-3xl font-bold">List your business today</h2>
+            <h2 className="text-3xl font-bold">Get your business in front of Tallaght</h2>
             <p className="text-white/70 leading-relaxed">
-              Join the Tallaght community directory. Free, fast, and as simple as sending a WhatsApp.
+              Free. Fast. As simple as sending a WhatsApp.
             </p>
             <WaButton size="lg" />
             <p className="text-white/40 text-sm">{WA_NUMBER}</p>
