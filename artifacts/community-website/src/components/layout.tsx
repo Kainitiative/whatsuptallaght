@@ -36,6 +36,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <Link href="/directory" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Directory
       </Link>
+      <Link href="/list-your-business" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
+        List Your Business
+      </Link>
       <Link href="/advertise" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Advertise
       </Link>
@@ -150,7 +153,8 @@ export function Layout({ children }: { children: ReactNode }) {
               <h4 className="font-semibold text-foreground">Partner</h4>
               <ul className="space-y-2">
                 <li><Link href="/advertise" className="text-muted-foreground hover:text-primary transition-colors text-sm">Advertise with us</Link></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">Local Business Directory</a></li>
+                <li><Link href="/directory" className="text-muted-foreground hover:text-primary transition-colors text-sm">Business Directory</Link></li>
+                <li><Link href="/list-your-business" className="text-muted-foreground hover:text-primary transition-colors text-sm">List Your Business</Link></li>
                 <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors text-sm">Submit a Story</Link></li>
               </ul>
             </div>
