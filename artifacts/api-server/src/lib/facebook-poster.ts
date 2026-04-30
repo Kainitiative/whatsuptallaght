@@ -255,7 +255,7 @@ export async function postBusinessToFacebook(business: {
     const pageToken = await resolvePageToken(pageId, storedToken);
     const base = (platformUrl ?? "https://whatsuptallaght.ie").replace(/\/$/, "");
     const directoryUrl = `${base}/directory/${business.slug}`;
-    const message = `${business.facebookPostText}\n\n${directoryUrl}`;
+    const message = `${business.facebookPostText}\n\n${directoryUrl}\n\n📲 Want to list your business? Send us a WhatsApp: https://wa.me/353894366696`;
 
     const absoluteLogoUrl = business.logoUrl
       ? business.logoUrl.startsWith("http")
