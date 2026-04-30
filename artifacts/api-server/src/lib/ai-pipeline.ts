@@ -1,4 +1,5 @@
 import OpenAI, { toFile } from "openai";
+import { processBusinessListing } from "./business-pipeline";
 import { applyWatermark } from "./watermark";
 import { postToFacebookPage } from "./facebook-poster";
 import { generateWeatherQuip, getWeatherForDate } from "../routes/weather";
@@ -245,7 +246,7 @@ Report: event name, date, time, venue, organiser, ticket price, and a brief desc
 // ---------------------------------------------------------------------------
 
 interface ToneResult {
-  tone: "news" | "event" | "sport" | "community" | "business" | "warning" | "memorial" | "personal_story" | "other";
+  tone: "news" | "event" | "sport" | "community" | "business" | "warning" | "memorial" | "personal_story" | "business_listing" | "other";
   suggestedCategory: string;
   confidence: number;
 }
@@ -277,6 +278,7 @@ Tone options:
 - warning: A safety alert, scam warning, traffic notice, or urgent local notice.
 - memorial: A death notice, tribute, or announcement of passing.
 - personal_story: A first-person lived experience — addiction, grief, mental health, a personal testimony or plea for help. The person is sharing their own story, not reporting news. Use this when the submission is written in the first person about the contributor's own life.
+- business_listing: The sender is submitting their OWN business for listing in the community business directory. Signs: first-person ("I am", "we are", "my business", "my company"), provides contact details (phone, website, email), describes what they do as a service/trade/profession. NOT a news story about a business — this is self-promotion/registration.
 - other: Does not fit any of the above.
 
 Categories available:
@@ -1459,6 +1461,21 @@ export async function processWhatsAppSubmission(payload: PipelinePayload & { job
   // --- Stage 4: Tone classification ---
   logger.info({ submissionId }, "AI pipeline: classifying tone");
   const toneResult = await classifyTone(openai, combinedText, ctx, allCategories);
+
+  // --- Business listing intercept ---
+  // If the sender is submitting their own business for the directory, route to
+  // the dedicated business pipeline instead of the news article pipeline.
+  if (toneResult.tone === "business_listing") {
+    logger.info({ submissionId }, "AI pipeline: routing to business listing pipeline");
+    await processBusinessListing(openai, {
+      submissionId,
+      phoneNumber,
+      contributorId,
+      combinedText,
+      mediaUrls,
+    });
+    return;
+  }
 
   // --- Stage 5: Information extraction ---
   logger.info({ submissionId }, "AI pipeline: extracting info");

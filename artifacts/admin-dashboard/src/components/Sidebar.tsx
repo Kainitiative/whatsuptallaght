@@ -17,6 +17,7 @@ const NAV = [
   { href: "/image-assets", label: "Image Library", icon: "🖼️" },
   { href: "/golden", label: "Golden Examples", icon: "⭐" },
   { href: "/usage", label: "AI Usage", icon: "📊" },
+  { href: "/directory", label: "Business Directory", icon: "🏪" },
   { href: "/contact-messages", label: "Contact Messages", icon: "✉️" },
   { href: "/newsletter", label: "Newsletter", icon: "📨" },
   { href: "/settings", label: "Settings", icon: "⚙️" },

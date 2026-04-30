@@ -231,3 +231,74 @@ export async function postToFacebookPage(post: {
     return { postId: null, errorDetail: `Unexpected error: ${detail}` };
   }
 }
+
+/**
+ * Posts a business directory listing introduction to the configured Facebook Page.
+ */
+export async function postBusinessToFacebook(business: {
+  name: string;
+  slug: string;
+  facebookPostText: string;
+  logoUrl?: string | null;
+}): Promise<FacebookPostResult> {
+  try {
+    const [pageId, storedToken, platformUrl] = await Promise.all([
+      getSettingValue("facebook_page_id"),
+      getSettingValue("facebook_page_access_token"),
+      getSettingValue("platform_url"),
+    ]);
+
+    if (!pageId || !storedToken) {
+      return { postId: null, errorDetail: "Facebook page ID or access token not configured in Settings." };
+    }
+
+    const pageToken = await resolvePageToken(pageId, storedToken);
+    const base = (platformUrl ?? "https://whatsuptallaght.ie").replace(/\/$/, "");
+    const directoryUrl = `${base}/directory/${business.slug}`;
+    const message = `${business.facebookPostText}\n\n${directoryUrl}`;
+
+    const absoluteLogoUrl = business.logoUrl
+      ? business.logoUrl.startsWith("http")
+        ? business.logoUrl
+        : `${base}${business.logoUrl}`
+      : null;
+
+    if (absoluteLogoUrl) {
+      const photoId = await uploadPhotoToFacebook(absoluteLogoUrl, pageId, pageToken);
+      if (photoId) {
+        const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            attached_media: [{ media_fbid: photoId }],
+            access_token: pageToken,
+          }),
+        });
+        const feedData = await feedRes.json() as { id?: string; error?: { message: string; code: number } };
+        if (feedRes.ok && !feedData.error && feedData.id) {
+          logger.info({ facebookPostId: feedData.id, slug: business.slug }, "Business posted to Facebook (photo post)");
+          return { postId: feedData.id };
+        }
+        logger.warn({ error: feedData.error, slug: business.slug }, "Business FB photo post failed, falling back");
+      }
+    }
+
+    const feedRes = await fetch(`${GRAPH_API_BASE}/${pageId}/feed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, access_token: pageToken }),
+    });
+    const feedData = await feedRes.json() as { id?: string; error?: { message: string; code: number } };
+    if (!feedRes.ok || feedData.error) {
+      const e = feedData.error;
+      return { postId: null, errorDetail: e ? `Facebook API error (code ${e.code}): ${e.message}` : `HTTP ${feedRes.status}` };
+    }
+    logger.info({ facebookPostId: feedData.id, slug: business.slug }, "Business posted to Facebook (text post)");
+    return { postId: feedData.id ?? null };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    logger.warn({ err }, "Business Facebook posting: unexpected error");
+    return { postId: null, errorDetail: `Unexpected error: ${detail}` };
+  }
+}

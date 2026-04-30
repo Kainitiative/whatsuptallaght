@@ -33,6 +33,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <Link href="/events" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Events
       </Link>
+      <Link href="/directory" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
+        Directory
+      </Link>
       <Link href="/advertise" className={`text-sm font-medium transition-colors ${dark ? "text-white/75 hover:text-white" : "text-foreground/70 hover:text-foreground"}`}>
         Advertise
       </Link>

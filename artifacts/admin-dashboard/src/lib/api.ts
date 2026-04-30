@@ -802,3 +802,54 @@ export async function removeEntityPageRelation(
 ): Promise<{ relatedPages: RelatedEntityPage[] }> {
   return request(`/admin/entity-pages/${id}/relations/${relatedId}`, { method: "DELETE" });
 }
+
+// ---------------------------------------------------------------------------
+// Business Directory
+// ---------------------------------------------------------------------------
+
+export interface AdminBusiness {
+  id: number;
+  slug: string;
+  name: string;
+  ownerName: string | null;
+  category: string;
+  subcategory: string | null;
+  description: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  address: string | null;
+  area: string | null;
+  logoUrl: string | null;
+  facebookPostId: string | null;
+  facebookPostText: string | null;
+  status: "pending_review" | "active" | "inactive" | "rejected";
+  isFeatured: boolean;
+  isSponsored: boolean;
+  sourceSubmissionId: number | null;
+  contributorId: number | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getAdminBusinesses(status?: string): Promise<AdminBusiness[]> {
+  const qs = status ? `?status=${status}` : "";
+  return request<AdminBusiness[]>(`/admin/businesses${qs}`);
+}
+
+export async function updateBusiness(id: number, data: Partial<AdminBusiness>): Promise<AdminBusiness> {
+  return request<AdminBusiness>(`/admin/businesses/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function approveBusiness(id: number): Promise<{ success: boolean; facebookPostId?: string | null }> {
+  return request<{ success: boolean; facebookPostId?: string | null }>(`/admin/businesses/${id}/approve`, { method: "POST" });
+}
+
+export async function rejectBusiness(id: number): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/admin/businesses/${id}/reject`, { method: "POST" });
+}
+
+export async function toggleBusinessFeature(id: number): Promise<{ isFeatured: boolean }> {
+  return request<{ isFeatured: boolean }>(`/admin/businesses/${id}/feature`, { method: "POST" });
+}

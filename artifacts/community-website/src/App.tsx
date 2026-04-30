@@ -21,6 +21,8 @@ import WhatsOnTallaghtPage from "@/pages/whats-on-tallaght";
 import PlacePage from "@/pages/place";
 import ContactPage from "@/pages/contact";
 import WeatherPage from "@/pages/weather";
+import DirectoryPage from "@/pages/directory";
+import BusinessProfilePage from "@/pages/business-profile";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +53,8 @@ function Router() {
         <Route path="/place/:slug" component={PlacePage} />
         <Route path="/contact" component={ContactPage} />
         <Route path="/weather" component={WeatherPage} />
+        <Route path="/directory/:slug" component={BusinessProfilePage} />
+        <Route path="/directory" component={DirectoryPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

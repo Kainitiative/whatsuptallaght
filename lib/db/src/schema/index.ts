@@ -16,3 +16,4 @@ export * from "./header-image-assets";
 export * from "./competitions";
 export * from "./entity-pages";
 export * from "./contact";
+export * from "./businesses";
