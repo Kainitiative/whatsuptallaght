@@ -368,18 +368,45 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
   let normalisedItems: NormalisedFeedItem[] = [];
 
   if (feedType === "eventbrite") {
-    const apiKey = await getSettingValue("eventbrite_api_key");
-    if (!apiKey) {
-      logger.warn({ feedId: feed.id, url: feed.url }, "RSS: Eventbrite feed skipped — no API key configured (add eventbrite_api_key in Settings)");
-      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
-      return;
-    }
+    // Eventbrite deprecated their public /v3/events/search/ endpoint — it now returns 404.
+    // Strategy: try the Eventbrite RSS feed first (?format=rss appended to the browse URL).
+    // If that fails (e.g. Eventbrite blocks it), fall back to the API with the stored key.
+    const rssUrl = feed.url.includes("?")
+      ? `${feed.url}&format=rss`
+      : `${feed.url}?format=rss`;
+
+    let rssSuccess = false;
     try {
-      normalisedItems = await fetchEventbriteApi(feed.url, apiKey);
-    } catch (err) {
-      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: failed to fetch Eventbrite via API");
-      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
-      return;
+      const parsed = await parser.parseURL(rssUrl);
+      const items = parsed.items ?? [];
+      normalisedItems = items.map((item) => ({
+        guid: (item.guid || item.id || item.link) as string,
+        title: (item.title ?? "").trim(),
+        content: ((item as any).contentEncoded || item.contentSnippet || item.content || item.summary || "").trim(),
+        link: item.link ?? "",
+        feedImageUrl: extractFeedImageUrl(item as Record<string, any>),
+        pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
+      })).filter((i) => !!i.guid);
+      rssSuccess = true;
+      logger.info({ feedId: feed.id, url: rssUrl, count: normalisedItems.length }, "RSS: Eventbrite RSS feed fetched successfully");
+    } catch (rssErr) {
+      logger.warn({ rssErr, feedId: feed.id, url: rssUrl }, "RSS: Eventbrite RSS failed — falling back to API");
+    }
+
+    if (!rssSuccess) {
+      const apiKey = await getSettingValue("eventbrite_api_key");
+      if (!apiKey) {
+        logger.warn({ feedId: feed.id, url: feed.url }, "RSS: Eventbrite feed skipped — RSS failed and no API key configured");
+        await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+        return;
+      }
+      try {
+        normalisedItems = await fetchEventbriteApi(feed.url, apiKey);
+      } catch (err) {
+        logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: Eventbrite API fallback also failed");
+        await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+        return;
+      }
     }
   } else if (feedType === "sdcc") {
     try {
