@@ -203,10 +203,10 @@ export default function CocaineSupportTallaghtPage() {
   return (
     <>
       <Helmet>
-        <title>Cocaine Awareness, Support & Recovery in Tallaght | What's Up Tallaght</title>
+        <title>Cocaine Support Tallaght | Recovery, Mental Health & Local Help</title>
         <meta
           name="description"
-          content="Information, local support services, and recovery resources for cocaine use and addiction in Tallaght, Dublin. Help exists. Recovery is possible."
+          content="Information on cocaine addiction, mental health, recovery, and support services in Tallaght including local help, family supports, and recovery pathways."
         />
       </Helmet>
 
