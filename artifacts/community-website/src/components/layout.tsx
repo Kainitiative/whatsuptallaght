@@ -156,6 +156,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 <li><Link href="/directory" className="text-muted-foreground hover:text-primary transition-colors text-sm">Business Directory</Link></li>
                 <li><Link href="/list-your-business" className="text-muted-foreground hover:text-primary transition-colors text-sm">List Your Business</Link></li>
                 <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors text-sm">Submit a Story</Link></li>
+                <li><Link href="/cocaine-support-tallaght" className="text-muted-foreground hover:text-primary transition-colors text-sm">Addiction Support</Link></li>
               </ul>
             </div>
           </div>
