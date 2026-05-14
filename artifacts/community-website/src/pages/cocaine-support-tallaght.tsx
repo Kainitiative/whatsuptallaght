@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { Link } from "wouter";
 import {
   AlertTriangle,
   Phone,
@@ -391,6 +392,23 @@ export default function CocaineSupportTallaghtPage() {
                 <a href="tel:112" className="bg-red-600 text-white font-bold px-5 py-2.5 rounded-lg text-sm hover:bg-red-700 transition-colors">Call 112</a>
               </div>
             </div>
+          </div>
+
+          {/* Link to supporting page */}
+          <div className="mt-6 bg-purple-50 border border-purple-200 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-purple-600 mb-1">Supporting Resource</p>
+              <h3 className="font-bold text-purple-900 text-lg mb-1">Cocaine Psychosis & Brain Effects</h3>
+              <p className="text-purple-800 text-sm leading-relaxed">
+                A deeper look at how cocaine affects the brain, why sleep deprivation matters, how paranoia develops, and what the research says about long-term cognitive effects.
+              </p>
+            </div>
+            <Link
+              href="/cocaine-psychosis-brain-effects"
+              className="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-3 rounded-xl transition-colors shrink-0 text-sm"
+            >
+              Read more <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </section>
 

@@ -25,6 +25,7 @@ import DirectoryPage from "@/pages/directory";
 import BusinessProfilePage from "@/pages/business-profile";
 import ListYourBusinessPage from "@/pages/list-your-business";
 import CocaineSupportTallaghtPage from "@/pages/cocaine-support-tallaght";
+import CocainePsychosisBrainEffectsPage from "@/pages/cocaine-psychosis-brain-effects";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +60,7 @@ function Router() {
         <Route path="/directory" component={DirectoryPage} />
         <Route path="/list-your-business" component={ListYourBusinessPage} />
         <Route path="/cocaine-support-tallaght" component={CocaineSupportTallaghtPage} />
+        <Route path="/cocaine-psychosis-brain-effects" component={CocainePsychosisBrainEffectsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
