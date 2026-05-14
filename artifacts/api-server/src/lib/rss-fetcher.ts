@@ -231,31 +231,129 @@ interface NormalisedFeedItem {
 }
 
 // ---------------------------------------------------------------------------
-// Eventbrite API client — replaces the old HTML scraper (blocked by Eventbrite)
-// Extracts the search term from the feed URL and queries the official API.
-// e.g. https://www.eventbrite.ie/d/ireland--dublin/tallaght/ → q="tallaght"
+// Ticketmaster Discovery API client
+// Replaces the Eventbrite integration — Eventbrite blocked all server-side
+// access (WAF CAPTCHA on RSS, deprecated search API endpoint).
+// Ticketmaster Discovery API is free up to 5,000 calls/day with no bot blocking.
+//
+// Feed URL format stored in DB:
+//   https://app.ticketmaster.com/discovery/v2/events.json?keyword=tallaght&countryCode=IE
+// The apikey param is added at runtime from platform_settings.
 // ---------------------------------------------------------------------------
 
-interface EventbriteApiResponse {
-  events?: EventbriteEvent[];
-  pagination?: { page_count: number; page_number: number };
+interface TmResponse {
+  _embedded?: { events?: TmEvent[] };
+  page?: { totalElements: number };
 }
 
-interface EventbriteEvent {
+interface TmEvent {
   id?: string;
+  name?: string;
   url?: string;
-  name?: { text?: string };
-  description?: { text?: string };
-  summary?: string;
-  start?: { local?: string; utc?: string };
-  end?: { local?: string; utc?: string };
-  logo?: { url?: string };
-  is_free?: boolean;
-  venue?: {
-    name?: string;
-    address?: { address_1?: string; city?: string };
+  dates?: {
+    start?: { localDate?: string; localTime?: string; dateTime?: string };
+    end?: { localDate?: string; localTime?: string };
   };
-  organizer?: { name?: string };
+  images?: { url?: string; width?: number; height?: number; ratio?: string }[];
+  _embedded?: {
+    venues?: {
+      name?: string;
+      address?: { line1?: string };
+      city?: { name?: string };
+    }[];
+  };
+  priceRanges?: { min?: number; max?: number; currency?: string }[];
+  classifications?: { segment?: { name?: string }; genre?: { name?: string } }[];
+  info?: string;
+  pleaseNote?: string;
+}
+
+function buildTicketmasterContent(ev: TmEvent): NormalisedFeedItem {
+  const link = ev.url ?? "";
+  const title = ev.name ?? "";
+
+  const startLocal = ev.dates?.start?.localDate;
+  const startTime = ev.dates?.start?.localTime;
+  let dateLine = "";
+  if (startLocal) {
+    try {
+      const dt = new Date(`${startLocal}T${startTime ?? "00:00:00"}`);
+      const dateStr = dt.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      const timeStr = startTime ? dt.toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", hour12: true }) : "";
+      dateLine = timeStr ? `${dateStr} at ${timeStr}` : dateStr;
+    } catch {
+      dateLine = startLocal;
+    }
+  }
+
+  const venue = ev._embedded?.venues?.[0];
+  const venueName = venue?.name ?? "";
+  const venueCity = venue?.city?.name ?? "";
+  const venueAddr = venue?.address?.line1 ?? "";
+  const venueStr = [venueName, venueAddr, venueCity].filter(Boolean).join(", ");
+
+  const price = ev.priceRanges?.[0];
+  const priceStr = price
+    ? `${price.currency ?? "EUR"} ${price.min ?? ""}${price.max && price.max !== price.min ? `–${price.max}` : ""}`
+    : "";
+
+  const genre = ev.classifications?.[0]?.genre?.name ?? ev.classifications?.[0]?.segment?.name ?? "";
+  const notes = [ev.info, ev.pleaseNote].filter(Boolean).join(" ");
+
+  const parts = [
+    dateLine   ? `Date/Time: ${dateLine}`   : "",
+    venueStr   ? `Venue: ${venueStr}`       : "",
+    priceStr   ? `Price: ${priceStr}`       : "",
+    genre      ? `Category: ${genre}`       : "",
+    link       ? `Tickets/More info: ${link}` : "",
+    notes      ? `\n${notes}`              : "",
+  ].filter(Boolean);
+
+  // Best image: prefer 16_9 ratio at largest size
+  const bestImg = (ev.images ?? [])
+    .filter((i) => i.url)
+    .sort((a, b) => (b.width ?? 0) - (a.width ?? 0))
+    .find((i) => i.ratio === "16_9") ?? ev.images?.[0];
+
+  const pubDate = startLocal
+    ? new Date(`${startLocal}T${startTime ?? "00:00:00"}`)
+    : new Date();
+
+  return {
+    guid: `ticketmaster-${ev.id ?? link}`,
+    title,
+    content: parts.join("\n"),
+    link,
+    feedImageUrl: bestImg?.url ?? null,
+    pubDate,
+  };
+}
+
+async function fetchTicketmasterEvents(feedUrl: string, apiKey: string): Promise<NormalisedFeedItem[]> {
+  const base = new URL(feedUrl);
+  base.searchParams.set("apikey", apiKey);
+  base.searchParams.set("size", "50");
+  base.searchParams.set("sort", "date,asc");
+  base.searchParams.set("startDateTime", new Date().toISOString().replace(/\.\d{3}Z$/, "Z"));
+
+  const res = await fetch(base.toString(), {
+    headers: { "Accept": "application/json" },
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Ticketmaster API error ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = await res.json() as TmResponse;
+  const events = data._embedded?.events ?? [];
+  const items = events
+    .filter((ev) => ev.url && ev.name)
+    .map(buildTicketmasterContent);
+
+  logger.info({ feedUrl, count: items.length }, "RSS: Ticketmaster events fetched");
+  return items;
 }
 
 function buildEventContent(ev: EventbriteEvent): { title: string; content: string; link: string; feedImageUrl: string | null; pubDate: Date; guid: string } {
@@ -367,46 +465,22 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
   const feedType: string = (feed as any).feedType ?? "rss";
   let normalisedItems: NormalisedFeedItem[] = [];
 
-  if (feedType === "eventbrite") {
-    // Eventbrite deprecated their public /v3/events/search/ endpoint — it now returns 404.
-    // Strategy: try the Eventbrite RSS feed first (?format=rss appended to the browse URL).
-    // If that fails (e.g. Eventbrite blocks it), fall back to the API with the stored key.
-    const rssUrl = feed.url.includes("?")
-      ? `${feed.url}&format=rss`
-      : `${feed.url}?format=rss`;
-
-    let rssSuccess = false;
-    try {
-      const parsed = await parser.parseURL(rssUrl);
-      const items = parsed.items ?? [];
-      normalisedItems = items.map((item) => ({
-        guid: (item.guid || item.id || item.link) as string,
-        title: (item.title ?? "").trim(),
-        content: ((item as any).contentEncoded || item.contentSnippet || item.content || item.summary || "").trim(),
-        link: item.link ?? "",
-        feedImageUrl: extractFeedImageUrl(item as Record<string, any>),
-        pubDate: item.pubDate ? new Date(item.pubDate) : new Date(),
-      })).filter((i) => !!i.guid);
-      rssSuccess = true;
-      logger.info({ feedId: feed.id, url: rssUrl, count: normalisedItems.length }, "RSS: Eventbrite RSS feed fetched successfully");
-    } catch (rssErr) {
-      logger.warn({ rssErr, feedId: feed.id, url: rssUrl }, "RSS: Eventbrite RSS failed — falling back to API");
+  if (feedType === "ticketmaster" || feedType === "eventbrite") {
+    // Eventbrite is fully blocked (WAF CAPTCHA on RSS, deprecated API search endpoint).
+    // All event feeds now route through the Ticketmaster Discovery API.
+    // Feeds with type "eventbrite" are automatically migrated to use Ticketmaster.
+    const apiKey = await getSettingValue("ticketmaster_api_key");
+    if (!apiKey) {
+      logger.warn({ feedId: feed.id, url: feed.url }, "RSS: Ticketmaster feed skipped — no ticketmaster_api_key in Settings. Get a free key at developer.ticketmaster.com");
+      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      return;
     }
-
-    if (!rssSuccess) {
-      const apiKey = await getSettingValue("eventbrite_api_key");
-      if (!apiKey) {
-        logger.warn({ feedId: feed.id, url: feed.url }, "RSS: Eventbrite feed skipped — RSS failed and no API key configured");
-        await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
-        return;
-      }
-      try {
-        normalisedItems = await fetchEventbriteApi(feed.url, apiKey);
-      } catch (err) {
-        logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: Eventbrite API fallback also failed");
-        await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
-        return;
-      }
+    try {
+      normalisedItems = await fetchTicketmasterEvents(feed.url, apiKey);
+    } catch (err) {
+      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: Ticketmaster fetch failed");
+      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      return;
     }
   } else if (feedType === "sdcc") {
     try {

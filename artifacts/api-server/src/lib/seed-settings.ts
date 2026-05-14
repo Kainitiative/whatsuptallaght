@@ -252,24 +252,28 @@ const SETTINGS: Omit<typeof platformSettingsTable.$inferInsert, "id">[] = [
     displayOrder: 32,
   },
 
-  // ── Eventbrite ────────────────────────────────────────────────────────────────
+  // ── Events (Ticketmaster) ─────────────────────────────────────────────────────
+  // Note: Eventbrite was replaced — they blocked all server-side access (WAF
+  // CAPTCHA on RSS feeds, deprecated public search API endpoint).
+  // Ticketmaster Discovery API is free, covers Ireland, and has no bot blocking.
 
   {
-    key: "eventbrite_api_key",
-    label: "Eventbrite API Key",
+    key: "ticketmaster_api_key",
+    label: "Ticketmaster API Key",
     description:
-      "Your personal Eventbrite API key. This allows the platform to fetch local events directly from Eventbrite " +
-      "instead of scraping the website (which Eventbrite blocks). " +
-      "Events are pulled automatically based on the search terms in each Eventbrite feed URL in RSS Feeds. " +
+      "A free API key from the Ticketmaster Developer Portal. This powers all event feeds — " +
+      "concerts, sports, theatre, family events and more happening in and around Tallaght. " +
       "\n\n" +
-      "HOW TO GET YOUR KEY:\n" +
-      "Step 1 — Go to eventbrite.com/platform/api-keys and sign in.\n" +
-      "Step 2 — Your private token is shown on the page — copy it.\n" +
-      "Step 3 — Paste it here and save.\n" +
+      "HOW TO GET YOUR FREE KEY:\n" +
+      "Step 1 — Go to developer.ticketmaster.com and click 'Get your API key'.\n" +
+      "Step 2 — Sign up for a free account.\n" +
+      "Step 3 — Create a new app — name it anything, e.g. 'Tallaght Community Platform'.\n" +
+      "Step 4 — Your Consumer Key (API key) is shown immediately on the app page.\n" +
+      "Step 5 — Paste it here and save.\n" +
       "\n" +
-      "Once saved, all Eventbrite feeds will automatically switch to using the API.",
-    helpUrl: "https://www.eventbrite.com/platform/api-keys",
-    category: "eventbrite",
+      "Free tier: 5,000 API calls per day — far more than this platform needs. No credit card required.",
+    helpUrl: "https://developer.ticketmaster.com/products-and-docs/apis/getting-started/",
+    category: "events",
     isSecret: true,
     isRequired: false,
     isConfigured: false,
