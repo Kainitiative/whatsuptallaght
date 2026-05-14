@@ -469,7 +469,14 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
     // Eventbrite is fully blocked (WAF CAPTCHA on RSS, deprecated API search endpoint).
     // All event feeds now route through the Ticketmaster Discovery API.
     // Feeds with type "eventbrite" are automatically migrated to use Ticketmaster.
-    const apiKey = await getSettingValue("ticketmaster_api_key");
+    let apiKey: string | null = null;
+    try {
+      apiKey = await getSettingValue("ticketmaster_api_key");
+    } catch (keyErr) {
+      logger.warn({ keyErr, feedId: feed.id }, "RSS: Ticketmaster feed skipped — could not read API key (decryption error)");
+      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      return;
+    }
     if (!apiKey) {
       logger.warn({ feedId: feed.id, url: feed.url }, "RSS: Ticketmaster feed skipped — no ticketmaster_api_key in Settings. Get a free key at developer.ticketmaster.com");
       await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
@@ -478,8 +485,16 @@ async function fetchFeed(feed: typeof rssFeedsTable.$inferSelect): Promise<void>
     try {
       normalisedItems = await fetchTicketmasterEvents(feed.url, apiKey);
     } catch (err) {
-      logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: Ticketmaster fetch failed");
-      await db.update(rssFeedsTable).set({ lastFetchedAt: new Date() }).where(eq(rssFeedsTable.id, feed.id));
+      const msg = err instanceof Error ? err.message : String(err);
+      // 401 = key not yet active or invalid. Back off for 60 min to avoid log spam.
+      const backoffMinutes = msg.includes("401") ? 60 : 15;
+      const backoffTs = new Date(Date.now() - (feed.checkIntervalMinutes - backoffMinutes) * 60 * 1000);
+      if (msg.includes("401")) {
+        logger.warn({ feedId: feed.id }, `RSS: Ticketmaster API key rejected (401) — key not yet activated or invalid. Backing off ${backoffMinutes} min. Check developer.ticketmaster.com`);
+      } else {
+        logger.error({ err, feedId: feed.id, url: feed.url }, "RSS: Ticketmaster fetch failed");
+      }
+      await db.update(rssFeedsTable).set({ lastFetchedAt: backoffTs }).where(eq(rssFeedsTable.id, feed.id));
       return;
     }
   } else if (feedType === "sdcc") {
