@@ -46,7 +46,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/contact-messages": "Contact Messages",
   "/newsletter": "Newsletter",
   "/directory": "Business Directory",
-  "/pillar-pages": "Pillar Pages",
+  "/pillar-pages": "Kent Engine",
   "/settings": "Settings",
 };
 

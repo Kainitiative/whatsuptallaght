@@ -74,20 +74,23 @@ export default function PillarPages() {
   return (
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Pillar Pages</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-2xl">🗞️</span>
+          <h1 className="text-2xl font-bold text-foreground">Kent Engine</h1>
+          <span className="text-xs font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full tracking-wide uppercase">Pillar Desk</span>
+        </div>
         <p className="text-muted-foreground text-sm mt-1">
-          Generate a community news article for any pillar page. Articles are saved as{" "}
-          <span className="font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">drafts</span>{" "}
-          — review and publish from the Review Queue.
+          Assign a story brief to Kent — he'll research it, write a draft, and leave it on your desk.{" "}
+          <span className="font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">Nothing goes to print until you say so.</span>
         </p>
       </div>
 
       {loading && (
-        <div className="text-muted-foreground text-sm">Loading pillar pages…</div>
+        <div className="text-muted-foreground text-sm">Loading the Pillar Desk…</div>
       )}
 
       {!loading && pillars && pillars.length === 0 && (
-        <div className="text-muted-foreground text-sm">No pillar pages configured.</div>
+        <div className="text-muted-foreground text-sm">No stories assigned to the Pillar Desk.</div>
       )}
 
       <div className="space-y-5">
@@ -121,38 +124,38 @@ export default function PillarPages() {
                   {state.status === "idle" || state.status === "error" ? (
                     <button
                       onClick={() => generate(pillar)}
-                      className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors"
+                      className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors"
                     >
-                      ✨ Generate Article
+                      ✏️ Assign to Kent
                     </button>
                   ) : state.status === "generating" ? (
                     <button
                       disabled
-                      className="inline-flex items-center gap-2 bg-purple-400 text-white font-semibold px-5 py-2.5 rounded-lg text-sm cursor-not-allowed"
+                      className="inline-flex items-center gap-2 bg-slate-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm cursor-not-allowed"
                     >
                       <span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
-                      Writing article…
+                      Kent is on it…
                     </button>
                   ) : state.status === "done" ? (
                     <button
                       onClick={() => generate(pillar)}
                       className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors"
                     >
-                      ↻ Regenerate
+                      ↻ Reassign to Kent
                     </button>
                   ) : null}
                 </div>
               </div>
 
-              {/* Key points */}
+              {/* Story brief */}
               <div className="px-6 py-4 bg-slate-50 border-b border-border">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  Key points the article will cover
+                  Story brief Kent will follow
                 </p>
                 <ul className="grid sm:grid-cols-2 gap-1">
                   {pillar.keyPoints.map((point) => (
                     <li key={point} className="flex items-start gap-2 text-xs text-slate-600">
-                      <span className="text-purple-400 mt-0.5">•</span>
+                      <span className="text-slate-400 mt-0.5">•</span>
                       {point}
                     </li>
                   ))}
@@ -162,8 +165,8 @@ export default function PillarPages() {
               {/* Result area */}
               {state.status === "generating" && (
                 <div className="px-6 py-6 flex items-center gap-3 text-sm text-muted-foreground">
-                  <span className="animate-spin inline-block w-5 h-5 border-2 border-purple-200 border-t-purple-600 rounded-full" />
-                  AI is writing the article — this takes about 15 seconds…
+                  <span className="animate-spin inline-block w-5 h-5 border-2 border-slate-200 border-t-slate-600 rounded-full" />
+                  Kent is at his desk — researching and writing this one. About 15 seconds…
                 </div>
               )}
 
@@ -181,7 +184,7 @@ export default function PillarPages() {
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <div>
                         <span className="text-xs font-semibold text-green-700 uppercase tracking-wider">
-                          ✅ Draft saved
+                          📋 Kent filed a draft
                         </span>
                         <h3 className="font-semibold text-foreground mt-1 text-base">
                           {state.result.post.title}
@@ -222,14 +225,15 @@ export default function PillarPages() {
         })}
       </div>
 
-      {/* How it works */}
+      {/* How the newsroom works */}
       <div className="mt-10 bg-slate-50 border border-border rounded-xl p-6">
-        <h3 className="font-semibold text-foreground mb-3">How it works</h3>
+        <h3 className="font-semibold text-foreground mb-1">How the Pillar Desk works</h3>
+        <p className="text-xs text-muted-foreground mb-4">Kent works quietly in the background. You make every editorial call.</p>
         <ol className="space-y-2 text-sm text-muted-foreground">
-          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">1.</span> Click "Generate Article" — the AI writes a ~450-word community news article based on the pillar page content.</li>
-          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">2.</span> The article is saved as a <span className="font-medium text-amber-700">draft</span> and appears in the Review Queue for you to check before publishing.</li>
-          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">3.</span> Publishing the draft automatically posts it to Facebook and generates social captions.</li>
-          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">4.</span> You can regenerate as many times as you like — each run creates a new draft.</li>
+          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">1.</span> Click "Assign to Kent" — he reads the story brief and writes a ~450-word community article in WUT's voice.</li>
+          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">2.</span> Kent files it as a <span className="font-medium text-amber-700">draft</span> — it lands in the Review Queue for you to read before anything goes live.</li>
+          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">3.</span> When you publish, it automatically posts to Facebook and generates social captions.</li>
+          <li className="flex items-start gap-2"><span className="font-bold text-foreground shrink-0">4.</span> Not happy with the draft? Reassign to Kent — each run creates a fresh version.</li>
         </ol>
       </div>
     </div>
