@@ -15,6 +15,7 @@ const NAV = [
   { href: "/entity-pages", label: "Entity Pages", icon: "📄" },
   { href: "/competitions", label: "Competitions", icon: "🏆" },
   { href: "/image-assets", label: "Image Library", icon: "🖼️" },
+  { href: "/pillar-pages", label: "Pillar Pages", icon: "🏛️" },
   { href: "/golden", label: "Golden Examples", icon: "⭐" },
   { href: "/usage", label: "AI Usage", icon: "📊" },
   { href: "/directory", label: "Business Directory", icon: "🏪" },

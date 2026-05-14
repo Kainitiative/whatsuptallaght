@@ -22,6 +22,7 @@ import EntityPageEdit from "@/pages/EntityPageEdit";
 import ContactMessages from "@/pages/ContactMessages";
 import NewsletterSubscribers from "@/pages/NewsletterSubscribers";
 import BusinessDirectory from "@/pages/BusinessDirectory";
+import PillarPages from "@/pages/PillarPages";
 import { Menu } from "lucide-react";
 
 const queryClient = new QueryClient({
@@ -45,6 +46,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/contact-messages": "Contact Messages",
   "/newsletter": "Newsletter",
   "/directory": "Business Directory",
+  "/pillar-pages": "Pillar Pages",
   "/settings": "Settings",
 };
 
@@ -98,6 +100,7 @@ function ProtectedLayout() {
             <Route path="/contact-messages" component={ContactMessages} />
             <Route path="/newsletter" component={NewsletterSubscribers} />
             <Route path="/directory" component={BusinessDirectory} />
+            <Route path="/pillar-pages" component={PillarPages} />
             <Route path="/settings" component={Settings} />
             <Route>
               <div className="p-8">
